@@ -1,0 +1,153 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # Execução manual: compila e publica os artefatos do run, mas NÃO cria release.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+          - name: windows
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Resolver versão e validar tag
+        id: meta
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME difere da versão do package.json (v$VERSION)"
+            exit 1
+          fi
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint src
+
+      - name: Testes
+        run: npm test
+
+      - name: Migrations Drizzle consistentes
+        run: npm run db:check
+
+      # ---------- Linux: AppImage + linux-unpacked ----------
+      - name: Build Linux
+        if: matrix.name == 'linux'
+        run: npm run dist:linux
+
+      - name: Smoke test Linux (binário desempacotado + libsql + migrations)
+        if: matrix.name == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          timeout 20 xvfb-run -a dist/linux-unpacked/bakasub --no-sandbox || true
+          grep -q "database ready" "$HOME/.config/bakasub/logs/main.log"
+
+      - name: Empacotar Linux
+        if: matrix.name == 'linux'
+        shell: bash
+        run: |
+          mkdir release
+          cp "dist/bakasub-${{ steps.meta.outputs.version }}.AppImage" release/
+          # tar preserva o bit de execução (zip não preserva).
+          tar -czf "release/bakasub-${{ steps.meta.outputs.version }}-linux-x64-unpacked.tar.gz" -C dist linux-unpacked
+
+      # ---------- Windows: instalador NSIS + win-unpacked ----------
+      - name: Build Windows
+        if: matrix.name == 'windows'
+        run: npm run dist:win
+
+      - name: Smoke test Windows (binário desempacotado + libsql + migrations)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist/win-unpacked/bakasub.exe" -PassThru
+          Start-Sleep -Seconds 20
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          $log = Join-Path $env:APPDATA "bakasub/logs/main.log"
+          if (-not (Select-String -Path $log -Pattern "database ready" -Quiet)) {
+            Get-Content $log -ErrorAction SilentlyContinue
+            throw "O app não inicializou o banco (libsql/migrations)"
+          }
+
+      - name: Empacotar Windows
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Name release | Out-Null
+          Copy-Item "dist/bakasub-${{ steps.meta.outputs.version }}-setup.exe" release/
+          Compress-Archive -Path "dist/win-unpacked" -DestinationPath "release/bakasub-${{ steps.meta.outputs.version }}-win-x64-unpacked.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publicar release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Conferir os 4 artefatos esperados
+        shell: bash
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          for f in "bakasub-$V.AppImage" "bakasub-$V-setup.exe" \
+                   "bakasub-$V-linux-x64-unpacked.tar.gz" "bakasub-$V-win-x64-unpacked.zip"; do
+            test -s "release/$f" || { echo "::error::Faltando $f"; exit 1; }
+          done
+
+      - name: Gerar SHA256SUMS
+        shell: bash
+        working-directory: release
+        run: sha256sum bakasub-* > SHA256SUMS.txt
+
+      - name: Criar release (rascunho)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""; [[ "$GITHUB_REF_NAME" == *-* ]] && PRE="--prerelease"
+          # Rascunho: revise e publique manualmente na UI do GitHub.
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "BakaSub $GITHUB_REF_NAME" \
+            --generate-notes --draft $PRE

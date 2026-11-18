@@ -1,0 +1,44 @@
+appId: com.bakasub.app
+productName: BakaSub
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  # Binários nativos do libsql não podem ser carregados de dentro do asar.
+  - '**/node_modules/{libsql,@libsql,7zip-bin}/**'
+extraResources:
+  # Migrations Drizzle lidas em runtime via process.resourcesPath/drizzle (ver config/paths.ts).
+  - from: drizzle
+    to: drizzle
+  - from: resources
+    to: resources
+# Sidecars (ffmpeg/mkvtoolnix) NÃO são empacotados: baixados em userData/bin via manifest remoto.
+npmRebuild: false
+win:
+  files:
+    - '!**/node_modules/7zip-bin/{linux,mac}/**'
+    - '!**/node_modules/7zip-bin/win/{arm64,ia32}/**'
+    - '!**/node_modules/@libsql/{darwin-*,linux-*}/**'
+  executableName: bakasub
+  target: nsis
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+linux:
+  files:
+    - '!**/node_modules/7zip-bin/{win,mac}/**'
+    - '!**/node_modules/7zip-bin/linux/{arm,arm64,ia32}/**'
+    - '!**/node_modules/@libsql/{win32-*,darwin-*}/**'
+  target:
+    - AppImage
+    # deb exige `homepage` no package.json; adicione e reative: - deb
+  syncDesktopName: true
+  maintainer: BakaSub
+  category: AudioVideo
+appImage:
+  artifactName: ${name}-${version}.${ext}
