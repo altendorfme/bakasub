@@ -8,6 +8,7 @@ import { JobRepository } from '../database/repositories/job.repository'
 import { openTestDatabase } from '../database/test-db'
 import { AppError } from '../errors'
 import type { Artifacts } from './artifacts'
+import { currentJobId } from '../logging/job-context'
 import { JobManager } from './job-manager'
 import { StepFailure, type RunHooks, type RunOutcome } from './job-runner'
 import type { JobSpec } from './job-spec'
@@ -18,6 +19,8 @@ interface Pending {
   hooks: RunHooks
   resolve(o: RunOutcome): void
   reject(e: unknown): void
+  /** Job id visible to logging while the runner runs. */
+  logJobId: string | undefined
 }
 
 let t: Awaited<ReturnType<typeof openTestDatabase>>
@@ -59,7 +62,7 @@ beforeEach(async () => {
       run: (input, hooks) =>
         new Promise<RunOutcome>((resolve, reject) => {
           const id = input.workDir.split('/').pop()!
-          pending.push({ id, input, hooks, resolve, reject })
+          pending.push({ id, input, hooks, resolve, reject, logJobId: currentJobId() })
           hooks.signal.addEventListener('abort', () =>
             reject(
               new StepFailure('translate', new AppError('CANCELLED', 'x'), {
@@ -98,6 +101,7 @@ describe('JobManager', () => {
     await until(() => pending.length === 1)
     expect(pending).toHaveLength(1)
     expect((await manager.get('job-1')).status).toBe('running')
+    expect(pending[0].logJobId).toBe('job-1')
     expect(existsSync(join(workRoot, 'job-1'))).toBe(true)
     done(pending[0])
     await until(async () => (await manager.get('job-1')).status === 'completed')

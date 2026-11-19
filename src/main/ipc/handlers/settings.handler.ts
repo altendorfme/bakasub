@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ApiKeyStatus } from '../../../shared/ipc-contract'
 import type { PreferencesService } from '../../settings/preferences.service'
 import type { SecretVault } from '../../settings/secret-vault'
+import { redactor } from '../../logging/logger'
 import { createHandler } from '../create-handler'
 
 const apiKeyInput = z.object({
@@ -26,6 +27,7 @@ export function registerSettingsHandlers(deps: {
     input: apiKeyInput,
     handle: async ({ apiKey }) => {
       await deps.vault.set('openrouter.apiKey', apiKey)
+      redactor.add(apiKey)
       return status()
     }
   })

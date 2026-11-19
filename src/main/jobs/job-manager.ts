@@ -1,3 +1,4 @@
+import { runWithJob } from '../logging/job-context'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
@@ -275,8 +276,13 @@ export class JobManager {
       }
     }
 
-    const done = this.deps.runner
-      .run({ spec: row.spec as JobSpec, artifacts: row.artifacts as Artifacts, workDir }, hooks)
+    // Tudo que o job logar (LLM, sidecars, stderr dos CLIs) carrega o id, sem passar logger adiante.
+    const done = runWithJob(id, () =>
+      this.deps.runner.run(
+        { spec: row.spec as JobSpec, artifacts: row.artifacts as Artifacts, workDir },
+        hooks
+      )
+    )
       .then(
         (outcome) =>
           outcome.status === 'awaiting-confirmation'

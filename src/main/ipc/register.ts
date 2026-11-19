@@ -12,6 +12,7 @@ import type { SidecarManager } from '../sidecars/sidecar-manager'
 import { registerAppHandlers } from './handlers/app.handler'
 import { registerBatchHandlers } from './handlers/batches.handler'
 import { registerJobHandlers } from './handlers/jobs.handler'
+import { registerLogHandlers } from './handlers/logs.handler'
 import { registerMediaHandlers } from './handlers/media.handler'
 import { registerMemoryHandlers } from './handlers/memory.handler'
 import { registerPresetHandlers } from './handlers/presets.handler'
@@ -42,4 +43,5 @@ export function registerIpc(deps: IpcDependencies): void {
   registerJobHandlers(deps)
   registerMediaHandlers(deps)
   registerBatchHandlers(deps)
+  registerLogHandlers()
 }

@@ -86,6 +86,39 @@ export interface PublicSettings {
   'jobs.concurrency': number
   'preflight.autoConfirmBelowUsd': number | null
   'tracks.preferredSourceLangs': string[]
+  'logs.level': 'info' | 'debug'
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+/** Uma linha do log (arquivo JSON por linha), já sem segredos. */
+export interface LogEntry {
+  /** ISO 8601 (linhas antigas, em texto puro, trazem o horário como estava). */
+  time: string
+  level: LogLevel
+  /** `app`, `db`, `ipc`, `sidecar`, `llm`, `jobs`, `renderer`… */
+  scope: string
+  msg: string
+  /** Presente em tudo que foi logado durante a execução de um job. */
+  jobId?: string
+  /** Erro (código + stack), stderr de ferramentas, corpo de resposta HTTP… */
+  detail?: string
+}
+
+export interface LogTailQuery {
+  /** 1..2000, padrão 500. */
+  limit?: number
+  minLevel?: LogLevel
+  scopes?: string[]
+  jobId?: string
+}
+
+export interface RendererErrorReport {
+  level: 'warn' | 'error'
+  message: string
+  stack?: string
+  /** `boundary` (React), `window` (onerror), `promise` (unhandledrejection). */
+  source: 'boundary' | 'window' | 'promise'
 }
 
 export interface ApiKeyStatus {
@@ -405,6 +438,15 @@ export interface IpcInvokeContract {
   'settings:get': { req: void; res: PublicSettings }
   /** Patch parcial, validado por chave; aplica as regras de favoritos/idiomas (`SETTINGS_CONFLICT`). */
   'settings:update': { req: Partial<PublicSettings>; res: PublicSettings }
+  /** Últimas entradas (mais antigas primeiro), de todos os arquivos rotacionados. */
+  'logs:tail': { req: LogTailQuery; res: LogEntry[] }
+  /** Liga/desliga o envio de `logs:entry` (só enquanto a tela de logs está aberta). */
+  'logs:watch': { req: { on: boolean }; res: { watching: boolean } }
+  'logs:open-folder': { req: void; res: { opened: boolean } }
+  /** Diálogo nativo para salvar; home vira `~` e segredos são removidos. `null` = cancelado. */
+  'logs:export': { req: void; res: { path: string | null } }
+  /** Erro do renderer gravado no log (escopo `renderer`), com limite de taxa. */
+  'logs:report': { req: RendererErrorReport; res: { accepted: boolean } }
   /** Embutidos primeiro, depois os personalizados. */
   'presets:list': { req: void; res: Preset[] }
   'presets:create': { req: PresetInput; res: Preset }
@@ -465,6 +507,8 @@ export interface IpcEventContract {
   'sidecars:progress': SidecarProgress
   /** Throttle de 250 ms por job; transições de estado saem na hora. */
   'jobs:progress': JobProgressEvent
+  /** Lotes a cada 250 ms, só enquanto `logs:watch` estiver ligado. */
+  'logs:entry': LogEntry[]
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -484,6 +528,11 @@ export const INVOKE_CHANNELS = [
   'settings:api-key-status',
   'settings:get',
   'settings:update',
+  'logs:tail',
+  'logs:watch',
+  'logs:open-folder',
+  'logs:export',
+  'logs:report',
   'presets:list',
   'presets:create',
   'presets:update',
@@ -515,7 +564,8 @@ export const INVOKE_CHANNELS = [
 ] as const satisfies readonly InvokeChannel[]
 export const EVENT_CHANNELS = [
   'sidecars:progress',
-  'jobs:progress'
+  'jobs:progress',
+  'logs:entry'
 ] as const satisfies readonly EventChannel[]
 
 /** Superfície tipada de `window.api`. */
@@ -539,6 +589,13 @@ export interface BakaSubApi {
     apiKeyStatus(): Promise<IpcResult<ApiKeyStatus>>
     get(): Promise<IpcResult<PublicSettings>>
     update(patch: Partial<PublicSettings>): Promise<IpcResult<PublicSettings>>
+  }
+  logs: {
+    tail(query?: LogTailQuery): Promise<IpcResult<LogEntry[]>>
+    watch(on: boolean): Promise<IpcResult<{ watching: boolean }>>
+    openFolder(): Promise<IpcResult<{ opened: boolean }>>
+    export(): Promise<IpcResult<{ path: string | null }>>
+    report(report: RendererErrorReport): Promise<IpcResult<{ accepted: boolean }>>
   }
   presets: {
     list(): Promise<IpcResult<Preset[]>>

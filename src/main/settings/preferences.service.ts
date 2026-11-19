@@ -14,7 +14,8 @@ export const PUBLIC_SETTING_KEYS = [
   'models.favorites',
   'jobs.concurrency',
   'preflight.autoConfirmBelowUsd',
-  'tracks.preferredSourceLangs'
+  'tracks.preferredSourceLangs',
+  'logs.level'
 ] as const satisfies readonly (keyof PublicSettings & SettingKey)[]
 
 type PublicKey = (typeof PUBLIC_SETTING_KEYS)[number]

@@ -48,6 +48,7 @@ React hook ──► window.api.<domain>.<method>()          (preload, typed by 
 | `settings:clear-api-key`                                                                      | none                                                          | `ApiKeyStatus`                                                                   |
 | `settings:get`                                                                                | none                                                          | `PublicSettings` (only public keys; see [`database.md`](./database.md#settings)) |
 | `settings:update`                                                                             | `Partial<PublicSettings>`                                     | `PublicSettings`; `INVALID_INPUT`, `SETTINGS_CONFLICT`, `PRESET_NOT_FOUND`       |
+| `logs:tail` / `logs:watch` / `logs:open-folder` / `logs:export` / `logs:report`               | see [`logging.md`](./logging.md)                              |                                                                                  |
 | `settings:api-key-status`                                                                     | none                                                          | `ApiKeyStatus` (`{ present, protection: 'os' \| 'none' }`)                       |
 | `presets:list` / `presets:create` / `presets:update` / `presets:duplicate` / `presets:delete` | `PresetInput` / `{ id, preset }` / `{ id, name? }` / `{ id }` | `Preset[]` / `Preset` / `{ deleted: true }` (built-ins are read-only)            |
 | `presets:export`                                                                              | `{ ids }`                                                     | `{ path \| null, count }` (native save dialog)                                   |
@@ -69,6 +70,7 @@ React hook ──► window.api.<domain>.<method>()          (preload, typed by 
 | `batches:cancel` / `batches:remove`                                                           | `{ id }`                                                      | `Batch` / `{ removed: true }`                                                    |
 | `batches:confirm`                                                                             | `{ id }`                                                      | `Batch` (confirms every waiting job)                                             |
 | event `jobs:progress`                                                                         | n/a                                                           | `JobProgressEvent` (`{ id, status, progress }`, 250 ms throttle)                 |
+| event `logs:entry`                                                                            | n/a                                                           | `LogEntry[]` (batches every 250 ms, only while `logs:watch` is on)               |
 | event `sidecars:progress`                                                                     | n/a                                                           | `SidecarProgress`                                                                |
 
 ## Error codes

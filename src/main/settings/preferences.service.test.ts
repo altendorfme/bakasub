@@ -35,7 +35,8 @@ describe('PreferencesService', () => {
       'models.favorites': [],
       'jobs.concurrency': 2,
       'preflight.autoConfirmBelowUsd': null,
-      'tracks.preferredSourceLangs': ['en']
+      'tracks.preferredSourceLangs': ['en'],
+      'logs.level': 'info'
     })
     expect(s).not.toHaveProperty('models.cache')
   })

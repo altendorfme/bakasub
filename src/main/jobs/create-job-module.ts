@@ -29,6 +29,8 @@ export interface JobModuleOptions {
   /** `userData/cache/jobs`. */
   readonly workRoot: string
   readonly emit: (event: JobProgressEvent) => void
+  /** Chaves públicas alteradas pelo usuário (além do que o módulo já trata). */
+  readonly onSettingsChanged?: (keys: readonly string[]) => void
   readonly log: {
     jobs: { info(m: string): void; warn(m: string): void; error(m: string, e?: unknown): void }
     llm: LlmLog
@@ -124,6 +126,7 @@ export function createJobModule(o: JobModuleOptions): {
     // Mais slots => a fila anda na hora; menos slots valem conforme os jobs terminam.
     onChanged: (keys) => {
       if (keys.includes('jobs.concurrency')) jobs.kick()
+      o.onSettingsChanged?.(keys)
     }
   })
   return { jobs, presets, mkv, models, settings, preferences, batches }

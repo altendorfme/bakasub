@@ -35,6 +35,8 @@ export const SETTINGS_SCHEMA = {
   },
   /** Preset usado quando o job não escolhe um. */
   'translation.defaultPresetId': { schema: z.string().min(1).max(64), default: 'builtin:series' },
+  /** `debug` = log detalhado (tela Settings: "Verbose logging"). Vale na hora. */
+  'logs.level': { schema: z.enum(['info', 'debug']), default: 'info' as 'info' | 'debug' },
   /** Jobs executados ao mesmo tempo. */
   'jobs.concurrency': { schema: z.number().int().min(1).max(4), default: 2 },
   /** Preflight: o job segue sozinho se o custo máximo estimado (USD) ficar abaixo disto. `null` = sempre perguntar. */

@@ -44,6 +44,13 @@ const api: BakaSubApi = {
     get: () => invoke('settings:get'),
     update: (patch) => invoke('settings:update', patch)
   },
+  logs: {
+    tail: (query) => invoke('logs:tail', query ?? {}),
+    watch: (on) => invoke('logs:watch', { on }),
+    openFolder: () => invoke('logs:open-folder'),
+    export: () => invoke('logs:export'),
+    report: (report) => invoke('logs:report', report)
+  },
   presets: {
     list: () => invoke('presets:list'),
     create: (preset) => invoke('presets:create', preset),

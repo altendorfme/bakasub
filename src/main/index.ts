@@ -1,6 +1,6 @@
 import { app, BrowserWindow, safeStorage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import { initLogger, logger } from './logging/logger'
+import { initLogger, logger, redactor, setLogLevel } from './logging/logger'
 import { openDatabase } from './database/client'
 import { JobMemoryRepository } from './database/repositories/job-memory.repository'
 import { JobMemoryService } from './memory/job-memory.service'
@@ -19,7 +19,7 @@ import { AppInfoService } from './services/app-info.service'
 import { shutdown } from './services/shutdown-coordinator'
 import { createMainWindow } from './window/create-main-window'
 
-initLogger()
+initLogger({ emitEntries: (batch) => emitToRenderers('logs:entry', batch) })
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -40,6 +40,7 @@ if (!app.requestSingleInstanceLock()) {
     const vault = await SecretVault.open(new SecretsRepository(database.db), safeStorage)
     logger.app.info(`secret vault ready (protection: ${vault.protection})`)
     if (vault.recovered) logger.app.warn('secret vault master key was unrecoverable; secrets reset')
+    redactor.add(await vault.get('openrouter.apiKey'))
 
     const sidecarModule = createSidecarModule({
       binDir: paths.bin(),
@@ -63,9 +64,13 @@ if (!app.requestSingleInstanceLock()) {
       tools: sidecarModule.manager,
       workRoot: join(paths.cache(), 'jobs'),
       emit: (e) => emitToRenderers('jobs:progress', e),
-      log: { jobs: logger.app, llm: logger.llm }
+      onSettingsChanged: (keys) => {
+        if (keys.includes('logs.level')) void jobModule.settings.get('logs.level').then(setLogLevel)
+      },
+      log: { jobs: logger.jobs, llm: logger.llm }
     })
     isBusy = () => jobModule.jobs.isBusy()
+    setLogLevel(await jobModule.settings.get('logs.level'))
     // Registrado por último => descartado primeiro: aborta jobs (e seus processos) antes de
     // sidecars, Job Memory e banco.
     shutdown.register('jobs', () => jobModule.jobs.dispose(5000))
