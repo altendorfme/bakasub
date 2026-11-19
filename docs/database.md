@@ -49,7 +49,7 @@ Schema files live in `src/main/database/schema/` and are re-exported from `index
 
 ### `settings`
 
-Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)).
+Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`).
 
 ### `secrets` and `vault_keys`
 
@@ -77,6 +77,27 @@ Indexes: unique `(context_hash, target_lang, model, glossary_hash)`; `last_used_
 
 Repository: `src/main/database/repositories/job-memory.repository.ts` (`lookupMany`, `upsertMany` in one transaction, `touch`, `prune` + `incremental_vacuum`, `stats` with real on-disk bytes from `dbstat`). Policy lives in the service; see [`job-memory.md`](./job-memory.md).
 
-## Planned
+### `jobs`
 
-Profile CRUD repository. Job state tables will be added together with the Job Manager.
+| Column                                                     | Type               | Notes                                                                    |
+| ---------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------ |
+| `id`                                                       | text PK (UUID)     |                                                                          |
+| `kind`                                                     | text               | `extract` / `translate` / `mux` / `pipeline`                             |
+| `batch_id`                                                 | text, nullable     | reserved for batch mode                                                  |
+| `status`                                                   | text               | see [`jobs.md`](./jobs.md)                                               |
+| `step`                                                     | text, nullable     | current step, or where it stopped                                        |
+| `spec`                                                     | JSON               | validated, frozen request (paths, options, **profile snapshot**)         |
+| `progress`                                                 | JSON               | last persisted progress (per step / translation chunk)                   |
+| `artifacts`                                                | JSON               | per-step outputs with size + sha256 (retry resumes from the failed step) |
+| `result`                                                   | JSON, nullable     | outputs, warnings, LLM usage, cache hits, failed lines                   |
+| `error`                                                    | JSON, nullable     | `{ code, message }`                                                      |
+| `attempt`                                                  | integer, default 1 | incremented by `jobs:retry`                                              |
+| `created_at` / `updated_at` / `started_at` / `finished_at` | integer (ms)       |                                                                          |
+
+Indexes: `(status, created_at)` (FIFO queue), `batch_id`. Every transition is a single `UPDATE`.
+
+### `batches`
+
+`id` text PK, `name`, `kind` (`extract` / `translate` / `pipeline`), `root` (source folder or `null`), `options` (JSON: profile id, languages, output dir, mux options), `created_at`. Created together with its jobs in one transaction (`BatchRepository.insertWithJobs`); status is aggregated from `jobs.batch_id`.
+
+Repositories: `profile.repository.ts` (profile CRUD; validation in `ProfileService`), `job.repository.ts`.

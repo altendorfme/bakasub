@@ -44,3 +44,32 @@ CREATE TABLE `vault_keys` (
 	`protection` text NOT NULL,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
 );
+--> statement-breakpoint
+CREATE TABLE `jobs` (
+	`id` text PRIMARY KEY NOT NULL,
+	`kind` text NOT NULL,
+	`batch_id` text,
+	`status` text NOT NULL,
+	`step` text,
+	`spec` text NOT NULL,
+	`progress` text NOT NULL,
+	`artifacts` text NOT NULL,
+	`result` text,
+	`error` text,
+	`attempt` integer DEFAULT 1 NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	`started_at` integer,
+	`finished_at` integer
+);
+--> statement-breakpoint
+CREATE INDEX `jobs_status_idx` ON `jobs` (`status`,`created_at`);--> statement-breakpoint
+CREATE INDEX `jobs_batch_idx` ON `jobs` (`batch_id`);--> statement-breakpoint
+CREATE TABLE `batches` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`kind` text NOT NULL,
+	`root` text,
+	`options` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
+);

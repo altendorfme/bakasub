@@ -146,10 +146,11 @@ export async function translateDocument<F>(
     },
     {
       accept: async (entries) => {
+        // Sem `signal`: a resposta já foi paga e validada; o abort só impede novas requisições
+        // (a próxima `session.request` vê o signal e cancela). A transação é curta e atômica.
         const r = await deps.memory.commitChunk(
           ctx,
-          entries.map((e) => ({ hashed: e.unit, translated: e.translated })),
-          signal
+          entries.map((e) => ({ hashed: e.unit, translated: e.translated }))
         )
         done += entries.length
         if (r.rejected.length) log.warn(`memory rejected ids: ${r.rejected.join(',')}`)

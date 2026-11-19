@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
@@ -41,6 +41,43 @@ const api: BakaSubApi = {
     setApiKey: (apiKey) => invoke('settings:set-api-key', { apiKey }),
     clearApiKey: () => invoke('settings:clear-api-key'),
     apiKeyStatus: () => invoke('settings:api-key-status')
+  },
+  profiles: {
+    list: () => invoke('profiles:list'),
+    create: (profile) => invoke('profiles:create', profile),
+    update: (id, profile) => invoke('profiles:update', { id, profile }),
+    delete: (id) => invoke('profiles:delete', { id })
+  },
+  models: {
+    list: (force) => invoke('models:list', { force })
+  },
+  media: {
+    probe: (path) => invoke('media:probe', { path })
+  },
+  dialog: {
+    openFiles: (kind, multiple) => invoke('dialog:open-files', { kind, multiple }),
+    chooseOutputDir: () => invoke('dialog:choose-output-dir'),
+    openFolder: () => invoke('dialog:open-folder')
+  },
+  batches: {
+    plan: (request) => invoke('batches:plan', request),
+    create: (request) => invoke('batches:create', request),
+    list: () => invoke('batches:list'),
+    get: (id) => invoke('batches:get', { id }),
+    jobs: (id) => invoke('batches:jobs', { id }),
+    cancel: (id) => invoke('batches:cancel', { id }),
+    remove: (id) => invoke('batches:remove', { id })
+  },
+  jobs: {
+    create: (request) => invoke('jobs:create', request),
+    list: () => invoke('jobs:list'),
+    get: (id) => invoke('jobs:get', { id }),
+    cancel: (id) => invoke('jobs:cancel', { id }),
+    retry: (id) => invoke('jobs:retry', { id }),
+    remove: (id) => invoke('jobs:remove', { id })
+  },
+  files: {
+    pathFor: (file) => webUtils.getPathForFile(file)
   },
   events: {
     on(channel: EventChannel, listener) {

@@ -6,6 +6,8 @@ import { JobMemoryRepository } from './database/repositories/job-memory.reposito
 import { JobMemoryService } from './memory/job-memory.service'
 import { SecretsRepository } from './database/repositories/secrets.repository'
 import { SecretVault } from './settings/secret-vault'
+import { createJobModule } from './jobs/create-job-module'
+import { join } from 'node:path'
 import { emitToRenderers } from './ipc/events'
 import { registerIpc } from './ipc/register'
 import { paths } from './config/paths'
@@ -29,8 +31,10 @@ if (!app.requestSingleInstanceLock()) {
     const database = await openDatabase()
     shutdown.register('database', () => database.close())
     // LIFO: registrado depois do banco => termina as escritas em andamento antes do close.
-    // `isBusy` passa a consultar o Job Manager quando ele existir.
-    const memory = new JobMemoryService(new JobMemoryRepository(database.db))
+    let isBusy = (): boolean => false
+    const memory = new JobMemoryService(new JobMemoryRepository(database.db), {
+      isBusy: () => isBusy()
+    })
     shutdown.register('job-memory', () => memory.dispose())
 
     const vault = await SecretVault.open(new SecretsRepository(database.db), safeStorage)
@@ -51,12 +55,33 @@ if (!app.requestSingleInstanceLock()) {
       await sidecarModule.runner.disposeAll()
     })
 
+    const jobModule = createJobModule({
+      db: database.db,
+      memory,
+      vault,
+      runner: sidecarModule.runner,
+      tools: sidecarModule.manager,
+      workRoot: join(paths.cache(), 'jobs'),
+      emit: (e) => emitToRenderers('jobs:progress', e),
+      log: { jobs: logger.app, llm: logger.llm }
+    })
+    isBusy = () => jobModule.jobs.isBusy()
+    // Registrado por último => descartado primeiro: aborta jobs (e seus processos) antes de
+    // sidecars, Job Memory e banco.
+    shutdown.register('jobs', () => jobModule.jobs.dispose(5000))
+    await jobModule.jobs.init()
+
     registerIpc({
       appInfo: new AppInfoService(),
       appUpdate: new AppUpdateService(sidecarModule.manifests),
       sidecars: sidecarModule.manager,
       memory,
-      vault
+      vault,
+      profiles: jobModule.profiles,
+      jobs: jobModule.jobs,
+      mkv: jobModule.mkv,
+      models: jobModule.models,
+      batches: jobModule.batches
     })
     createMainWindow()
 

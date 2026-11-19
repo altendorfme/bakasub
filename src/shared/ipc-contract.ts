@@ -79,6 +79,226 @@ export interface ApiKeyStatus {
   protection: 'os' | 'none'
 }
 
+export interface GlossaryEntry {
+  source: string
+  target?: string
+  rule?: string
+}
+
+export interface Profile {
+  id: number
+  name: string
+  model: string
+  glossary: GlossaryEntry[]
+  /** BCP-47 canônico. */
+  targetLang: string
+  temperature: number
+  createdAt: string
+}
+
+export type ProfileInput = Omit<Profile, 'id' | 'createdAt'>
+
+export type JobKind = 'extract' | 'translate' | 'mux' | 'pipeline'
+export type JobStatus =
+  | 'queued'
+  | 'running'
+  /** Reservado para o preflight (inativo nesta versão). */
+  | 'awaiting-confirmation'
+  | 'completed'
+  | 'completed-with-warnings'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted'
+export type JobStep = 'probe' | 'extract' | 'translate' | 'validate' | 'write' | 'mux'
+
+export interface MuxOptions {
+  /** A faixa nova vira `default` e as legendas originais perdem o `default`. Padrão `true`. */
+  setDefault?: boolean
+  /** Mantém as legendas originais no MKV novo. Padrão `true`. */
+  keepOriginalSubtitles?: boolean
+}
+
+/** Pedido do renderer. Caminhos vêm do diálogo/drag & drop e são revalidados no Main. */
+export type JobCreateRequest =
+  | { kind: 'extract'; source: string; trackIds: number[]; outputDir?: string }
+  | {
+      kind: 'translate'
+      source: string
+      profileId: number
+      targetLang?: string
+      sourceLang?: string
+      outputDir?: string
+    }
+  | {
+      kind: 'mux'
+      source: string
+      subtitles: { path: string; language: string; name?: string; default?: boolean }[]
+      outputDir?: string
+      options?: MuxOptions
+    }
+  | {
+      kind: 'pipeline'
+      source: string
+      trackId: number
+      profileId: number
+      targetLang?: string
+      sourceLang?: string
+      outputDir?: string
+      options?: MuxOptions & { alsoWriteSubtitle?: boolean }
+    }
+
+export interface JobProgress {
+  step: JobStep | null
+  /** 0..1 dentro da etapa, quando conhecido. */
+  stepFraction?: number
+  /** Etapa de tradução. */
+  translation?: {
+    done: number
+    total: number
+    cached: number
+    chunk?: { index: number; count: number }
+  }
+  cost?: number
+}
+
+export interface JobResult {
+  outputs: string[]
+  warnings: string[]
+  usage?: {
+    requests: number
+    promptTokens: number
+    completionTokens: number
+    cachedTokens: number
+    cost: number
+    costIncomplete: boolean
+  }
+  cache?: { hits: number; misses: number }
+  failedLines?: { cueId: number; reason: string }[]
+}
+
+export interface Job {
+  id: string
+  kind: JobKind
+  batchId: string | null
+  status: JobStatus
+  /** Etapa atual (running) ou onde parou (failed/cancelled/interrupted). */
+  step: JobStep | null
+  /** Nome do arquivo de origem (para listar sem expor o caminho completo à toa). */
+  source: string
+  progress: JobProgress
+  result: JobResult | null
+  error: { code: string; message: string } | null
+  attempt: number
+  createdAt: string
+  updatedAt: string
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export interface JobProgressEvent {
+  id: string
+  status: JobStatus
+  progress: JobProgress
+}
+
+export interface SubtitleTrackInfo {
+  id: number
+  codecId: string
+  /** `null` = não traduzível/extraível nesta versão (ver `unsupported`). */
+  format: 'srt' | 'ass' | 'ssa' | null
+  unsupported?: 'image-based' | 'no-parser'
+  language?: string
+  name?: string
+  default: boolean
+  forced: boolean
+  eventCount?: number
+}
+
+export interface MediaProbe {
+  subtitles: SubtitleTrackInfo[]
+  attachments: number
+}
+
+export interface ModelSummary {
+  id: string
+  name: string
+  contextLength: number | null
+  maxCompletionTokens: number | null
+  isModerated: boolean
+  /** USD por token; `null` = preço dinâmico. */
+  pricing: { prompt: number; completion: number } | null
+  structuredOutputs: boolean
+  responseFormat: boolean
+}
+
+export interface ModelList {
+  models: ModelSummary[]
+  fetchedAt: string
+  offline: boolean
+}
+
+export type OpenDialogKind = 'media' | 'subtitle' | 'any'
+
+export type BatchKind = 'extract' | 'translate' | 'pipeline'
+
+export type BatchSource =
+  { type: 'folder'; path: string; recursive?: boolean } | { type: 'files'; paths: string[] }
+
+export interface BatchPlanRequest {
+  kind: BatchKind
+  source: BatchSource
+}
+
+export interface BatchPlanItem {
+  path: string
+  /** Relativo à pasta do batch (ou só o nome, para arquivos avulsos). */
+  relPath: string
+  /** Faixas do MKV (`extract`/`pipeline`). */
+  tracks?: SubtitleTrackInfo[]
+  /** Seleção automática: várias no `extract`, uma no `pipeline`, nenhuma no `translate`. */
+  selected: number[]
+  /** Arquivo sem o que processar (o usuário pode removê-lo do plano ou escolher outra faixa). */
+  skipped?: 'no-subtitle-track' | 'no-supported-track' | 'probe-failed'
+  error?: string
+}
+
+export interface BatchPlan {
+  kind: BatchKind
+  /** Pasta de origem (espelhamento) ou `null`. */
+  root: string | null
+  items: BatchPlanItem[]
+  /** Caminhos recusados pelo validador (arquivos avulsos). */
+  rejected: { path: string; reason: string }[]
+  /** Pasta com mais arquivos que o limite. */
+  truncated: boolean
+}
+
+export interface BatchCreateRequest {
+  kind: BatchKind
+  name?: string
+  /** `plan.root`: revalidado; base do espelhamento quando há `outputDir`. */
+  root: string | null
+  items: { path: string; trackIds?: number[] }[]
+  profileId?: number
+  targetLang?: string
+  sourceLang?: string
+  /** Sem `outputDir`: saída ao lado de cada arquivo. Com `outputDir` e `root`: estrutura espelhada. */
+  outputDir?: string
+  options?: MuxOptions & { alsoWriteSubtitle?: boolean }
+}
+
+export interface Batch {
+  id: string
+  name: string
+  kind: BatchKind
+  root: string | null
+  createdAt: string
+  total: number
+  counts: Partial<Record<JobStatus, number>>
+  /** `active` enquanto algum job não é terminal. */
+  state: 'active' | 'finished'
+}
+
 export type IpcError = { code: string; message: string }
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError }
 
@@ -97,11 +317,46 @@ export interface IpcInvokeContract {
   'settings:set-api-key': { req: { apiKey: string }; res: ApiKeyStatus }
   'settings:clear-api-key': { req: void; res: ApiKeyStatus }
   'settings:api-key-status': { req: void; res: ApiKeyStatus }
+  'profiles:list': { req: void; res: Profile[] }
+  'profiles:create': { req: ProfileInput; res: Profile }
+  'profiles:update': { req: { id: number; profile: ProfileInput }; res: Profile }
+  /** `PROFILE_IN_USE` enquanto um job não terminal usa o perfil. */
+  'profiles:delete': { req: { id: number }; res: { deleted: true } }
+  'models:list': { req: { force?: boolean }; res: ModelList }
+  /** Faixas de legenda de um MKV (caminho revalidado no Main). */
+  'media:probe': { req: { path: string }; res: MediaProbe }
+  /** Diálogo nativo; caminhos já validados. `[]` se cancelado. */
+  'dialog:open-files': {
+    req: { kind: OpenDialogKind; multiple?: boolean }
+    res: { paths: string[] }
+  }
+  'dialog:choose-output-dir': { req: void; res: { path: string | null } }
+  /** Responde já com o job enfileirado; a execução é assíncrona (`jobs:progress`). */
+  'jobs:create': { req: JobCreateRequest; res: Job }
+  'jobs:list': { req: void; res: Job[] }
+  'jobs:get': { req: { id: string }; res: Job }
+  'jobs:cancel': { req: { id: string }; res: Job }
+  'jobs:retry': { req: { id: string }; res: Job }
+  'jobs:remove': { req: { id: string }; res: { removed: true } }
+  /** Pasta de entrada de um batch (legível). `null` se cancelado. */
+  'dialog:open-folder': { req: void; res: { path: string | null } }
+  /** Varre, faz o probe e pré-seleciona faixas; não cria nada. */
+  'batches:plan': { req: BatchPlanRequest; res: BatchPlan }
+  /** Cria o batch e todos os jobs numa transação (um item inválido recusa tudo). */
+  'batches:create': { req: BatchCreateRequest; res: Batch }
+  'batches:list': { req: void; res: Batch[] }
+  'batches:get': { req: { id: string }; res: Batch }
+  'batches:jobs': { req: { id: string }; res: Job[] }
+  'batches:cancel': { req: { id: string }; res: Batch }
+  /** Só batches sem jobs ativos; remove também os jobs. */
+  'batches:remove': { req: { id: string }; res: { removed: true } }
 }
 
 /** Canais push (main -> renderer). Payload tipado por canal. */
 export interface IpcEventContract {
   'sidecars:progress': SidecarProgress
+  /** Throttle de 250 ms por job; transições de estado saem na hora. */
+  'jobs:progress': JobProgressEvent
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -118,9 +373,34 @@ export const INVOKE_CHANNELS = [
   'memory:prune',
   'settings:set-api-key',
   'settings:clear-api-key',
-  'settings:api-key-status'
+  'settings:api-key-status',
+  'profiles:list',
+  'profiles:create',
+  'profiles:update',
+  'profiles:delete',
+  'models:list',
+  'media:probe',
+  'dialog:open-files',
+  'dialog:choose-output-dir',
+  'jobs:create',
+  'jobs:list',
+  'jobs:get',
+  'jobs:cancel',
+  'jobs:retry',
+  'jobs:remove',
+  'dialog:open-folder',
+  'batches:plan',
+  'batches:create',
+  'batches:list',
+  'batches:get',
+  'batches:jobs',
+  'batches:cancel',
+  'batches:remove'
 ] as const satisfies readonly InvokeChannel[]
-export const EVENT_CHANNELS = ['sidecars:progress'] as const satisfies readonly EventChannel[]
+export const EVENT_CHANNELS = [
+  'sidecars:progress',
+  'jobs:progress'
+] as const satisfies readonly EventChannel[]
 
 /** Superfície tipada de `window.api`. */
 export interface BakaSubApi {
@@ -141,6 +421,44 @@ export interface BakaSubApi {
     setApiKey(apiKey: string): Promise<IpcResult<ApiKeyStatus>>
     clearApiKey(): Promise<IpcResult<ApiKeyStatus>>
     apiKeyStatus(): Promise<IpcResult<ApiKeyStatus>>
+  }
+  profiles: {
+    list(): Promise<IpcResult<Profile[]>>
+    create(profile: ProfileInput): Promise<IpcResult<Profile>>
+    update(id: number, profile: ProfileInput): Promise<IpcResult<Profile>>
+    delete(id: number): Promise<IpcResult<{ deleted: true }>>
+  }
+  models: {
+    list(force?: boolean): Promise<IpcResult<ModelList>>
+  }
+  media: {
+    probe(path: string): Promise<IpcResult<MediaProbe>>
+  }
+  dialog: {
+    openFiles(kind: OpenDialogKind, multiple?: boolean): Promise<IpcResult<{ paths: string[] }>>
+    chooseOutputDir(): Promise<IpcResult<{ path: string | null }>>
+    openFolder(): Promise<IpcResult<{ path: string | null }>>
+  }
+  batches: {
+    plan(request: BatchPlanRequest): Promise<IpcResult<BatchPlan>>
+    create(request: BatchCreateRequest): Promise<IpcResult<Batch>>
+    list(): Promise<IpcResult<Batch[]>>
+    get(id: string): Promise<IpcResult<Batch>>
+    jobs(id: string): Promise<IpcResult<Job[]>>
+    cancel(id: string): Promise<IpcResult<Batch>>
+    remove(id: string): Promise<IpcResult<{ removed: true }>>
+  }
+  jobs: {
+    create(request: JobCreateRequest): Promise<IpcResult<Job>>
+    list(): Promise<IpcResult<Job[]>>
+    get(id: string): Promise<IpcResult<Job>>
+    cancel(id: string): Promise<IpcResult<Job>>
+    retry(id: string): Promise<IpcResult<Job>>
+    remove(id: string): Promise<IpcResult<{ removed: true }>>
+  }
+  files: {
+    /** Drag & drop: caminho real de um `File` (`webUtils.getPathForFile`). Revalidado no Main. */
+    pathFor(file: File): string
   }
   events: {
     on<C extends EventChannel>(

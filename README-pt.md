@@ -4,7 +4,7 @@
 
 Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
 
-> Status: **infraestrutura base, parsers SRT e ASS/SSA, cache Job Memory e camada de tradução LLM concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). Job Manager (fila, IPC de jobs de tradução) e a UI ainda não foram implementados. Veja o [roadmap](#roadmap).
+> Status: **infraestrutura base, parsers SRT e ASS/SSA, cache Job Memory, camada de tradução LLM e Job Manager concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI e o preflight de custo ainda não foram implementados. Veja o [roadmap](#roadmap).
 
 ## Stack
 
@@ -55,7 +55,13 @@ src/
     services/      shutdown-coordinator, app-info, app-update, consentimento nativo
     sidecars/      módulo de sidecars (sem dependência de `electron`, testável em Node puro)
     parsers/       parsing de legendas: decoder, AST comum, SRT, ASS/SSA, segmentação, cobertura (puro, testável)
-    jobs/ llm/     reservados para a lógica de negócio
+    llm/           cliente OpenRouter (SSE), catálogo de modelos, chunking, prompts, retries, translateDocument
+    memory/        Job Memory: context hash e serviço de cache
+    media/         fachada do mkvtoolnix (probe/extract/mux), idiomas, nomes de saída, validação de caminhos
+    jobs/          fila de jobs, runner, etapas (probe/extract/translate/validate/write/mux), specs
+    batch/         planejamento de batch (varredura, probe, seleção de faixas) e serviço de batch
+    profiles/      schema e serviço de perfis
+    settings/      registro tipado de configurações e o cofre de segredos cifrado
     window/        criação da BrowserWindow
   preload/         única superfície exposta ao renderer (window.api), com allowlist
   renderer/        React + Tailwind + TanStack Query
@@ -76,7 +82,7 @@ Para adicionar um canal: declarar em `IpcInvokeContract` + allowlist, expor em `
 
 ### Shutdown gracioso
 
-`ShutdownCoordinator` executa disposers em ordem LIFO, com timeout global, no `before-quit` e em `SIGINT`/`SIGTERM`. Hoje libera o banco (checkpoint `wal_checkpoint(TRUNCATE)`) e os processos filhos dos sidecars (SIGTERM → SIGKILL). O Job Manager deve se registrar nele.
+`ShutdownCoordinator` executa disposers em ordem LIFO, com timeout global, no `before-quit` e em `SIGINT`/`SIGTERM`. Primeiro aborta os jobs em execução (marcando-os `interrupted`), depois libera os processos filhos dos sidecars (SIGTERM → SIGKILL), as escritas do Job Memory e o banco (`wal_checkpoint(TRUNCATE)`).
 
 ## Dados do usuário
 
@@ -145,7 +151,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 
@@ -157,7 +163,9 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] Build e release (Linux + Windows)
 - [x] **Parser SRT**: AST lossless (nós Text / Tag / LineBreak), scanner tolerante com diagnósticos, modo de reparo seguro, segmentação estilo XLIFF para o LLM, relatório de cobertura (veja [`docs/parsing.md`](./docs/parsing.md))
 - [x] **Parser ASS/SSA**: mesma AST de `core/`; só `Dialogue:` vira cue e o resto é trivia lossless; desenhos e karaokê nunca vão ao LLM (veja [`docs/parsing.md`](./docs/parsing.md))
-- [ ] **Job Manager**: fila com concorrência controlada, cancelamento via `AbortController`, rollback de transações
+- [x] **Job Manager**: jobs persistidos (`extract`, `translate`, `mux`, `pipeline`), fila FIFO com concorrência limitada, `AbortController` por job, retry a partir da etapa que falhou, saídas atômicas, shutdown gracioso, CRUD de perfis, caminhos validados (veja [`docs/jobs.md`](./docs/jobs.md))
+- [x] **Modo batch**: pastas (com recursão opcional) ou vários arquivos, plano com seleção automática de faixas, criação atômica, espelhamento de pastas, cancelamento do lote (veja [`docs/jobs.md`](./docs/jobs.md))
+- [ ] **Formatos de legenda**: parser de WebVTT; OCR para PGS/VobSub
 - [x] **Camada LLM**: chunks sequenciais `<context>`/`<target>` sobre os misses do cache, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
 - [ ] **Preflight**: estimativa local de tokens (`tiktoken`) × taxa de cache × preços de `/api/v1/models`

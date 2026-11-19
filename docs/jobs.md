@@ -1,0 +1,102 @@
+# Jobs
+
+`src/main/jobs/` runs every user action on files as a persisted **job**: extract tracks, translate a subtitle, mux subtitles into an MKV, or the whole pipeline. Pure Node apart from the IPC handlers; composed in `create-job-module.ts`.
+
+```
+jobs:create ──► resolveJobSpec (Zod + path guard + profile snapshot) ──► jobs row (queued)
+JobManager (FIFO, concurrency = settings 'jobs.concurrency', default 2)
+  └─ JobRunner.run(spec, artifacts, workDir)       userData/cache/jobs/<id>/
+        resume at the first step whose artifact does not verify
+        probe → extract → translate → write → mux   (subset per kind)
+  └─ status, step, progress, artifacts, result, error persisted at every transition
+jobs:progress (throttled 250 ms; state transitions immediately)
+```
+
+## Kinds
+
+| `kind`      | Input                                           | Steps                                       | Output                                                        |
+| ----------- | ----------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| `extract`   | MKV + track ids                                 | probe → extract → write                     | `<base>.<trackId>.<lang\|und>.<ext>` per track                |
+| `translate` | `.srt` / `.ass` / `.ssa`                        | translate → write                           | `<base>.<targetLang>.<ext>`                                   |
+| `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                      | `<base>.<lang>.mkv`                                           |
+| `pipeline`  | MKV + track id                                  | probe → extract → translate → [write] → mux | `<base>.<targetLang>.mkv` (+ subtitle if `alsoWriteSubtitle`) |
+
+Steps (`steps/*.step.ts`) are shared by every kind (`plan.ts`):
+
+- **probe**: `mkvmerge -J` → subtitle tracks (`media/mkv-probe.ts`). Supported: `S_TEXT/UTF8`, `S_TEXT/ASS`, `S_TEXT/SSA`. PGS/VobSub (`image-based`, would need OCR) and WebVTT (`no-parser`) are listed but rejected. Track language: `language_ietf`, else ISO 639-2 → BCP-47 table (`media/languages.ts`); `und` = unknown.
+- **extract**: one `mkvextract` pass for all requested tracks into the work dir.
+- **translate**: decode → parse → `translateDocument` (see [`llm.md`](./llm.md)) → `serializeRepaired` → UTF-8 (BOM if the source had one). `sourceLang`: job option, else filename suffix (`ep01.en.srt`), else the track language.
+- **validate** (mux): each subtitle must parse; nothing is repaired. Failure → `INVALID_SUBTITLE` before touching the MKV.
+- **write**: publishes work-dir files into the output dir (unique name, atomic copy).
+- **mux**: `mkvmerge` keeps every original track and attachment (fonts); the new track gets `--language`, `--track-name` (`<Language> (BakaSub)` in the pipeline) and the default flag; with `setDefault` the original subtitle tracks lose theirs; `keepOriginalSubtitles: false` → `--no-subtitles`.
+
+## Outputs never corrupt anything
+
+- The source is never overwritten. Name collisions get ` (2)`, ` (3)`…
+- Every final file is written as `.<name>.bakasub-partial.<ext>` in the destination directory and renamed only on success (atomic on the same filesystem); failures and cancellation delete it.
+- Free space is checked before mux (`source + subtitles × 1.05`, `DISK_FULL`) and before extraction (100 MB in the work dir).
+
+## mkvtoolnix (`media/mkvtoolnix*.ts`)
+
+- Binaries come from the verified sidecars (`SidecarManager.resolve`, `SIDECAR_MISSING` if not installed) and run through `ProcessRunner` (abort → SIGTERM → SIGKILL after 3 s; **no timeout**, big files take long).
+- `--gui-mode`: `#GUI#progress NN%` → step progress, `#GUI#warning` → job warnings, `#GUI#error` → error message. `ProcessRunner` gained `onStdoutLine` for this.
+- Exit codes: `0` ok, **`1` = finished with warnings (success → `completed-with-warnings`)**, `2` error (`MEDIA_TOOL_FAILED`).
+- Not yet validated against the real binaries (no mkvtoolnix on the dev machine at the time): the `mkvmerge -J` fields read (`codec_id`, `language`, `language_ietf`, `track_name`, `default_track`, `forced_track`, `num_index_entries`) and the `--gui-mode` position for `mkvextract` must be checked once the sidecars are installed.
+
+## States
+
+```
+queued → running(step) → [awaiting-confirmation] → completed | completed-with-warnings
+                        ↘ failed | cancelled | interrupted
+```
+
+- `awaiting-confirmation` is reserved for the preflight (not used yet).
+- `completed-with-warnings`: translation left lines untranslated (`result.failedLines`) or mkvtoolnix reported warnings (`result.warnings`).
+- `failed`: `error = { code, message }` (`AppError` code, or `INTERNAL` for bugs) and `step` = where it stopped. The work dir is kept.
+- `cancelled` (user) deletes the work dir; `interrupted` (shutdown or crash) keeps it. On boot, `running` rows become `interrupted`.
+- `result.usage` keeps the LLM cost even for cancelled/failed jobs.
+
+## Retry, cancel, remove
+
+- `jobs:retry` (failed / cancelled / interrupted): back to `queued`, `attempt + 1`. The runner resumes at the **first step whose artifact does not verify** (`artifacts.ts`: probe info, extracted and translated files with size + sha256); everything from there on is redone. Outputs (`write`, `mux`) are always redone. Translation is cheap anyway thanks to the Job Memory.
+- `jobs:cancel`: queued → `cancelled` directly; running → abort (LLM request and backoff, child processes); a translation already paid for is still written to the cache.
+- `jobs:remove`: terminal jobs only; deletes the row and the work dir.
+- Profiles: the job stores a **snapshot** of the profile (`spec.profile`), so editing the profile does not change a queued job or its retry; deleting a profile used by a non-terminal job → `PROFILE_IN_USE`.
+
+## Shutdown and housekeeping
+
+- The `jobs` disposer is registered last (runs first): abort every job, wait up to 5 s, mark leftovers `interrupted`; then sidecars, Job Memory and the database close.
+- Boot: work dirs without a job row, and dirs of terminal jobs finished more than 7 days ago, are deleted.
+- `isBusy()` (any job running) blocks the Job Memory prune.
+
+## Paths and security
+
+Paths only come from the native dialogs (`dialog:open-files`, `dialog:choose-output-dir`) or drag & drop (`window.api.files.pathFor(file)` = `webUtils.getPathForFile`). Main revalidates every path in `jobs:create` / `media:probe` (`media/path-guard.ts`): absolute, resolved symlinks, regular file, extension allowlist (`.mkv` / `.srt .ass .ssa`) checked on both the given and the real path, readable, subtitles ≤ 50 MB; output dirs must be writable directories. Errors: `INVALID_PATH` with a stable reason (`relative`, `not-found`, `not-a-file`, `extension`, `too-large`, `not-writable`…).
+
+## Batch mode (`src/main/batch/`)
+
+A batch groups independent jobs created together; it executes nothing itself. Kinds: `extract`, `translate`, `pipeline` (mux batches would need pairing MKVs with subtitles, not designed yet).
+
+```
+dialog:open-folder | dialog:open-files (multiple) | drag & drop
+  └─ batches:plan   scan (folder or files) → probe MKVs (4 in parallel) → automatic selection
+  └─ UI shows the plan; the user adjusts tracks / drops files
+  └─ batches:create resolve + validate EVERY item, then one transaction: batch + all jobs (queued)
+```
+
+- **Scan** (`scan-files.ts`): folder from the native dialog, optional recursion, natural order (`ep2` before `ep10`), root files before subfolders, hidden entries skipped, symlinked directories not followed, at most 2,000 files and 10 levels (`truncated` in the plan). Every file goes through the same path guard as single jobs; loose files the guard rejects come back in `plan.rejected` with the reason.
+- **Automatic track selection** (`track-selection.ts`):
+  - `pipeline`: one track, by preferred source language (setting `tracks.preferredSourceLangs`, default `['en']`, list order, `en-US` matches `en`) → ASS/SSA before SRT → not forced → name not matching `sign|song|karaoke|lyric` → most events → lowest id.
+  - `extract`: every supported text track.
+  - Files without a usable track stay in the plan with `skipped` (`no-subtitle-track`, `no-supported-track`, `probe-failed` + `error`).
+- **Create** (`batch-service.ts`): all items are resolved (`resolveJobSpec`) before anything is written; one bad item rejects the whole batch (`INVALID_INPUT`, message `item N: …`). `translate`/`pipeline` require `profileId`.
+- **Output**: without `outputDir`, next to each source. With `outputDir` and a folder batch, the relative structure is **mirrored** (subfolders created on demand); items must be inside the batch folder. Loose-file batches with `outputDir` are flat; name collisions get ` (2)`.
+- **Order**: jobs keep the plan order in the FIFO queue (staggered `created_at`).
+- **State**: `Batch.counts` per job status, `total`, `state: active | finished`.
+- **Cancel**: queued jobs first (so the queue cannot pick the next item of the same batch), then running ones.
+- **Remove**: only when no job is active; removes the jobs (and their work dirs) and the batch.
+
+## Pending
+
+- WebVTT parser; OCR for PGS/VobSub.
+- Preflight (cost estimate) using `awaiting-confirmation`.

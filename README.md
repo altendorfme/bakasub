@@ -4,7 +4,7 @@
 
 Desktop application for extracting, AI-translating and re-muxing subtitles from `.mkv` videos.
 
-> Status: **base infrastructure, the SRT and ASS/SSA parsers, the Job Memory cache and the LLM translation layer are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The Job Manager (queue, IPC for translation jobs) and the UI are not implemented yet. See the [roadmap](#roadmap).
+> Status: **base infrastructure, the SRT and ASS/SSA parsers, the Job Memory cache, the LLM translation layer and the Job Manager are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI and the cost preflight are not implemented yet. See the [roadmap](#roadmap).
 
 ## Stack
 
@@ -55,7 +55,13 @@ src/
     services/      shutdown-coordinator, app-info, app-update, native consent dialog
     sidecars/      sidecar module (no `electron` dependency, testable in plain Node)
     parsers/       subtitle parsing: decoder, common AST, SRT, ASS/SSA, segmentation, coverage (pure, testable)
-    jobs/ llm/     reserved for business logic
+    llm/           OpenRouter client (SSE), model catalog, chunking, prompts, retries, translateDocument
+    memory/        Job Memory: context hash and cache service
+    media/         mkvtoolnix facade (probe/extract/mux), languages, output naming, path guard
+    jobs/          job queue, runner, steps (probe/extract/translate/validate/write/mux), job specs
+    batch/         batch planning (scan, probe, track selection) and batch service
+    profiles/      profile schema and service
+    settings/      typed settings registry and the encrypted secret vault
     window/        BrowserWindow factory
   preload/         the only surface exposed to the renderer (window.api), allowlisted
   renderer/        React + Tailwind + TanStack Query
@@ -71,7 +77,7 @@ docs/              detailed system flows
 
 ### Graceful shutdown
 
-`ShutdownCoordinator` runs disposers in LIFO order with a global timeout on `before-quit` and on `SIGINT`/`SIGTERM`. It currently releases the database (`wal_checkpoint(TRUNCATE)`) and sidecar child processes (SIGTERM → SIGKILL). The Job Manager must register itself there.
+`ShutdownCoordinator` runs disposers in LIFO order with a global timeout on `before-quit` and on `SIGINT`/`SIGTERM`. It aborts running jobs first (marking them `interrupted`), then releases sidecar child processes (SIGTERM → SIGKILL), the Job Memory writes and the database (`wal_checkpoint(TRUNCATE)`).
 
 ## User data
 
@@ -134,7 +140,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 
@@ -146,7 +152,9 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] Build and release (Linux + Windows)
 - [x] **SRT parser**: lossless AST (Text / Tag / LineBreak nodes), tolerant scanner with diagnostics, safe repair mode, XLIFF-style segmentation for the LLM, coverage report (see [`docs/parsing.md`](./docs/parsing.md))
 - [x] **ASS/SSA parser**: same `core/` AST; only `Dialogue:` becomes a cue, everything else is lossless trivia; drawings and karaoke are never sent to the LLM (see [`docs/parsing.md`](./docs/parsing.md))
-- [ ] **Job Manager**: bounded-concurrency queue, `AbortController` cancellation, transaction rollback
+- [x] **Job Manager**: persisted jobs (`extract`, `translate`, `mux`, `pipeline`), FIFO queue with bounded concurrency, per-job `AbortController`, retry from the failed step, atomic outputs, graceful shutdown, profiles CRUD, validated paths (see [`docs/jobs.md`](./docs/jobs.md))
+- [x] **Batch mode**: folders (optionally recursive) or multiple files, plan with automatic track selection, atomic batch creation, mirrored output folders, batch cancel (see [`docs/jobs.md`](./docs/jobs.md))
+- [ ] **Subtitle formats**: WebVTT parser; OCR for PGS/VobSub
 - [x] **LLM layer**: sequential `<context>`/`<target>` chunks over cache misses, structured JSON (`json_schema` → `json_object` → prompt) validated with Zod + marker validation, per-line repair, transport retry policy, termbase in the System Prompt, OpenRouter SSE with cancellation and cost accounting, encrypted API key (see [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: validated cache keyed by _context hash_ + language + model + glossary, per-chunk transactional upsert, prune with incremental vacuum (see [`docs/job-memory.md`](./docs/job-memory.md))
 - [ ] **Preflight**: local token estimate (`tiktoken`) × cache hit rate × `/api/v1/models` pricing

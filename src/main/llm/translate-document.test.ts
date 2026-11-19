@@ -268,6 +268,21 @@ describe('translateDocument', () => {
     expect((await memory.stats()).rows).toBe(40)
   })
 
+  it('abort depois da resposta recebida: a resposta paga é gravada, e nada novo é pedido', async () => {
+    const ac = new AbortController()
+    const lines = Array.from({ length: 50 }, (_, i) => `Sentence number ${i} goes here.`)
+    const d = deps((req) => {
+      ac.abort()
+      return echo(req)
+    })
+    const err = await translateDocument(input(srt(...lines)), d, { signal: ac.signal }).catch(
+      (e) => e
+    )
+    expect(err).toBeInstanceOf(TranslationCancelled)
+    expect(d.calls).toHaveLength(1)
+    expect((await memory.stats()).rows).toBe(40)
+  })
+
   it('mais de 10% esgotado: para cedo com LLM_TOO_MANY_FAILURES', async () => {
     const lines = Array.from({ length: 60 }, (_, i) => `Sentence number ${i} goes here.`)
     const d = deps(() => ok('{}'))

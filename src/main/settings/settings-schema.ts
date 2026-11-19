@@ -15,6 +15,13 @@ export const SETTINGS_SCHEMA = {
       })
       .nullable(),
     default: null
+  },
+  /** Jobs executados ao mesmo tempo. */
+  'jobs.concurrency': { schema: z.number().int().min(1).max(4), default: 2 },
+  /** Idiomas de origem preferidos (ordem) na seleção automática de faixas do batch. */
+  'tracks.preferredSourceLangs': {
+    schema: z.array(z.string().min(1).max(35)).max(10),
+    default: ['en']
   }
 } as const satisfies Record<string, { schema: z.ZodType; default: unknown }>
 

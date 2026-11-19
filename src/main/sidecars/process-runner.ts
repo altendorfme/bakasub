@@ -10,6 +10,8 @@ export interface RunOptions {
   timeoutMs?: number
   /** Janela entre SIGTERM e SIGKILL. */
   killGraceMs?: number
+  /** Cada linha completa de stdout (sem EOL), ex.: `#GUI#progress 42%` do mkvtoolnix. */
+  onStdoutLine?: (line: string) => void
 }
 
 export interface RunResult {
@@ -47,8 +49,14 @@ export class ProcessRunner {
       let timedOut = false
       let aborted = false
       let killTimer: NodeJS.Timeout | undefined
-      child.stdout.on('data', (d) => {
+      let pendingLine = ''
+      child.stdout.setEncoding('utf8')
+      child.stdout.on('data', (d: string) => {
         if (stdout.length < OUTPUT_CAP) stdout += d
+        if (!opts.onStdoutLine) return
+        const parts = (pendingLine + d).split(/\r\n|\r|\n/)
+        pendingLine = parts.pop() ?? ''
+        for (const l of parts) opts.onStdoutLine(l)
       })
       child.stderr.on('data', (d) => {
         if (stderr.length < OUTPUT_CAP) stderr += d
@@ -84,6 +92,7 @@ export class ProcessRunner {
       })
       child.once('close', (code) => {
         cleanup()
+        if (pendingLine && opts.onStdoutLine) opts.onStdoutLine(pendingLine)
         if (stderr.trim() && code !== 0) {
           this.log.warn(`${name} stderr: ${stderr.trim().slice(0, 2000)}`)
         }

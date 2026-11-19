@@ -1,6 +1,6 @@
 # LLM translation layer
 
-`src/main/llm/` turns a parsed subtitle document into a translated one through OpenRouter. It is pure Node (no `electron` import) and fully injectable: `translateDocument(input, deps, { signal, onProgress })`. The Job Manager (not implemented yet) will wrap it with a queue, persistence and IPC.
+`src/main/llm/` turns a parsed subtitle document into a translated one through OpenRouter. It is pure Node (no `electron` import) and fully injectable: `translateDocument(input, deps, { signal, onProgress })`. The Job Manager ([`jobs.md`](./jobs.md)) wraps it in the `translate` step.
 
 ```
 translateDocument
@@ -72,7 +72,7 @@ Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay 
 
 - Requests always stream (`stream: true`). The client accumulates `delta.content`, ignores `: OPENROUTER PROCESSING` keep-alives (they still reset the idle timer), treats a chunk with `error` or `finish_reason: "error"` (HTTP 200) as `stream-error`, and a stream that ends without `[DONE]` or a finish reason as truncated.
 - `usage` (tokens, cached tokens, `cost` in credits) comes in the last chunk and is summed in `UsageTotals`.
-- Cancellation goes through the `AbortSignal` (request, backoff sleep and the cache write). Aborting stops generation and billing only for providers that support it (OpenAI, Anthropic, DeepSeek, Together…); others (Google, Groq, Mistral, Bedrock…) bill the whole generation. For every interrupted generation (abort, idle timeout, stream error) the session queries `GET /api/v1/generation?id=` (`X-Generation-Id`, after 1.5 s, 5 s timeout, best effort); failures set `costIncomplete: true`. A cancelled job throws `TranslationCancelled` (`AppError` `CANCELLED`) carrying the usage.
+- Cancellation goes through the `AbortSignal` (request and backoff sleep). A response that already arrived and validated is still written to the cache (it was paid for); the abort only prevents new requests. Aborting stops generation and billing only for providers that support it (OpenAI, Anthropic, DeepSeek, Together…); others (Google, Groq, Mistral, Bedrock…) bill the whole generation. For every interrupted generation (abort, idle timeout, stream error) the session queries `GET /api/v1/generation?id=` (`X-Generation-Id`, after 1.5 s, 5 s timeout, best effort); failures set `costIncomplete: true`. A cancelled job throws `TranslationCancelled` (`AppError` `CANCELLED`) carrying the usage.
 
 ## API key and logging
 
@@ -82,6 +82,5 @@ Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay 
 
 ## Open points
 
-- IPC/Job Manager: start/cancel/progress channels and the `models:list` channel for the model picker.
 - Media context (`<media>`) comes from the TMDB/TVDB module.
 - Chunk limits, context window and the failure ratio are constants; profiles may override them later.

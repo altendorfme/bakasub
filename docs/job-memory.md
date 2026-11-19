@@ -51,7 +51,7 @@ hash = sha256_hex("v1" + "\0" + prev + "\0" + normalizeForHash(payload))
 
 - `stats()`: rows, real on-disk bytes of the table + indexes (`dbstat`), oldest `last_used_at`.
 - `prune(1 | 3 | 7 | 30 | 'all')`: deletes entries **not used** for more than N days (by `last_used_at`, so frequently reprocessed episodes keep their cache), then `PRAGMA incremental_vacuum` (the database runs with `auto_vacuum = INCREMENTAL`, see [`database.md`](./database.md)) so the file actually shrinks.
-- Refused with `AppError('MEMORY_BUSY')` while a job runs (`isBusy` is wired to the Job Manager once it exists; today it is always `false`).
+- Refused with `AppError('MEMORY_BUSY')` while a job runs (`isBusy` = the Job Manager has a running job).
 - Nothing is pruned automatically.
 
 ## IPC
@@ -60,5 +60,5 @@ Only `memory:stats` and `memory:prune` are exposed ([`ipc.md`](./ipc.md)). Looku
 
 ## Open points
 
-- `isBusy` and `sourceLang` are filled by the Job Manager (the latter from the MKV track language via `mkvmerge -J`, or the profile).
+- `sourceLang` comes from the job (option, filename suffix or MKV track language).
 - The preflight will use `lookupDocument` to compute the cache hit rate. Today every lookup updates `last_used_at`; decide in the preflight iteration whether a preflight-only lookup should count as use (it probably should not: a cancelled preflight would keep stale entries alive).

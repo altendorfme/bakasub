@@ -58,7 +58,7 @@ Measured: MKVToolNix AppImage 153 MB → 55 MB; Windows MKVToolNix 260 MB → 50
 const { path, env } = await sidecars.resolve('mkvmerge')
 ```
 
-`env` is mandatory for AppImage-derived binaries: without `LD_LIBRARY_PATH=<root>/usr/lib` they fail to load their libraries. Spawn through `ProcessRunner` (timeout, SIGTERM → SIGKILL after a grace period, stderr logged, children tracked and killed by `disposeAll()` on shutdown).
+`env` is mandatory for AppImage-derived binaries: without `LD_LIBRARY_PATH=<root>/usr/lib` they fail to load their libraries. Spawn through `ProcessRunner` (optional timeout, SIGTERM → SIGKILL after a grace period, stderr logged, `onStdoutLine` for line-based progress such as mkvtoolnix `--gui-mode`, children tracked and killed by `disposeAll()` on shutdown).
 
 ## Layout under `userData/bin`
 

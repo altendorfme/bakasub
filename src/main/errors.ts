@@ -17,6 +17,17 @@ export type AppErrorCode =
   | 'LLM_UNAVAILABLE'
   | 'LLM_UNKNOWN_MODEL'
   | 'LLM_TOO_MANY_FAILURES'
+  | 'INVALID_PATH'
+  | 'DISK_FULL'
+  | 'PROFILE_NOT_FOUND'
+  | 'PROFILE_IN_USE'
+  | 'PROFILE_NAME_TAKEN'
+  | 'INVALID_INPUT'
+  | 'JOB_NOT_FOUND'
+  | 'JOB_INVALID_STATE'
+  | 'BATCH_NOT_FOUND'
+  | 'MEDIA_TOOL_FAILED'
+  | 'INVALID_SUBTITLE'
 
 /** Erro de domínio com código estável, propagado pelo IPC como `{ code, message }`. */
 export class AppError extends Error {

@@ -65,10 +65,34 @@ The goal is that the edge cases handled defensively by the backend never happen 
 - **Result**: `completed-with-warnings` lists the lines left untranslated (coverage report with `failures`). `LLM_TOO_MANY_FAILURES` (more than 10% of the lines failed validation) should suggest another model; the lines already translated stay in the cache.
 - **Progress**: `onProgress` reports `done/total`, cached lines, chunk `index/count` and the cost so far, once per chunk.
 
-## 5. Encoding confidence
+## 5. Jobs (from the Job Manager design)
+
+API: `jobs:*`, `profiles:*`, `media:probe`, `dialog:*`, event `jobs:progress` (see [`jobs.md`](./jobs.md)).
+
+- **Four actions, usable separately**: extract tracks, translate a subtitle file, mux subtitles into an MKV, and the full pipeline (MKV → translated MKV).
+- **Inputs** only via `dialog:open-files` or drag & drop (`window.api.files.pathFor(file)`); output folder via `dialog:choose-output-dir` (default: next to the source). Show `INVALID_PATH` reasons in plain language.
+- **Track picker** from `media:probe`: language, name, default/forced flags, event count; image-based (PGS/VobSub) and WebVTT tracks visible but disabled with the reason ("needs OCR", "not supported yet"); fonts count (attachments) as information for ASS.
+- **Mux form**: one row per subtitle with language (pre-filled from the filename suffix, e.g. `ep01.pt-BR.ass`), track name (default: language name) and default flag; options `setDefault` and `keepOriginalSubtitles`.
+- **Profiles screen**: CRUD with glossary editor (`source`, `target?`, `rule?`), model from the model picker, default target language, temperature; `PROFILE_IN_USE` when deleting a profile used by a queued/running job.
+- **Job list**: status, step, step progress (`stepFraction`), translation `done/total` with cached lines and chunk `index/count`, cost so far; actions cancel / retry (failed, cancelled, interrupted; resumes from the failed step) / remove (terminal). `completed-with-warnings` must show `result.warnings` and the untranslated lines; `interrupted` jobs after a restart should invite a retry.
+- **Sidecars**: `SIDECAR_MISSING` when mkvtoolnix is not installed → offer the install flow (`sidecars:install`).
+- **Notification** when a job finishes (native `Notification`), backlog.
+
+## 6. Batch mode (from the batch design)
+
+API: `dialog:open-folder`, `dialog:open-files` (multiple), drag & drop, `batches:*` (see [`jobs.md`](./jobs.md#batch-mode-srcmainbatch)).
+
+- **Source**: a folder (with an "include subfolders" toggle) or several files; batch kinds extract / translate / full pipeline.
+- **Plan review before creating**: one row per file with the chosen track(s) (`selected`) and a picker over `tracks`; `extract` allows several tracks, `pipeline` exactly one. Files with `skipped` (no subtitles, only image/WebVTT tracks, probe failed + `error`) are shown and excluded by default; `rejected` paths and `truncated` (more than 2,000 files) must be visible.
+- **Common options**: profile, target/source language, output folder (default next to each file; with a folder, the structure is mirrored), mux options.
+- **Preferred source languages** (setting `tracks.preferredSourceLangs`) drive the automatic selection; expose it in the settings.
+- **Batch view**: counts per status, overall progress, cancel all, remove when finished, drill down into its jobs (`batches:jobs`).
+- Creating a batch is all-or-nothing: an `INVALID_INPUT` with `item N: …` points to the file to fix or drop.
+
+## 7. Encoding confidence
 
 - `decodeSubtitle()` returns `meta.encoding` and `meta.confidence`. When confidence is low (legacy single-byte encodings), the UI must say which encoding was assumed and let the user override it.
 
-## 6. Sidecars (already implemented API)
+## 8. Sidecars (already implemented API)
 
 - `sidecars:check`, `sidecars:install` (native consent dialog), `sidecars:progress`, `app:check-update`: the current `App.tsx` is a placeholder. A proper onboarding/settings screen is still missing.
