@@ -73,6 +73,21 @@ export interface MemoryPruneResult {
   stats: MemoryStats
 }
 
+/**
+ * Configurações que o renderer pode ler e alterar (`settings:get`/`settings:update`).
+ * Chaves internas (ex.: `models.cache`) nunca aparecem aqui.
+ */
+export interface PublicSettings {
+  'translation.defaultModel': string | null
+  'translation.defaultTargetLang': string | null
+  'translation.defaultPresetId': string
+  'translation.targetLangs': string[]
+  'models.favorites': string[]
+  'jobs.concurrency': number
+  'preflight.autoConfirmBelowUsd': number | null
+  'tracks.preferredSourceLangs': string[]
+}
+
 export interface ApiKeyStatus {
   present: boolean
   /** `os`: protegida pelo cofre do sistema; `none`: sem keyring disponível (a UI deve avisar). */
@@ -85,12 +100,13 @@ export interface GlossaryEntry {
   rule?: string
 }
 
-export type MediaType = 'movie' | 'series' | 'anime' | 'documentary' | 'other'
+/** Rótulo livre ("Anime", "Sitcom"…); só informativo, não entra no prompt. */
+export type MediaType = string
 
 /**
- * Preset de tradução. Os embutidos (`builtin: true`, ids `builtin:*`) são imutáveis e não têm
- * modelo/idioma/glossário (usam as configurações padrão); os personalizados são criados do zero
- * ou copiados (`copiedFrom`).
+ * Preset de tradução: só ESTILO (prompt, temperatura, glossário, tipo de mídia). Modelo e idioma
+ * de destino são escolhidos por job (padrões nas configurações). Os embutidos (`builtin: true`,
+ * ids `builtin:*`) são imutáveis; os personalizados são criados do zero ou copiados (`copiedFrom`).
  */
 export interface Preset {
   id: string
@@ -101,19 +117,12 @@ export interface Preset {
   /** Orientação de estilo para o tipo de mídia (vai no System Prompt, antes das regras fixas). */
   prompt: string
   glossary: GlossaryEntry[]
-  /** `null` = `translation.defaultModel`. */
-  model: string | null
-  /** BCP-47; `null` = `translation.defaultTargetLang`. */
-  targetLang: string | null
   copiedFrom: string | null
   /** `null` nos embutidos. */
   createdAt: string | null
 }
 
-export type PresetInput = Pick<
-  Preset,
-  'name' | 'mediaType' | 'temperature' | 'prompt' | 'glossary' | 'model' | 'targetLang'
->
+export type PresetInput = Pick<Preset, 'name' | 'mediaType' | 'temperature' | 'prompt' | 'glossary'>
 
 /** Formatos de legenda em texto que o app lê, traduz e grava (a extensão do arquivo é o id). */
 export type SubtitleTextFormat = 'srt' | 'ass' | 'ssa' | 'vtt'
@@ -146,8 +155,11 @@ export type JobCreateRequest =
       source: string
       /** Padrão: `translation.defaultPresetId`. */
       presetId?: string
+      /** Id OpenRouter. Padrão: `translation.defaultModel`. */
+      model?: string
       /** Notas/contexto do usuário (sinopse, personagens…), até 4000 caracteres; vai no `<media>`. */
       notes?: string
+      /** Padrão: `translation.defaultTargetLang`. */
       targetLang?: string
       sourceLang?: string
       outputDir?: string
@@ -167,8 +179,11 @@ export type JobCreateRequest =
       trackId: number
       /** Padrão: `translation.defaultPresetId`. */
       presetId?: string
+      /** Id OpenRouter. Padrão: `translation.defaultModel`. */
+      model?: string
       /** Notas/contexto do usuário (sinopse, personagens…), até 4000 caracteres; vai no `<media>`. */
       notes?: string
+      /** Padrão: `translation.defaultTargetLang`. */
       targetLang?: string
       sourceLang?: string
       outputDir?: string
@@ -387,6 +402,9 @@ export interface IpcInvokeContract {
   'settings:set-api-key': { req: { apiKey: string }; res: ApiKeyStatus }
   'settings:clear-api-key': { req: void; res: ApiKeyStatus }
   'settings:api-key-status': { req: void; res: ApiKeyStatus }
+  'settings:get': { req: void; res: PublicSettings }
+  /** Patch parcial, validado por chave; aplica as regras de favoritos/idiomas (`SETTINGS_CONFLICT`). */
+  'settings:update': { req: Partial<PublicSettings>; res: PublicSettings }
   /** Embutidos primeiro, depois os personalizados. */
   'presets:list': { req: void; res: Preset[] }
   'presets:create': { req: PresetInput; res: Preset }
@@ -464,6 +482,8 @@ export const INVOKE_CHANNELS = [
   'settings:set-api-key',
   'settings:clear-api-key',
   'settings:api-key-status',
+  'settings:get',
+  'settings:update',
   'presets:list',
   'presets:create',
   'presets:update',
@@ -517,6 +537,8 @@ export interface BakaSubApi {
     setApiKey(apiKey: string): Promise<IpcResult<ApiKeyStatus>>
     clearApiKey(): Promise<IpcResult<ApiKeyStatus>>
     apiKeyStatus(): Promise<IpcResult<ApiKeyStatus>>
+    get(): Promise<IpcResult<PublicSettings>>
+    update(patch: Partial<PublicSettings>): Promise<IpcResult<PublicSettings>>
   }
   presets: {
     list(): Promise<IpcResult<Preset[]>>

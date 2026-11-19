@@ -111,9 +111,7 @@ API: `dialog:open-folder`, `dialog:open-files` (multiple), drag & drop, `batches
 
 The approved design (prototype variant D, see [`renderer.md`](./renderer.md)) needs IPC that does not exist yet:
 
-- **Settings read/write**: the renderer cannot read `translation.defaultModel`, `translation.defaultTargetLang`, `translation.defaultPresetId` or `jobs.concurrency`; only the API key channels exist. Needed by the status bar (default model), the Preset & context step (preselected model and language) and Settings.
-- **Favorite models**: a new setting (e.g. `models.favorites`, list of OpenRouter ids). The default model is always a favorite. The Preset & context model select lists favorites only.
-- **Target languages**: a new setting (e.g. `translation.targetLangs`, BCP-47 list) managed in the Languages screen; the default is always in the list.
+- ~~Settings read/write, favorite models, target languages~~: done (`settings:get`/`settings:update`, `models.favorites`, `translation.targetLangs`, see [`database.md`](./database.md)). The request carries `model?`; presets no longer have a model or target language.
 - **Logs**: structured log lines (JSON per line: time, level, scope, message, job id, detail), a `logs:tail` invoke (last N parsed entries), a throttled `logs:entry` event, "open log folder" through `shell`, a `jobs` scope with the job id on every line, and more than one rotated file. Secrets stay redacted before anything reaches the renderer.
 - **Media context (TVDB)**: scene-name parsing, search, details (title, year, type, genres, runtime, synopsis) and episode lookup by season/episode; artwork URL for the backdrop; provider key stored in the vault. The job request needs a structured media context (not only `notes`).
 - **Translate a file**: a subtitle file goes through `translate` (no track step, no mux options); a video goes through `pipeline`.

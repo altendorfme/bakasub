@@ -5,8 +5,6 @@ CREATE TABLE `presets` (
 	`temperature` real NOT NULL,
 	`prompt` text NOT NULL,
 	`glossary` text DEFAULT '[]' NOT NULL,
-	`model` text,
-	`target_lang` text,
 	`copied_from` text,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
 );

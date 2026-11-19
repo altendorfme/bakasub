@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ApiKeyStatus } from '../../../shared/ipc-contract'
+import type { PreferencesService } from '../../settings/preferences.service'
 import type { SecretVault } from '../../settings/secret-vault'
 import { createHandler } from '../create-handler'
 
@@ -13,7 +14,10 @@ const apiKeyInput = z.object({
     .regex(/^[\x21-\x7e]+$/)
 })
 
-export function registerSettingsHandlers(deps: { vault: SecretVault }): void {
+export function registerSettingsHandlers(deps: {
+  vault: SecretVault
+  preferences: PreferencesService
+}): void {
   const status = async (): Promise<ApiKeyStatus> => ({
     present: await deps.vault.has('openrouter.apiKey'),
     protection: deps.vault.protection
@@ -32,4 +36,10 @@ export function registerSettingsHandlers(deps: { vault: SecretVault }): void {
     }
   })
   createHandler('settings:api-key-status', { handle: status })
+  createHandler('settings:get', { handle: () => deps.preferences.snapshot() })
+  createHandler('settings:update', {
+    // Forma livre aqui: a validação por chave (e a recusa de chaves internas) é do PreferencesService.
+    input: z.record(z.string(), z.unknown()),
+    handle: (patch) => deps.preferences.update(patch)
+  })
 }

@@ -33,7 +33,7 @@ You are assisting a Senior Front-End Engineer / Tech Lead in building "BakaSub",
 - **Hybrid Prompting:** Batch subtitles into chunks. Use XML tags in the prompt to distinguish `<context>` (overlapping lines for semantic reference) and `<target>` (lines to be translated).
 - **Strict Validation:** The LLM must return a JSON object (`{ "ID": "Translation" }`). Validate the network output with Zod. If hallucination or malformed JSON occurs, trigger an automated retry routine for the chunk before failing the Job.
 - **Termbase (Glossary):** Allow custom glossary injection per Preset (e.g., retaining anime suffixes or specific jargon). The glossary injects strict rules into the top of the System Prompt.
-- **Media Context:** Parse the filename (scene release naming) to pre-fill TMDB/TVDB queries, fetching synopses to enrich the AI's semantic context (allowing manual user override).
+- **Media Context:** Parse the filename (scene release naming) to pre-fill TMDB queries, fetching synopses to enrich the AI's semantic context (allowing manual user override).
 
 ### 4. Job Memory & Detailed Preflight
 - SQLite acts as a continuous cache (*Job Memory*). Translated lines are saved via *upsert*. File reprocessing must instantly hit the local cache.

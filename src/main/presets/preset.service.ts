@@ -15,8 +15,6 @@ function toDto(r: PresetRow): Preset {
     temperature: r.temperature,
     prompt: r.prompt,
     glossary: r.glossary,
-    model: r.model,
-    targetLang: r.targetLang,
     copiedFrom: r.copiedFrom,
     createdAt: r.createdAt.toISOString()
   }
@@ -68,9 +66,7 @@ export class PresetService {
       mediaType: src.mediaType,
       temperature: src.temperature,
       prompt: src.prompt,
-      glossary: src.glossary,
-      model: src.model,
-      targetLang: src.targetLang
+      glossary: src.glossary
     })
     return this.insert(data, src.id)
   }

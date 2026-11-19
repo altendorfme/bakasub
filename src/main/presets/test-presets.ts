@@ -10,8 +10,6 @@ export const TEST_PRESET: Preset = {
   temperature: 0.3,
   prompt: 'Keep honorifics.',
   glossary: [{ source: 'senpai', rule: 'keep' }],
-  model: 'a/b',
-  targetLang: 'pt-BR',
   copiedFrom: null,
   createdAt: new Date(0).toISOString()
 }
@@ -28,7 +26,7 @@ export function testPresetSource(
     },
     defaults: async () => ({
       presetId: presets[0].id,
-      model: null,
+      model: 'a/b',
       targetLang: 'pt-BR',
       ...defaults
     })

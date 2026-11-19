@@ -26,16 +26,15 @@ export const LangTagSchema = z.string().transform((tag, ctx) => {
   return z.NEVER
 })
 
-export const MediaTypeSchema = z.enum(['movie', 'series', 'anime', 'documentary', 'other'])
+/** Rótulo livre, só informativo. */
+export const MediaTypeSchema = z.string().trim().min(1).max(40)
 
 export const PresetInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   mediaType: MediaTypeSchema,
   temperature: z.number().min(0).max(2),
   prompt: z.string().trim().max(MAX_PRESET_PROMPT),
-  glossary: z.array(GlossaryEntrySchema).max(500),
-  model: z.string().trim().min(1).max(200).nullable(),
-  targetLang: LangTagSchema.nullable()
+  glossary: z.array(GlossaryEntrySchema).max(500)
 }) satisfies z.ZodType<PresetInput>
 
 export type PresetData = z.output<typeof PresetInputSchema>

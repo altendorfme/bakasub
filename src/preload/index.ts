@@ -40,7 +40,9 @@ const api: BakaSubApi = {
   settings: {
     setApiKey: (apiKey) => invoke('settings:set-api-key', { apiKey }),
     clearApiKey: () => invoke('settings:clear-api-key'),
-    apiKeyStatus: () => invoke('settings:api-key-status')
+    apiKeyStatus: () => invoke('settings:api-key-status'),
+    get: () => invoke('settings:get'),
+    update: (patch) => invoke('settings:update', patch)
   },
   presets: {
     list: () => invoke('presets:list'),

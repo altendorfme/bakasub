@@ -51,7 +51,7 @@ describe('initDatabase', () => {
       'updated_at'
     ])
     expect(await cols('presets')).toEqual(
-      expect.arrayContaining(['media_type', 'temperature', 'prompt', 'model', 'copied_from'])
+      expect.arrayContaining(['media_type', 'temperature', 'prompt', 'glossary', 'copied_from'])
     )
     client.close()
   })

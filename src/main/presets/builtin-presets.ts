@@ -51,18 +51,16 @@ function builtin(
     temperature,
     prompt,
     glossary: Object.freeze([]) as unknown as Preset['glossary'],
-    model: null,
-    targetLang: null,
     copiedFrom: null,
     createdAt: null
   })
 }
 
 export const BUILTIN_PRESETS: readonly Readonly<Preset>[] = Object.freeze([
-  builtin('builtin:movie', 'Movie', 'movie', 0.35, MOVIE),
-  builtin('builtin:series', 'Series', 'series', 0.35, SERIES),
-  builtin('builtin:anime', 'Anime', 'anime', 0.45, ANIME),
-  builtin('builtin:documentary', 'Documentary', 'documentary', 0.2, DOCUMENTARY)
+  builtin('builtin:movie', 'Movie', 'Movie', 0.35, MOVIE),
+  builtin('builtin:series', 'Series', 'Series', 0.35, SERIES),
+  builtin('builtin:anime', 'Anime', 'Anime', 0.45, ANIME),
+  builtin('builtin:documentary', 'Documentary', 'Documentary', 0.2, DOCUMENTARY)
 ])
 
 export const isBuiltinId = (id: string): boolean => id.startsWith('builtin:')

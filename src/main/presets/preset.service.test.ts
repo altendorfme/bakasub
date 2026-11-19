@@ -23,23 +23,22 @@ const custom = {
   mediaType: 'anime' as const,
   temperature: 0.5,
   prompt: 'Keep jutsu names in Japanese.',
-  glossary: [{ source: 'Konoha', target: 'Folha' }],
-  model: 'anthropic/claude-x',
-  targetLang: 'pt-br'
+  glossary: [{ source: 'Konoha', target: 'Folha' }]
 }
 
 describe('presets embutidos', () => {
   it('quatro, imutáveis, com temperatura e prompt por tipo de mídia', async () => {
     const list = await svc.list()
     expect(list.filter((p) => p.builtin).map((p) => [p.id, p.mediaType, p.temperature])).toEqual([
-      ['builtin:movie', 'movie', 0.35],
-      ['builtin:series', 'series', 0.35],
-      ['builtin:anime', 'anime', 0.45],
-      ['builtin:documentary', 'documentary', 0.2]
+      ['builtin:movie', 'Movie', 0.35],
+      ['builtin:series', 'Series', 0.35],
+      ['builtin:anime', 'Anime', 0.45],
+      ['builtin:documentary', 'Documentary', 0.2]
     ])
     for (const p of BUILTIN_PRESETS) {
       expect(p.prompt.length).toBeGreaterThan(100)
-      expect(p).toMatchObject({ model: null, targetLang: null, glossary: [] })
+      expect(p).toMatchObject({ glossary: [] })
+      expect(p).not.toHaveProperty('model')
     }
     expect(Object.isFrozen(BUILTIN_PRESETS[0])).toBe(true)
   })
@@ -57,9 +56,9 @@ describe('presets embutidos', () => {
 })
 
 describe('presets personalizados', () => {
-  it('create do zero normaliza idioma; aparecem depois dos embutidos', async () => {
+  it('create do zero; aparecem depois dos embutidos', async () => {
     const p = await svc.create(custom)
-    expect(p).toMatchObject({ id: 'p1', builtin: false, targetLang: 'pt-BR', copiedFrom: null })
+    expect(p).toMatchObject({ id: 'p1', builtin: false, mediaType: 'anime', copiedFrom: null })
     expect((await svc.list()).map((x) => x.id)).toEqual([
       'builtin:movie',
       'builtin:series',
@@ -75,7 +74,7 @@ describe('presets personalizados', () => {
     expect(copy).toMatchObject({
       builtin: false,
       name: 'Meu anime',
-      mediaType: 'anime',
+      mediaType: 'Anime',
       temperature: anime.temperature,
       prompt: anime.prompt,
       copiedFrom: 'builtin:anime'
@@ -90,9 +89,8 @@ describe('presets personalizados', () => {
       { ...custom, name: ' ' },
       { ...custom, temperature: 2.5 },
       { ...custom, prompt: 'x'.repeat(4001) },
-      { ...custom, mediaType: 'cartoon' },
-      { ...custom, targetLang: 'xx yy' },
-      { ...custom, model: '' }
+      { ...custom, mediaType: '' },
+      { ...custom, mediaType: 'x'.repeat(41) }
     ])
       await expect(svc.create(bad as never)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     await expect(svc.create({ ...custom, name: 'Anime' })).rejects.toMatchObject({
@@ -100,7 +98,7 @@ describe('presets personalizados', () => {
     })
     const p = await svc.create(custom)
     await expect(svc.create(custom)).rejects.toMatchObject({ code: 'PRESET_NAME_TAKEN' })
-    expect((await svc.update(p.id, { ...custom, temperature: 0.9, model: null })).model).toBeNull()
+    expect((await svc.update(p.id, { ...custom, temperature: 0.9 })).temperature).toBe(0.9)
     await expect(svc.get('nope')).rejects.toMatchObject({ code: 'PRESET_NOT_FOUND' })
   })
 
@@ -143,7 +141,7 @@ describe('export / import', () => {
 
   it("onConflict 'skip' ignora nomes existentes; repetidos no mesmo arquivo também conflitam", async () => {
     await svc.create(custom)
-    const entry = { ...custom, targetLang: 'pt-BR' }
+    const entry = { ...custom }
     const r = await svc.importPresets(
       file([entry, { ...entry, name: 'Novo' }, { ...entry, name: 'Novo' }]),
       { onConflict: 'skip' }

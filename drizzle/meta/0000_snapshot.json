@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "08baabcf-eb6f-407d-af37-f3e887b86596",
+  "id": "066f4450-13c1-4bbc-92c9-1065bf6736f7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "presets": {
@@ -49,20 +49,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "target_lang": {
-          "name": "target_lang",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "copied_from": {
           "name": "copied_from",

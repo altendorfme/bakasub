@@ -18,7 +18,21 @@ export const SETTINGS_SCHEMA = {
   },
   /** Modelo OpenRouter usado quando o preset não define um. */
   'translation.defaultModel': { schema: z.string().min(1).max(200).nullable(), default: null },
-  'translation.defaultTargetLang': { schema: z.string().min(1).max(35), default: 'pt-BR' },
+  /** Sem padrão de fábrica: o onboarding obriga o usuário a escolher. Sempre está em `targetLangs`. */
+  'translation.defaultTargetLang': {
+    schema: z.string().min(1).max(35).nullable(),
+    default: null as string | null
+  },
+  /** Idiomas de destino habilitados pelo usuário (tela Languages). BCP-47 canônico. */
+  'translation.targetLangs': {
+    schema: z.array(z.string().min(1).max(35)).max(30),
+    default: [] as string[]
+  },
+  /** Modelos favoritos (ids do OpenRouter): os únicos oferecidos ao traduzir. Contém o padrão. */
+  'models.favorites': {
+    schema: z.array(z.string().min(1).max(200)).max(50),
+    default: [] as string[]
+  },
   /** Preset usado quando o job não escolhe um. */
   'translation.defaultPresetId': { schema: z.string().min(1).max(64), default: 'builtin:series' },
   /** Jobs executados ao mesmo tempo. */

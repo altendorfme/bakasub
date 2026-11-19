@@ -17,7 +17,7 @@ jobs:progress (throttled 250 ms; state transitions immediately)
 | `kind`      | Input                                           | Steps                                                   | Output                                                        |
 | ----------- | ----------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
 | `extract`   | MKV + track ids                                 | probe → extract → write                                 | `<base>.<trackId>.<lang\|und>.<ext>` per track                |
-| `translate` | `.srt` / `.ass` / `.ssa`                        | translate → write                                       | `<base>.<targetLang>.<ext>`                                   |
+| `translate` | `.srt` / `.ass` / `.ssa` / `.vtt`               | translate → write                                       | `<base>.<targetLang>.<ext>`                                   |
 | `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                                  | `<base>.<lang>.mkv`                                           |
 | `pipeline`  | MKV + track id                                  | probe → extract → preflight → translate → [write] → mux | `<base>.<targetLang>.mkv` (+ subtitle if `alsoWriteSubtitle`) |
 
@@ -90,7 +90,7 @@ dialog:open-folder | dialog:open-files (multiple) | drag & drop
   - `pipeline`: one track, by preferred source language (setting `tracks.preferredSourceLangs`, default `['en']`, list order, `en-US` matches `en`) → ASS/SSA before SRT → not forced → name not matching `sign|song|karaoke|lyric` → most events → lowest id.
   - `extract`: every supported text track.
   - Files without a usable track stay in the plan with `skipped` (`no-subtitle-track`, `no-supported-track`, `probe-failed` + `error`).
-- **Create** (`batch-service.ts`): all items are resolved (`resolveJobSpec`) before anything is written; one bad item rejects the whole batch (`INVALID_INPUT`, message `item N: …`). `translate`/`pipeline` use `presetId` (default: setting `translation.defaultPresetId`) and optional `notes`.
+- **Create** (`batch-service.ts`): all items are resolved (`resolveJobSpec`) before anything is written; one bad item rejects the whole batch (`INVALID_INPUT`, message `item N: …`). `translate`/`pipeline` use `presetId` (default: setting `translation.defaultPresetId`), optional `model` and `targetLang` (defaults: `translation.defaultModel` / `translation.defaultTargetLang`; missing → `MODEL_NOT_SET` / `TARGET_LANG_NOT_SET`) and optional `notes`.
 - **Output**: without `outputDir`, next to each source. With `outputDir` and a folder batch, the relative structure is **mirrored** (subfolders created on demand); items must be inside the batch folder. Loose-file batches with `outputDir` are flat; name collisions get ` (2)`.
 - **Order**: jobs keep the plan order in the FIFO queue (staggered `created_at`).
 - **State**: `Batch.counts` per job status, `total`, `state: active | finished`.

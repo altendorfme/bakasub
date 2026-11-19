@@ -26,7 +26,7 @@ const codes = {
   PRESET_IN_USE: 'This preset is used by a queued or running job.',
   PRESET_NAME_TAKEN: 'A preset with this name already exists.',
   PRESET_READ_ONLY: 'Built-in presets cannot be changed. Duplicate it to edit a copy.',
-  MODEL_NOT_SET: 'Choose a model first: set a default in Models or pick one for this preset.',
+  MODEL_NOT_SET: 'Choose a model first: star one in Models and make it the default.',
   INVALID_PRESET_FILE: 'This is not a valid BakaSub presets file.',
   INVALID_INPUT: 'Some of the information sent was invalid.',
   JOB_NOT_FOUND: 'This job no longer exists.',
@@ -34,6 +34,10 @@ const codes = {
   BATCH_NOT_FOUND: 'This batch no longer exists.',
   MEDIA_TOOL_FAILED: 'mkvtoolnix could not process this file.',
   INVALID_SUBTITLE: 'This subtitle file could not be read.',
+  SETTINGS_CONFLICT:
+    'The default model and language must stay in your lists. Pick another default before removing it.',
+  TARGET_LANG_NOT_SET:
+    'Choose a target language first: add one in Languages and make it the default.',
   FORBIDDEN: 'The request was blocked.',
   INTERNAL: 'Something went wrong inside BakaSub. Details are in the logs.'
 } satisfies Record<ErrorCode, string>

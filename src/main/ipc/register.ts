@@ -6,6 +6,7 @@ import type { ModelCatalog } from '../llm/model-catalog'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import type { JobMemoryService } from '../memory/job-memory.service'
 import type { PresetService } from '../presets/preset.service'
+import type { PreferencesService } from '../settings/preferences.service'
 import type { SecretVault } from '../settings/secret-vault'
 import type { SidecarManager } from '../sidecars/sidecar-manager'
 import { registerAppHandlers } from './handlers/app.handler'
@@ -23,6 +24,7 @@ export interface IpcDependencies {
   sidecars: SidecarManager
   memory: JobMemoryService
   vault: SecretVault
+  preferences: PreferencesService
   presets: PresetService
   jobs: JobManager
   mkv: MkvToolnix

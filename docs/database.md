@@ -39,22 +39,22 @@ Schema files live in `src/main/database/schema/` and are re-exported from `index
 
 Custom presets only (built-ins live in code, see [`presets.md`](./presets.md)).
 
-| Column        | Type                                     | Notes                                                  |
-| ------------- | ---------------------------------------- | ------------------------------------------------------ |
-| `id`          | text PK (UUID)                           | built-in ids (`builtin:*`) never appear here           |
-| `name`        | text, unique                             |                                                        |
-| `media_type`  | text                                     | `movie` / `series` / `anime` / `documentary` / `other` |
-| `temperature` | real                                     |                                                        |
-| `prompt`      | text                                     | style guidance (System Prompt)                         |
-| `glossary`    | text (JSON), default `'[]'`              | termbase injected at the top of the System Prompt      |
-| `model`       | text, nullable                           | `null` = `translation.defaultModel`                    |
-| `target_lang` | text, nullable                           | `null` = `translation.defaultTargetLang`               |
-| `copied_from` | text, nullable                           | origin preset id when duplicated                       |
-| `created_at`  | integer (ms), default `unixepoch()*1000` |                                                        |
+| Column        | Type                                     | Notes                                             |
+| ------------- | ---------------------------------------- | ------------------------------------------------- |
+| `id`          | text PK (UUID)                           | built-in ids (`builtin:*`) never appear here      |
+| `name`        | text, unique                             |                                                   |
+| `media_type`  | text                                     | free label, 1–40 chars                            |
+| `temperature` | real                                     |                                                   |
+| `prompt`      | text                                     | style guidance (System Prompt)                    |
+| `glossary`    | text (JSON), default `'[]'`              | termbase injected at the top of the System Prompt |
+| `copied_from` | text, nullable                           | origin preset id when duplicated                  |
+| `created_at`  | integer (ms), default `unixepoch()*1000` |                                                   |
 
 ### `settings`
 
-Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`), `preflight.autoConfirmBelowUsd` (USD or `null` = always ask), `translation.defaultModel` (`null`), `translation.defaultTargetLang` (`pt-BR`), `translation.defaultPresetId` (`builtin:series`).
+Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`), `preflight.autoConfirmBelowUsd` (USD or `null` = always ask), `translation.defaultModel` (`null`), `translation.defaultTargetLang` (`null`), `translation.defaultPresetId` (`builtin:series`), `translation.targetLangs` (`[]`, the user's target languages), `models.favorites` (`[]`, the only models offered when translating).
+
+The renderer reads and writes the public subset through `PreferencesService` (`settings:get` / `settings:update`, never `models.cache`). It enforces the links between keys: the default model is always a favorite and the default language is always in `translation.targetLangs` (setting a default adds it; removing the current default without changing it → `SETTINGS_CONFLICT`), languages are canonical BCP-47 without duplicates, and the default preset must exist. Changing `jobs.concurrency` kicks the queue right away; lowering it never interrupts running jobs.
 
 ### `secrets` and `vault_keys`
 

@@ -12,6 +12,7 @@ import { MkvToolnix, type CommandRunner, type ToolResolver } from '../media/mkvt
 import type { JobMemoryService } from '../memory/job-memory.service'
 import { PresetService } from '../presets/preset.service'
 import type { SecretVault } from '../settings/secret-vault'
+import { PreferencesService } from '../settings/preferences.service'
 import { SettingsService } from '../settings/settings.service'
 import type { JobProgressEvent } from '../../shared/ipc-contract'
 import { JobManager } from './job-manager'
@@ -44,6 +45,7 @@ export function createJobModule(o: JobModuleOptions): {
   mkv: MkvToolnix
   models: ModelCatalog
   settings: SettingsService
+  preferences: PreferencesService
   batches: BatchService
 } {
   const settings = new SettingsService(new SettingsRepository(o.db), (key, err) =>
@@ -112,5 +114,17 @@ export function createJobModule(o: JobModuleOptions): {
     presets: presetSource,
     preferredSourceLangs: () => settings.get('tracks.preferredSourceLangs')
   })
-  return { jobs, presets, mkv, models, settings, batches }
+  const preferences = new PreferencesService({
+    settings,
+    presetExists: (id) =>
+      presets.get(id).then(
+        () => true,
+        () => false
+      ),
+    // Mais slots => a fila anda na hora; menos slots valem conforme os jobs terminam.
+    onChanged: (keys) => {
+      if (keys.includes('jobs.concurrency')) jobs.kick()
+    }
+  })
+  return { jobs, presets, mkv, models, settings, preferences, batches }
 }

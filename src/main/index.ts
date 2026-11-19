@@ -77,6 +77,7 @@ if (!app.requestSingleInstanceLock()) {
       sidecars: sidecarModule.manager,
       memory,
       vault,
+      preferences: jobModule.preferences,
       presets: jobModule.presets,
       jobs: jobModule.jobs,
       mkv: jobModule.mkv,

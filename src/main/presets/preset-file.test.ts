@@ -15,9 +15,7 @@ describe('buildPresetFile', () => {
           mediaType: 'anime',
           temperature: 0.3,
           prompt: 'Keep honorifics.',
-          glossary: [{ source: 'senpai', rule: 'keep' }],
-          model: 'a/b',
-          targetLang: 'pt-BR'
+          glossary: [{ source: 'senpai', rule: 'keep' }]
         }
       ]
     })
@@ -44,13 +42,21 @@ describe('parsePresetFile', () => {
     expect(r.invalid[1].name).toBe('só nome')
   })
 
-  it('model/targetLang ausentes viram null; idioma canonizado', () => {
-    const rest: Record<string, unknown> = { ...good }
-    delete rest.model
-    delete rest.targetLang
-    const r = parsePresetFile(file([rest, { ...good, targetLang: 'pt-br' }]))
-    expect(r.valid[0].data).toMatchObject({ model: null, targetLang: null })
-    expect(r.valid[1].data.targetLang).toBe('pt-BR')
+  it('campos de versões antigas (model/targetLang) são ignorados', () => {
+    const r = parsePresetFile(file([{ ...good, model: 'a/b', targetLang: 'pt-br' }]))
+    expect(r.valid[0].data).not.toHaveProperty('model')
+    expect(r.valid[0].data).not.toHaveProperty('targetLang')
+  })
+
+  it('tipo de mídia é livre (1..40)', () => {
+    const r = parsePresetFile(
+      file([
+        { ...good, mediaType: 'Sitcom' },
+        { ...good, name: 'x', mediaType: '' }
+      ])
+    )
+    expect(r.valid.map((v) => v.data.mediaType)).toEqual(['Sitcom'])
+    expect(r.invalid.map((i) => i.index)).toEqual([1])
   })
 
   it.each([

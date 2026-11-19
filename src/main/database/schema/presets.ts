@@ -17,10 +17,6 @@ export const presets = sqliteTable('presets', {
     .$type<GlossaryEntry[]>()
     .notNull()
     .default(sql`'[]'`),
-  /** `null` = modelo padrão das configurações. */
-  model: text('model'),
-  /** `null` = idioma padrão das configurações. */
-  targetLang: text('target_lang'),
   /** Id do preset de origem quando copiado. */
   copiedFrom: text('copied_from'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })

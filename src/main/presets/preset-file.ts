@@ -29,9 +29,7 @@ export function buildPresetFile(presets: readonly Preset[], now = new Date()): P
       mediaType: p.mediaType,
       temperature: p.temperature,
       prompt: p.prompt,
-      glossary: [...p.glossary],
-      model: p.model,
-      targetLang: p.targetLang
+      glossary: [...p.glossary]
     }))
   }
 }
@@ -41,11 +39,6 @@ const Envelope = z.object({
   version: z.literal(PRESET_FILE_VERSION),
   presets: z.array(z.unknown()).max(MAX_PRESETS_PER_FILE)
 })
-
-/** Campos opcionais no arquivo (escrito à mão ou por versões antigas) viram `null`. */
-const FileEntry = z
-  .looseObject({ model: z.unknown().optional(), targetLang: z.unknown().optional() })
-  .transform((e) => ({ ...e, model: e.model ?? null, targetLang: e.targetLang ?? null }))
 
 export interface ParsedPresetFile {
   valid: { index: number; data: PresetData }[]
@@ -68,17 +61,14 @@ export function parsePresetFile(text: string): ParsedPresetFile {
 
   const out: ParsedPresetFile = { valid: [], invalid: [] }
   env.data.presets.forEach((raw, index) => {
-    const entry = FileEntry.safeParse(raw)
-    const parsed = entry.success ? PresetInputSchema.safeParse(entry.data) : null
-    if (parsed?.success) out.valid.push({ index, data: parsed.data })
+    const parsed = PresetInputSchema.safeParse(raw)
+    if (parsed.success) out.valid.push({ index, data: parsed.data })
     else {
       const name = (raw as { name?: unknown } | null)?.name
       out.invalid.push({
         index,
         ...(typeof name === 'string' ? { name } : {}),
-        reason: parsed
-          ? parsed.error.issues.map((i) => i.path.join('.') || i.message).join(', ')
-          : 'not-an-object'
+        reason: parsed.error.issues.map((i) => i.path.join('.') || i.message).join(', ')
       })
     }
   })

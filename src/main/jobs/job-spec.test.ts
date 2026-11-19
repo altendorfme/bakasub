@@ -141,8 +141,8 @@ describe('resolveJobSpec', () => {
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
   })
 
-  it('preset padrão, modelo padrão e precedência do idioma (pedido > preset > padrão)', async () => {
-    const builtin = { ...TEST_PRESET, id: 'builtin:anime', model: null, targetLang: null }
+  it('preset padrão; modelo e idioma: pedido > padrão das configurações', async () => {
+    const builtin = { ...TEST_PRESET, id: 'builtin:anime' }
     const src = testPresetSource([builtin], { model: 'm/default', targetLang: 'es' })
     const s = await resolveJobSpec({ kind: 'translate', source: join(dir, 'ep01.en.srt') }, src)
     expect(s).toMatchObject({
@@ -150,17 +150,34 @@ describe('resolveJobSpec', () => {
       targetLang: 'es'
     })
     const s2 = await resolveJobSpec(
-      { kind: 'translate', source: join(dir, 'ep01.en.srt'), targetLang: 'fr' },
+      {
+        kind: 'translate',
+        source: join(dir, 'ep01.en.srt'),
+        targetLang: 'fr',
+        model: 'm/picked'
+      },
       src
     )
-    expect(s2).toMatchObject({ targetLang: 'fr' })
+    expect(s2).toMatchObject({ targetLang: 'fr', preset: { model: 'm/picked' } })
   })
 
-  it('sem modelo no preset nem padrão: MODEL_NOT_SET', async () => {
-    const src = testPresetSource([{ ...TEST_PRESET, model: null }])
+  it('sem modelo no pedido nem padrão: MODEL_NOT_SET', async () => {
+    const src = testPresetSource([TEST_PRESET], { model: null })
     await expect(
       resolveJobSpec({ kind: 'translate', source: join(dir, 'ep01.en.srt') }, src)
     ).rejects.toMatchObject({ code: 'MODEL_NOT_SET' })
+  })
+
+  it('sem idioma no pedido nem padrão: TARGET_LANG_NOT_SET', async () => {
+    const src = testPresetSource([TEST_PRESET], { targetLang: null })
+    await expect(
+      resolveJobSpec({ kind: 'translate', source: join(dir, 'ep01.en.srt') }, src)
+    ).rejects.toMatchObject({ code: 'TARGET_LANG_NOT_SET' })
+    const s = await resolveJobSpec(
+      { kind: 'translate', source: join(dir, 'ep01.en.srt'), targetLang: 'ja' },
+      src
+    )
+    expect(s).toMatchObject({ targetLang: 'ja' })
   })
 
   it('notas do usuário: trim; vazias somem; limite de tamanho', async () => {

@@ -31,7 +31,9 @@ export const APP_ERROR_CODES = [
   'JOB_INVALID_STATE',
   'BATCH_NOT_FOUND',
   'MEDIA_TOOL_FAILED',
-  'INVALID_SUBTITLE'
+  'INVALID_SUBTITLE',
+  'SETTINGS_CONFLICT',
+  'TARGET_LANG_NOT_SET'
 ] as const
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number]
 

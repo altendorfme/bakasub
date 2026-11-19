@@ -31,7 +31,7 @@ export interface PresetSnapshot {
 /** Presets + padrões das configurações (`translation.*`). */
 export interface PresetSource {
   get(id: string): Promise<Preset>
-  defaults(): Promise<{ presetId: string; model: string | null; targetLang: string }>
+  defaults(): Promise<{ presetId: string; model: string | null; targetLang: string | null }>
 }
 
 interface Base {
@@ -94,6 +94,7 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('translate'),
     source: path,
     presetId: z.string().min(1).max(64).optional(),
+    model: z.string().trim().min(1).max(200).optional(),
     notes: z.string().max(MAX_USER_NOTES).optional(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
@@ -122,6 +123,7 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     source: path,
     trackId,
     presetId: z.string().min(1).max(64).optional(),
+    model: z.string().trim().min(1).max(200).optional(),
     notes: z.string().max(MAX_USER_NOTES).optional(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
@@ -145,19 +147,18 @@ function requiredLang(tag: string): string {
 const optionalLang = (tag: string | undefined): string | undefined =>
   tag === undefined ? undefined : requiredLang(tag)
 
+/** Preset (estilo) + modelo e idioma: o pedido manda; senão, os padrões das configurações. */
 async function resolvePreset(
-  presetId: string | undefined,
-  requestedLang: string | undefined,
+  req: { presetId?: string; model?: string; targetLang?: string },
   presets: PresetSource
 ): Promise<{ preset: PresetSnapshot; targetLang: string }> {
   const defaults = await presets.defaults()
-  const p = await presets.get(presetId ?? defaults.presetId)
-  const model = p.model ?? defaults.model
-  if (!model)
-    throw new AppError(
-      'MODEL_NOT_SET',
-      `Preset "${p.name}" has no model and no default model is configured`
-    )
+  const p = await presets.get(req.presetId ?? defaults.presetId)
+  const model = req.model ?? defaults.model
+  if (!model) throw new AppError('MODEL_NOT_SET', 'No model in the request and no default model')
+  const lang = req.targetLang ?? defaults.targetLang
+  if (!lang)
+    throw new AppError('TARGET_LANG_NOT_SET', 'No target language in the request and no default')
   return {
     preset: {
       id: p.id,
@@ -168,7 +169,7 @@ async function resolvePreset(
       temperature: p.temperature,
       prompt: p.prompt
     },
-    targetLang: requiredLang(requestedLang ?? p.targetLang ?? defaults.targetLang)
+    targetLang: requiredLang(lang)
   }
 }
 
@@ -177,7 +178,7 @@ const withNotes = (notes: string | undefined): { notes?: string } =>
 
 /**
  * Pedido do renderer -> spec congelado. Revalida todos os caminhos no Main (o renderer nunca é
- * fonte confiável), copia o perfil e aplica os padrões. Lança `INVALID_INPUT`/`INVALID_PATH`.
+ * fonte confiável), copia o preset e aplica os padrões. Lança `INVALID_INPUT`/`INVALID_PATH`.
  */
 export async function resolveJobSpec(
   raw: JobCreateRequest,
@@ -204,7 +205,7 @@ export async function resolveJobSpec(
         trackIds: [...new Set(req.trackIds)].sort((a, b) => a - b)
       }
     case 'translate': {
-      const { preset, targetLang } = await resolvePreset(req.presetId, req.targetLang, presets)
+      const { preset, targetLang } = await resolvePreset(req, presets)
       return {
         ...base,
         kind: 'translate',
@@ -237,7 +238,7 @@ export async function resolveJobSpec(
       }
     }
     case 'pipeline': {
-      const { preset, targetLang } = await resolvePreset(req.presetId, req.targetLang, presets)
+      const { preset, targetLang } = await resolvePreset(req, presets)
       return {
         ...base,
         kind: 'pipeline',

@@ -1,10 +1,10 @@
 # Translation presets
 
-A preset is everything that shapes **how** a subtitle is translated: media type, temperature, style guidance (prompt), glossary, and optionally a model and a default target language. Code: `src/main/presets/`.
+A preset is the **style** of a translation: media type, temperature, style guidance (prompt) and glossary. The model and the target language are not part of a preset: they are chosen per job, starting from the defaults the user sets in Models and Languages. Code: `src/main/presets/`.
 
 ## Built-in presets (immutable)
 
-Defined in code (`builtin-presets.ts`), frozen, versioned with the app, **never stored in the database**. They have no model, glossary or target language: jobs use the settings `translation.defaultModel` and `translation.defaultTargetLang`.
+Defined in code (`builtin-presets.ts`), frozen, versioned with the app, **never stored in the database**. They have no glossary. Their media types are `Movie`, `Series`, `Anime` and `Documentary`.
 
 | Id                    | Name        | Temperature | Style guidance (summary)                                                                                                                     |
 | --------------------- | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -17,7 +17,7 @@ Defined in code (`builtin-presets.ts`), frozen, versioned with the app, **never 
 
 ## Custom presets
 
-Created from scratch (`presets:create`) or copied (`presets:duplicate`, from a built-in or a custom one; default name `<name> (copy)`, `(copy 2)`…; `copiedFrom` records the origin). Stored in the `presets` table. Validation (`preset.schema.ts`): name 1–80 chars, unique (also against built-in names, case-insensitive), `mediaType` in `movie | series | anime | documentary | other`, temperature 0–2, prompt ≤ 4,000 chars, glossary ≤ 500 entries `{ source, target?, rule? }`, `model` and `targetLang` (BCP-47) nullable. Deleting a preset used by a non-terminal job → `PRESET_IN_USE`.
+Created from scratch (`presets:create`) or copied (`presets:duplicate`, from a built-in or a custom one; default name `<name> (copy)`, `(copy 2)`…; `copiedFrom` records the origin). Stored in the `presets` table. Validation (`preset.schema.ts`): name 1–80 chars, unique (also against built-in names, case-insensitive), `mediaType` free text 1–40 chars (a label only, never sent to the model; the UI suggests Movie/Series/Anime/Documentary), temperature 0–2, prompt ≤ 4,000 chars, glossary ≤ 500 entries `{ source, target?, rule? }`. Deleting a preset used by a non-terminal job → `PRESET_IN_USE`.
 
 ## Export / import (`preset-file.ts`)
 
@@ -31,18 +31,16 @@ Created from scratch (`presets:create`) or copied (`presets:duplicate`, from a b
   "presets": [
     {
       "name": "Anime: Naruto",
-      "mediaType": "anime",
+      "mediaType": "Anime",
       "temperature": 0.45,
       "prompt": "Media type: anime. …",
-      "glossary": [{ "source": "Konoha", "target": "Folha" }],
-      "model": "anthropic/claude-x",
-      "targetLang": "pt-BR"
+      "glossary": [{ "source": "Konoha", "target": "Folha" }]
     }
   ]
 }
 ```
 
-- No ids, `builtin`, `copiedFrom` or dates: an imported preset is always a **new custom preset** (built-ins can be exported and come back as editable copies). Unknown fields are ignored; missing `model`/`targetLang` become `null`.
+- No ids, `builtin`, `copiedFrom` or dates: an imported preset is always a **new custom preset** (built-ins can be exported and come back as editable copies). Unknown fields are ignored (including `model`/`targetLang` from early development files).
 - Limits: 1 MB, 500 presets per file. A wrong envelope (not JSON, other `format`, unknown `version`) → `INVALID_PRESET_FILE` and nothing is written.
 - Each entry is validated with the same schema as `presets:create`; invalid entries are reported in `skipped` (`{ index, name?, reason }`, reason = offending fields) and the valid ones are inserted in **one transaction**.
 - Name conflicts (built-ins, existing presets, or duplicates inside the file): `onConflict: 'rename'` (default) → `<name> (imported)`, `(imported 2)`…; `'skip'` → reported as `name-taken`.
@@ -63,8 +61,8 @@ User:    <media> (user notes now; external API synopsis later)  →  <context>  
 ## Resolution when a job is created
 
 1. `presetId` from the request, else the setting `translation.defaultPresetId` (default `builtin:series`).
-2. Model: `preset.model`, else `translation.defaultModel`; neither → `MODEL_NOT_SET` (the UI should ask the user to pick a model).
-3. Target language: request → `preset.targetLang` → `translation.defaultTargetLang` (default `pt-BR`).
+2. Model: the request's `model`, else `translation.defaultModel`; neither → `MODEL_NOT_SET`.
+3. Target language: the request's `targetLang`, else `translation.defaultTargetLang`; neither → `TARGET_LANG_NOT_SET`. There is no factory default: the onboarding makes the user pick one.
 4. The job freezes a **resolved snapshot** (`spec.preset`: id, name, media type, model, glossary, temperature, prompt), so editing the preset or updating the built-ins later never changes a queued job or its retry.
 
 ## Cache key
