@@ -55,4 +55,32 @@ describe('initDatabase', () => {
     )
     client.close()
   })
+
+  it('a migration applied here but changed or gone locally is a clear DB_SCHEMA_MISMATCH', async () => {
+    const client = createClient({ url: 'file::memory:' })
+    await initDatabase(client, MIGRATIONS)
+    // Simulates a dev database migrated by an older, since regenerated, 0000.
+    await client.execute('UPDATE __drizzle_migrations SET created_at = created_at - 1000')
+    await expect(initDatabase(client, MIGRATIONS)).rejects.toMatchObject({
+      code: 'DB_SCHEMA_MISMATCH'
+    })
+    client.close()
+  })
+
+  it('same timestamp but a different hash is also a mismatch', async () => {
+    const client = createClient({ url: 'file::memory:' })
+    await initDatabase(client, MIGRATIONS)
+    await client.execute("UPDATE __drizzle_migrations SET hash = 'edited'")
+    await expect(initDatabase(client, MIGRATIONS)).rejects.toMatchObject({
+      code: 'DB_SCHEMA_MISMATCH'
+    })
+    client.close()
+  })
+
+  it('re-opening an up-to-date database is a no-op', async () => {
+    const client = createClient({ url: 'file::memory:' })
+    await initDatabase(client, MIGRATIONS)
+    await expect(initDatabase(client, MIGRATIONS)).resolves.toBeDefined()
+    client.close()
+  })
 })

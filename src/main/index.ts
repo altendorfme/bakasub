@@ -1,6 +1,6 @@
-import { app, BrowserWindow, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, safeStorage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import { initLogger, logger, redactor, setLogLevel } from './logging/logger'
+import { initLogger, logFile, logger, redactor, setLogLevel } from './logging/logger'
 import { openDatabase } from './database/client'
 import { JobMemoryRepository } from './database/repositories/job-memory.repository'
 import { JobMemoryService } from './memory/job-memory.service'
@@ -16,6 +16,7 @@ import { AppUpdateService } from './services/app-update.service'
 import { NativeConsentGate } from './services/sidecar-consent'
 import { path7za } from '7zip-bin'
 import { AppInfoService } from './services/app-info.service'
+import { bootFailureMessage } from './services/boot-failure'
 import { shutdown } from './services/shutdown-coordinator'
 import { createMainWindow } from './window/create-main-window'
 
@@ -24,77 +25,93 @@ initLogger({ emitEntries: (batch) => emitToRenderers('logs:entry', batch) })
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.whenReady().then(async () => {
-    electronApp.setAppUserModelId('com.bakasub.app')
-    app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
+  app
+    .whenReady()
+    .then(async () => {
+      electronApp.setAppUserModelId('com.bakasub.app')
+      app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
 
-    const database = await openDatabase()
-    shutdown.register('database', () => database.close())
-    // LIFO: registrado depois do banco => termina as escritas em andamento antes do close.
-    let isBusy = (): boolean => false
-    const memory = new JobMemoryService(new JobMemoryRepository(database.db), {
-      isBusy: () => isBusy()
-    })
-    shutdown.register('job-memory', () => memory.dispose())
+      const database = await openDatabase()
+      shutdown.register('database', () => database.close())
+      // LIFO: registrado depois do banco => termina as escritas em andamento antes do close.
+      let isBusy = (): boolean => false
+      const memory = new JobMemoryService(new JobMemoryRepository(database.db), {
+        isBusy: () => isBusy()
+      })
+      shutdown.register('job-memory', () => memory.dispose())
 
-    const vault = await SecretVault.open(new SecretsRepository(database.db), safeStorage)
-    logger.app.info(`secret vault ready (protection: ${vault.protection})`)
-    if (vault.recovered) logger.app.warn('secret vault master key was unrecoverable; secrets reset')
-    redactor.add(await vault.get('openrouter.apiKey'))
+      const vault = await SecretVault.open(new SecretsRepository(database.db), safeStorage)
+      logger.app.info(`secret vault ready (protection: ${vault.protection})`)
+      if (vault.recovered)
+        logger.app.warn('secret vault master key was unrecoverable; secrets reset')
+      redactor.add(await vault.get('openrouter.apiKey'))
 
-    const sidecarModule = createSidecarModule({
-      binDir: paths.bin(),
-      cacheDir: paths.cache(),
-      // 7za precisa estar fora do asar (ver asarUnpack).
-      sevenZipPath: path7za.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1'),
-      consent: new NativeConsentGate(),
-      emitProgress: (p) => emitToRenderers('sidecars:progress', p),
-      log: logger.sidecar
-    })
-    shutdown.register('sidecars', async () => {
-      sidecarModule.manager.dispose()
-      await sidecarModule.runner.disposeAll()
-    })
+      const sidecarModule = createSidecarModule({
+        binDir: paths.bin(),
+        cacheDir: paths.cache(),
+        // 7za precisa estar fora do asar (ver asarUnpack).
+        sevenZipPath: path7za.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1'),
+        consent: new NativeConsentGate(),
+        emitProgress: (p) => emitToRenderers('sidecars:progress', p),
+        log: logger.sidecar
+      })
+      shutdown.register('sidecars', async () => {
+        sidecarModule.manager.dispose()
+        await sidecarModule.runner.disposeAll()
+      })
 
-    const jobModule = createJobModule({
-      db: database.db,
-      memory,
-      vault,
-      runner: sidecarModule.runner,
-      tools: sidecarModule.manager,
-      workRoot: join(paths.cache(), 'jobs'),
-      emit: (e) => emitToRenderers('jobs:progress', e),
-      onSettingsChanged: (keys) => {
-        if (keys.includes('logs.level')) void jobModule.settings.get('logs.level').then(setLogLevel)
-      },
-      log: { jobs: logger.jobs, llm: logger.llm }
-    })
-    isBusy = () => jobModule.jobs.isBusy()
-    setLogLevel(await jobModule.settings.get('logs.level'))
-    // Registrado por último => descartado primeiro: aborta jobs (e seus processos) antes de
-    // sidecars, Job Memory e banco.
-    shutdown.register('jobs', () => jobModule.jobs.dispose(5000))
-    await jobModule.jobs.init()
+      const jobModule = createJobModule({
+        db: database.db,
+        memory,
+        vault,
+        runner: sidecarModule.runner,
+        tools: sidecarModule.manager,
+        workRoot: join(paths.cache(), 'jobs'),
+        emit: (e) => emitToRenderers('jobs:progress', e),
+        onSettingsChanged: (keys) => {
+          if (keys.includes('logs.level'))
+            void jobModule.settings.get('logs.level').then(setLogLevel)
+        },
+        log: { jobs: logger.jobs, llm: logger.llm }
+      })
+      isBusy = () => jobModule.jobs.isBusy()
+      setLogLevel(await jobModule.settings.get('logs.level'))
+      // Registrado por último => descartado primeiro: aborta jobs (e seus processos) antes de
+      // sidecars, Job Memory e banco.
+      shutdown.register('jobs', () => jobModule.jobs.dispose(5000))
+      await jobModule.jobs.init()
 
-    registerIpc({
-      appInfo: new AppInfoService(),
-      appUpdate: new AppUpdateService(sidecarModule.manifests),
-      sidecars: sidecarModule.manager,
-      memory,
-      vault,
-      preferences: jobModule.preferences,
-      presets: jobModule.presets,
-      jobs: jobModule.jobs,
-      mkv: jobModule.mkv,
-      models: jobModule.models,
-      batches: jobModule.batches
-    })
-    createMainWindow()
+      registerIpc({
+        appInfo: new AppInfoService(),
+        appUpdate: new AppUpdateService(sidecarModule.manifests),
+        sidecars: sidecarModule.manager,
+        memory,
+        vault,
+        preferences: jobModule.preferences,
+        presets: jobModule.presets,
+        jobs: jobModule.jobs,
+        mkv: jobModule.mkv,
+        models: jobModule.models,
+        batches: jobModule.batches
+      })
+      createMainWindow()
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+      })
     })
-  })
+    // Startup failures used to become an unhandled rejection and a windowless app.
+    .catch(async (err: unknown) => {
+      logger.app.error('startup failed', err)
+      const m = bootFailureMessage(err, {
+        packaged: app.isPackaged,
+        dbPath: paths.database(),
+        logPath: logFile()
+      })
+      dialog.showErrorBox(m.title, m.body)
+      await shutdown.run().catch(() => undefined)
+      app.exit(1)
+    })
 
   app.on('second-instance', () => {
     const [win] = BrowserWindow.getAllWindows()
