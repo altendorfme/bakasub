@@ -1,6 +1,6 @@
 import { AppError } from '../../errors'
 import type { SubtitleDocument, SubtitleFormat } from '../../parsers'
-import type { ProfileSnapshot } from '../job-spec'
+import type { PresetSnapshot } from '../job-spec'
 import type { StepContext } from '../step-context'
 import { formatFromPath, readSubtitle, type TextFormatId } from './subtitle-io'
 
@@ -8,7 +8,9 @@ export interface TranslationInput {
   readonly doc: SubtitleDocument<unknown>
   readonly format: SubtitleFormat<unknown>
   readonly formatId: TextFormatId
-  readonly profile: ProfileSnapshot
+  readonly preset: PresetSnapshot
+  /** Notas do usuário (e, no futuro, a sinopse da API externa). */
+  readonly media?: string
   readonly targetLang: string
   readonly sourceLang?: string
 }
@@ -40,7 +42,8 @@ export async function translationInput(ctx: StepContext): Promise<TranslationInp
     doc,
     format,
     formatId,
-    profile: spec.profile,
+    preset: spec.preset,
+    ...(spec.notes ? { media: spec.notes } : {}),
     targetLang: spec.targetLang,
     ...(sourceLang ? { sourceLang } : {})
   }

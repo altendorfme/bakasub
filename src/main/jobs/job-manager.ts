@@ -6,8 +6,7 @@ import type {
   JobCreateRequest,
   JobProgress,
   JobProgressEvent,
-  JobStatus,
-  Profile
+  JobStatus
 } from '../../shared/ipc-contract'
 import type { JobRepository, JobRow } from '../database/repositories/job.repository'
 import { AppError } from '../errors'
@@ -15,7 +14,7 @@ import { TranslationCancelled } from '../llm/translate-document'
 import type { Artifacts } from './artifacts'
 import type { RunHooks, RunOutcome } from './job-runner'
 import { StepFailure } from './job-runner'
-import { resolveJobSpec, type JobSpec } from './job-spec'
+import { resolveJobSpec, type JobSpec, type PresetSource } from './job-spec'
 import { createThrottle, type Throttle } from './throttle'
 
 const TERMINAL: ReadonlySet<JobStatus> = new Set([
@@ -39,7 +38,7 @@ export interface JobRunnerLike {
 export interface JobManagerDeps {
   readonly repo: JobRepository
   readonly runner: JobRunnerLike
-  readonly profiles: { get(id: number): Promise<Profile> }
+  readonly presets: PresetSource
   /** `userData/cache/jobs`. */
   readonly workRoot: string
   readonly concurrency: () => Promise<number> | number
@@ -116,7 +115,7 @@ export class JobManager {
 
   async create(request: JobCreateRequest): Promise<Job> {
     if (this.disposed) throw new AppError('CANCELLED', 'Shutting down')
-    const spec = await resolveJobSpec(request, this.deps.profiles)
+    const spec = await resolveJobSpec(request, this.deps.presets)
     const row = await this.deps.repo.insert({
       id: this.newId(),
       kind: spec.kind,
@@ -203,9 +202,9 @@ export class JobManager {
     return this.running.size > 0
   }
 
-  async isProfileInUse(profileId: number): Promise<boolean> {
+  async isPresetInUse(presetId: string): Promise<boolean> {
     const active = await this.deps.repo.active()
-    return active.some((r) => (r.spec as { profile?: { id: number } }).profile?.id === profileId)
+    return active.some((r) => (r.spec as { preset?: { id: string } }).preset?.id === presetId)
   }
 
   /** Shutdown: aborta tudo, espera até `timeoutMs` e marca o que sobrou como `interrupted`. */

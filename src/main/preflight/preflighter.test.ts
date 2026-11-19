@@ -40,7 +40,7 @@ describe('Preflighter', () => {
     const r = await pf().run({
       doc,
       format: srtFormat,
-      profile: { model: 'a/b', glossary: [], temperature: 0.3 },
+      preset: { model: 'a/b', glossary: [], temperature: 0.3, prompt: '' },
       targetLang: 'pt-BR'
     })
     expect(r.estimate.lines).toEqual({ total: 1, cached: 0, toTranslate: 1, chunks: 1 })
@@ -52,7 +52,7 @@ describe('Preflighter', () => {
       pf().run({
         doc,
         format: srtFormat,
-        profile: { model: 'x/y', glossary: [], temperature: 0.3 },
+        preset: { model: 'x/y', glossary: [], temperature: 0.3, prompt: '' },
         targetLang: 'pt-BR'
       })
     ).rejects.toMatchObject({ code: 'LLM_UNKNOWN_MODEL' })

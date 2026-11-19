@@ -1,18 +1,18 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "31683b3c-008f-455d-912d-1f34ab7b9ca9",
+  "id": "08baabcf-eb6f-407d-af37-f3e887b86596",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "profiles": {
-      "name": "profiles",
+    "presets": {
+      "name": "presets",
       "columns": {
         "id": {
           "name": "id",
-          "type": "integer",
+          "type": "text",
           "primaryKey": true,
           "notNull": true,
-          "autoincrement": true
+          "autoincrement": false
         },
         "name": {
           "name": "name",
@@ -21,8 +21,22 @@
           "notNull": true,
           "autoincrement": false
         },
-        "model": {
-          "name": "model",
+        "media_type": {
+          "name": "media_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "temperature": {
+          "name": "temperature",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prompt": {
+          "name": "prompt",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -36,21 +50,26 @@
           "autoincrement": false,
           "default": "'[]'"
         },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "target_lang": {
           "name": "target_lang",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'pt-BR'"
+          "notNull": false,
+          "autoincrement": false
         },
-        "temperature": {
-          "name": "temperature",
-          "type": "real",
+        "copied_from": {
+          "name": "copied_from",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0.3
+          "notNull": false,
+          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",
@@ -62,8 +81,8 @@
         }
       },
       "indexes": {
-        "profiles_name_unique": {
-          "name": "profiles_name_unique",
+        "presets_name_unique": {
+          "name": "presets_name_unique",
           "columns": [
             "name"
           ],
@@ -106,8 +125,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "glossary_hash": {
-          "name": "glossary_hash",
+        "prompt_hash": {
+          "name": "prompt_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -152,7 +171,7 @@
             "context_hash",
             "target_lang",
             "model",
-            "glossary_hash"
+            "prompt_hash"
           ],
           "isUnique": true
         },

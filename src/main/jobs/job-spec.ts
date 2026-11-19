@@ -1,8 +1,9 @@
 import { dirname } from 'node:path'
 import { z } from 'zod'
-import type { JobCreateRequest, Profile } from '../../shared/ipc-contract'
+import type { JobCreateRequest, MediaType, Preset } from '../../shared/ipc-contract'
 import { AppError } from '../errors'
 import { languageName } from '../llm/prompt-builder'
+import { MAX_USER_NOTES } from '../presets/preset.schema'
 import { canonicalTag } from '../media/languages'
 import { langFromFilename } from '../media/naming'
 import {
@@ -13,13 +14,24 @@ import {
   validateOutputDir
 } from '../media/path-guard'
 
-/** Cópia do perfil congelada no job: editar o perfil depois não muda o job nem o retry. */
-export interface ProfileSnapshot {
-  readonly id: number
+/**
+ * Preset congelado no job, já RESOLVIDO (modelo e idioma decididos na criação): editar o preset
+ * ou atualizar os embutidos depois não muda um job enfileirado nem o seu retry.
+ */
+export interface PresetSnapshot {
+  readonly id: string
   readonly name: string
+  readonly mediaType: MediaType
   readonly model: string
-  readonly glossary: Profile['glossary']
+  readonly glossary: Preset['glossary']
   readonly temperature: number
+  readonly prompt: string
+}
+
+/** Presets + padrões das configurações (`translation.*`). */
+export interface PresetSource {
+  get(id: string): Promise<Preset>
+  defaults(): Promise<{ presetId: string; model: string | null; targetLang: string }>
 }
 
 interface Base {
@@ -43,9 +55,11 @@ export type JobSpec =
   | (Base & { readonly kind: 'extract'; readonly trackIds: readonly number[] })
   | (Base & {
       readonly kind: 'translate'
-      readonly profile: ProfileSnapshot
+      readonly preset: PresetSnapshot
       readonly targetLang: string
       readonly sourceLang?: string
+      /** Contexto do usuário (vai no `<media>`). */
+      readonly notes?: string
       readonly confirmBeforeTranslate: boolean
     })
   | (Base &
@@ -54,10 +68,11 @@ export type JobSpec =
       MuxSpecOptions & {
         readonly kind: 'pipeline'
         readonly trackId: number
-        readonly profile: ProfileSnapshot
+        readonly preset: PresetSnapshot
         readonly targetLang: string
         readonly sourceLang?: string
         readonly alsoWriteSubtitle: boolean
+        readonly notes?: string
         readonly confirmBeforeTranslate: boolean
       })
 
@@ -78,7 +93,8 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('translate'),
     source: path,
-    profileId: z.number().int(),
+    presetId: z.string().min(1).max(64).optional(),
+    notes: z.string().max(MAX_USER_NOTES).optional(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
     outputDir: path.optional(),
@@ -105,7 +121,8 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('pipeline'),
     source: path,
     trackId,
-    profileId: z.number().int(),
+    presetId: z.string().min(1).max(64).optional(),
+    notes: z.string().max(MAX_USER_NOTES).optional(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
     outputDir: path.optional(),
@@ -128,13 +145,35 @@ function requiredLang(tag: string): string {
 const optionalLang = (tag: string | undefined): string | undefined =>
   tag === undefined ? undefined : requiredLang(tag)
 
-const snapshot = (p: Profile): ProfileSnapshot => ({
-  id: p.id,
-  name: p.name,
-  model: p.model,
-  glossary: p.glossary,
-  temperature: p.temperature
-})
+async function resolvePreset(
+  presetId: string | undefined,
+  requestedLang: string | undefined,
+  presets: PresetSource
+): Promise<{ preset: PresetSnapshot; targetLang: string }> {
+  const defaults = await presets.defaults()
+  const p = await presets.get(presetId ?? defaults.presetId)
+  const model = p.model ?? defaults.model
+  if (!model)
+    throw new AppError(
+      'MODEL_NOT_SET',
+      `Preset "${p.name}" has no model and no default model is configured`
+    )
+  return {
+    preset: {
+      id: p.id,
+      name: p.name,
+      mediaType: p.mediaType,
+      model,
+      glossary: p.glossary,
+      temperature: p.temperature,
+      prompt: p.prompt
+    },
+    targetLang: requiredLang(requestedLang ?? p.targetLang ?? defaults.targetLang)
+  }
+}
+
+const withNotes = (notes: string | undefined): { notes?: string } =>
+  notes?.trim() ? { notes: notes.trim() } : {}
 
 /**
  * Pedido do renderer -> spec congelado. Revalida todos os caminhos no Main (o renderer nunca é
@@ -142,7 +181,7 @@ const snapshot = (p: Profile): ProfileSnapshot => ({
  */
 export async function resolveJobSpec(
   raw: JobCreateRequest,
-  profiles: { get(id: number): Promise<Profile> }
+  presets: PresetSource
 ): Promise<JobSpec> {
   const parsed = JobCreateRequestSchema.safeParse(raw)
   if (!parsed.success) throw new AppError('INVALID_INPUT', parsed.error.message)
@@ -165,12 +204,13 @@ export async function resolveJobSpec(
         trackIds: [...new Set(req.trackIds)].sort((a, b) => a - b)
       }
     case 'translate': {
-      const profile = await profiles.get(req.profileId)
+      const { preset, targetLang } = await resolvePreset(req.presetId, req.targetLang, presets)
       return {
         ...base,
         kind: 'translate',
-        profile: snapshot(profile),
-        targetLang: requiredLang(req.targetLang ?? profile.targetLang),
+        preset,
+        targetLang,
+        ...withNotes(req.notes),
         ...withLang(optionalLang(req.sourceLang) ?? langFromFilename(src.path)),
         confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
       }
@@ -197,13 +237,14 @@ export async function resolveJobSpec(
       }
     }
     case 'pipeline': {
-      const profile = await profiles.get(req.profileId)
+      const { preset, targetLang } = await resolvePreset(req.presetId, req.targetLang, presets)
       return {
         ...base,
         kind: 'pipeline',
         trackId: req.trackId,
-        profile: snapshot(profile),
-        targetLang: requiredLang(req.targetLang ?? profile.targetLang),
+        preset,
+        targetLang,
+        ...withNotes(req.notes),
         ...withLang(optionalLang(req.sourceLang)),
         setDefault: req.options?.setDefault ?? true,
         keepOriginalSubtitles: req.options?.keepOriginalSubtitles ?? true,

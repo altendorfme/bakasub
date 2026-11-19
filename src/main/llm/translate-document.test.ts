@@ -88,7 +88,7 @@ const input = (
 ): Parameters<typeof translateDocument<unknown>>[0] => ({
   doc,
   format: srtFormat,
-  profile: { model: 'a/b', glossary: [], temperature: 0.3 },
+  preset: { model: 'a/b', glossary: [], temperature: 0.3, prompt: '' },
   targetLang: 'pt-BR',
   ...over
 })
@@ -141,7 +141,9 @@ describe('translateDocument', () => {
     const d = deps(echo)
     await expect(
       translateDocument(
-        input(srt('Hello there.'), { profile: { model: 'x/y', glossary: [], temperature: 0.3 } }),
+        input(srt('Hello there.'), {
+          preset: { model: 'x/y', glossary: [], temperature: 0.3, prompt: '' }
+        }),
         d
       )
     ).rejects.toMatchObject({ code: 'LLM_UNKNOWN_MODEL' })
@@ -313,19 +315,21 @@ describe('translateDocument', () => {
     ])
   })
 
-  it('glossário vai no System Prompt; max_tokens proporcional e limitado pelo modelo', async () => {
+  it('glossário e estilo do preset vão no System Prompt; max_tokens proporcional e limitado pelo modelo', async () => {
     const d = deps(echo)
     await translateDocument(
       input(srt('Hello senpai, how are you?'), {
-        profile: {
+        preset: {
           model: 'a/b',
           glossary: [{ source: 'senpai', rule: 'keep it' }],
-          temperature: 0.7
+          temperature: 0.7,
+          prompt: 'Media type: anime.'
         }
       }),
       d
     )
     expect(d.calls[0].messages[0].content).toContain('1. "senpai": keep it')
+    expect(d.calls[0].messages[0].content).toContain('<style>\nMedia type: anime.\n</style>')
     expect(d.calls[0].temperature).toBe(0.7)
     expect(d.calls[0].maxTokens).toBeGreaterThanOrEqual(256)
     expect(d.calls[0].maxTokens).toBeLessThanOrEqual(8000)

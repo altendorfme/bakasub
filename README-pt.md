@@ -61,7 +61,7 @@ src/
     jobs/          fila de jobs, runner, etapas (probe/extract/translate/validate/write/mux), specs
     batch/         planejamento de batch (varredura, probe, seleção de faixas) e serviço de batch
     preflight/     contagem de tokens (js-tiktoken) e estimativa de custo
-    profiles/      schema e serviço de perfis
+    presets/       presets de tradução embutidos (imutáveis) e personalizados
     settings/      registro tipado de configurações e o cofre de segredos cifrado
     window/        criação da BrowserWindow
   preload/         única superfície exposta ao renderer (window.api), com allowlist
@@ -126,7 +126,7 @@ Toda execução de CLI externo deve passar pelo `ProcessRunner` (timeout, SIGTER
 
 ## Banco de dados
 
-SQLite em modo WAL (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), com migrations Drizzle aplicadas no boot (`drizzle/` é copiado para `resources/` no pacote). Tabelas atuais: `profiles` (inclui glossário/termbase) e `job_memory` (cache de linhas traduzidas, chave única `context_hash + target_lang + model + glossary_hash`; veja [`docs/job-memory.md`](./docs/job-memory.md)).
+SQLite em modo WAL (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), com migrations Drizzle aplicadas no boot (`drizzle/` é copiado para `resources/` no pacote). Tabelas principais: `presets` (presets de tradução personalizados, com glossário/termbase; os embutidos vivem no código), `jobs`/`batches`, `settings`/`secrets` e `job_memory` (cache de linhas traduzidas, chave única `context_hash + target_lang + model + prompt_hash`; veja [`docs/job-memory.md`](./docs/job-memory.md)).
 
 ## Releases
 
@@ -152,7 +152,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 
@@ -164,7 +164,7 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] Build e release (Linux + Windows)
 - [x] **Parser SRT**: AST lossless (nós Text / Tag / LineBreak), scanner tolerante com diagnósticos, modo de reparo seguro, segmentação estilo XLIFF para o LLM, relatório de cobertura (veja [`docs/parsing.md`](./docs/parsing.md))
 - [x] **Parser ASS/SSA**: mesma AST de `core/`; só `Dialogue:` vira cue e o resto é trivia lossless; desenhos e karaokê nunca vão ao LLM (veja [`docs/parsing.md`](./docs/parsing.md))
-- [x] **Job Manager**: jobs persistidos (`extract`, `translate`, `mux`, `pipeline`), fila FIFO com concorrência limitada, `AbortController` por job, retry a partir da etapa que falhou, saídas atômicas, shutdown gracioso, CRUD de perfis, caminhos validados (veja [`docs/jobs.md`](./docs/jobs.md))
+- [x] **Job Manager**: jobs persistidos (`extract`, `translate`, `mux`, `pipeline`), fila FIFO com concorrência limitada, `AbortController` por job, retry a partir da etapa que falhou, saídas atômicas, shutdown gracioso, presets (4 embutidos imutáveis + personalizados, export/import em JSON), caminhos validados (veja [`docs/jobs.md`](./docs/jobs.md))
 - [x] **Modo batch**: pastas (com recursão opcional) ou vários arquivos, plano com seleção automática de faixas, criação atômica, espelhamento de pastas, cancelamento do lote (veja [`docs/jobs.md`](./docs/jobs.md))
 - [ ] **Formatos de legenda**: parser de WebVTT; OCR para PGS/VobSub
 - [x] **Camada LLM**: chunks sequenciais `<context>`/`<target>` sobre os misses do cache, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))

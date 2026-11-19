@@ -85,18 +85,35 @@ export interface GlossaryEntry {
   rule?: string
 }
 
-export interface Profile {
-  id: number
+export type MediaType = 'movie' | 'series' | 'anime' | 'documentary' | 'other'
+
+/**
+ * Preset de tradução. Os embutidos (`builtin: true`, ids `builtin:*`) são imutáveis e não têm
+ * modelo/idioma/glossário (usam as configurações padrão); os personalizados são criados do zero
+ * ou copiados (`copiedFrom`).
+ */
+export interface Preset {
+  id: string
+  builtin: boolean
   name: string
-  model: string
-  glossary: GlossaryEntry[]
-  /** BCP-47 canônico. */
-  targetLang: string
+  mediaType: MediaType
   temperature: number
-  createdAt: string
+  /** Orientação de estilo para o tipo de mídia (vai no System Prompt, antes das regras fixas). */
+  prompt: string
+  glossary: GlossaryEntry[]
+  /** `null` = `translation.defaultModel`. */
+  model: string | null
+  /** BCP-47; `null` = `translation.defaultTargetLang`. */
+  targetLang: string | null
+  copiedFrom: string | null
+  /** `null` nos embutidos. */
+  createdAt: string | null
 }
 
-export type ProfileInput = Omit<Profile, 'id' | 'createdAt'>
+export type PresetInput = Pick<
+  Preset,
+  'name' | 'mediaType' | 'temperature' | 'prompt' | 'glossary' | 'model' | 'targetLang'
+>
 
 export type JobKind = 'extract' | 'translate' | 'mux' | 'pipeline'
 export type JobStatus =
@@ -124,7 +141,10 @@ export type JobCreateRequest =
   | {
       kind: 'translate'
       source: string
-      profileId: number
+      /** Padrão: `translation.defaultPresetId`. */
+      presetId?: string
+      /** Notas/contexto do usuário (sinopse, personagens…), até 4000 caracteres; vai no `<media>`. */
+      notes?: string
       targetLang?: string
       sourceLang?: string
       outputDir?: string
@@ -142,7 +162,10 @@ export type JobCreateRequest =
       kind: 'pipeline'
       source: string
       trackId: number
-      profileId: number
+      /** Padrão: `translation.defaultPresetId`. */
+      presetId?: string
+      /** Notas/contexto do usuário (sinopse, personagens…), até 4000 caracteres; vai no `<media>`. */
+      notes?: string
       targetLang?: string
       sourceLang?: string
       outputDir?: string
@@ -287,7 +310,8 @@ export interface BatchCreateRequest {
   /** `plan.root`: revalidado; base do espelhamento quando há `outputDir`. */
   root: string | null
   items: { path: string; trackIds?: number[] }[]
-  profileId?: number
+  presetId?: string
+  notes?: string
   targetLang?: string
   sourceLang?: string
   /** Sem `outputDir`: saída ao lado de cada arquivo. Com `outputDir` e `root`: estrutura espelhada. */
@@ -333,6 +357,14 @@ export interface PreflightEstimate {
   decision: 'auto-confirmed' | 'needs-confirmation' | 'confirmed'
 }
 
+export interface PresetImportResult {
+  /** `null` se o diálogo foi cancelado. */
+  path: string | null
+  imported: Preset[]
+  /** Entradas não importadas: inválidas (campo com problema) ou `name-taken` com `onConflict: 'skip'`. */
+  skipped: { index: number; name?: string; reason: string }[]
+}
+
 export type IpcError = { code: string; message: string }
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError }
 
@@ -351,11 +383,22 @@ export interface IpcInvokeContract {
   'settings:set-api-key': { req: { apiKey: string }; res: ApiKeyStatus }
   'settings:clear-api-key': { req: void; res: ApiKeyStatus }
   'settings:api-key-status': { req: void; res: ApiKeyStatus }
-  'profiles:list': { req: void; res: Profile[] }
-  'profiles:create': { req: ProfileInput; res: Profile }
-  'profiles:update': { req: { id: number; profile: ProfileInput }; res: Profile }
-  /** `PROFILE_IN_USE` enquanto um job não terminal usa o perfil. */
-  'profiles:delete': { req: { id: number }; res: { deleted: true } }
+  /** Embutidos primeiro, depois os personalizados. */
+  'presets:list': { req: void; res: Preset[] }
+  'presets:create': { req: PresetInput; res: Preset }
+  /** `PRESET_READ_ONLY` nos embutidos. */
+  'presets:update': { req: { id: string; preset: PresetInput }; res: Preset }
+  /** Cópia editável (de embutido ou personalizado); nome padrão "<nome> (copy)". */
+  'presets:duplicate': { req: { id: string; name?: string }; res: Preset }
+  /** `PRESET_READ_ONLY` nos embutidos; `PRESET_IN_USE` enquanto um job não terminal o usa. */
+  'presets:delete': { req: { id: string }; res: { deleted: true } }
+  /** Diálogo nativo de salvar; `path: null` se cancelado. Embutidos também podem ser exportados. */
+  'presets:export': { req: { ids: string[] }; res: { path: string | null; count: number } }
+  /** Diálogo nativo de abrir (.json); sempre cria presets personalizados novos. */
+  'presets:import': {
+    req: { onConflict?: 'rename' | 'skip' }
+    res: PresetImportResult
+  }
   'models:list': { req: { force?: boolean }; res: ModelList }
   /** Faixas de legenda de um MKV (caminho revalidado no Main). */
   'media:probe': { req: { path: string }; res: MediaProbe }
@@ -417,10 +460,13 @@ export const INVOKE_CHANNELS = [
   'settings:set-api-key',
   'settings:clear-api-key',
   'settings:api-key-status',
-  'profiles:list',
-  'profiles:create',
-  'profiles:update',
-  'profiles:delete',
+  'presets:list',
+  'presets:create',
+  'presets:update',
+  'presets:duplicate',
+  'presets:delete',
+  'presets:export',
+  'presets:import',
   'models:list',
   'media:probe',
   'dialog:open-files',
@@ -468,11 +514,14 @@ export interface BakaSubApi {
     clearApiKey(): Promise<IpcResult<ApiKeyStatus>>
     apiKeyStatus(): Promise<IpcResult<ApiKeyStatus>>
   }
-  profiles: {
-    list(): Promise<IpcResult<Profile[]>>
-    create(profile: ProfileInput): Promise<IpcResult<Profile>>
-    update(id: number, profile: ProfileInput): Promise<IpcResult<Profile>>
-    delete(id: number): Promise<IpcResult<{ deleted: true }>>
+  presets: {
+    list(): Promise<IpcResult<Preset[]>>
+    create(preset: PresetInput): Promise<IpcResult<Preset>>
+    update(id: string, preset: PresetInput): Promise<IpcResult<Preset>>
+    duplicate(id: string, name?: string): Promise<IpcResult<Preset>>
+    delete(id: string): Promise<IpcResult<{ deleted: true }>>
+    export(ids: string[]): Promise<IpcResult<{ path: string | null; count: number }>>
+    import(onConflict?: 'rename' | 'skip'): Promise<IpcResult<PresetImportResult>>
   }
   models: {
     list(force?: boolean): Promise<IpcResult<ModelList>>

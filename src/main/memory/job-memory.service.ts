@@ -6,7 +6,7 @@ import type {
 import { AppError } from '../errors'
 import { validateTranslation, type InlineLexer, type SubtitleDocument } from '../parsers'
 import { computeContextHashes, type HashedUnit } from './context-hash'
-import { canonicalLang, glossaryHash } from './memory-key'
+import { canonicalLang, promptHash } from './memory-key'
 
 const DAY_MS = 86_400_000
 
@@ -75,6 +75,8 @@ export class JobMemoryService {
     targetLang: string
     model: string
     glossary: readonly unknown[]
+    /** Orientação de estilo do preset (entra na chave junto com o glossário). */
+    stylePrompt?: string
     lexInline: InlineLexer
     sourceLang?: string
   }): MemoryContext {
@@ -82,7 +84,7 @@ export class JobMemoryService {
       key: {
         targetLang: canonicalLang(input.targetLang),
         model: input.model,
-        glossaryHash: glossaryHash(input.glossary)
+        promptHash: promptHash(input.glossary, input.stylePrompt)
       },
       lexInline: input.lexInline,
       sourceLang: input.sourceLang

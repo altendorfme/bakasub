@@ -35,21 +35,26 @@ Schema files live in `src/main/database/schema/` and are re-exported from `index
 
 ## Tables
 
-### `profiles`
+### `presets`
 
-| Column        | Type                                     | Notes                                             |
-| ------------- | ---------------------------------------- | ------------------------------------------------- |
-| `id`          | integer PK autoincrement                 |                                                   |
-| `name`        | text, unique, not null                   |                                                   |
-| `model`       | text, not null                           | OpenRouter model id                               |
-| `glossary`    | text (JSON), not null, default `'[]'`    | termbase injected at the top of the System Prompt |
-| `target_lang` | text, not null, default `'pt-BR'`        | default target language pre-filled by the UI      |
-| `temperature` | real, not null, default `0.3`            | sampling temperature for translation requests     |
-| `created_at`  | integer (ms), default `unixepoch()*1000` |                                                   |
+Custom presets only (built-ins live in code, see [`presets.md`](./presets.md)).
+
+| Column        | Type                                     | Notes                                                  |
+| ------------- | ---------------------------------------- | ------------------------------------------------------ |
+| `id`          | text PK (UUID)                           | built-in ids (`builtin:*`) never appear here           |
+| `name`        | text, unique                             |                                                        |
+| `media_type`  | text                                     | `movie` / `series` / `anime` / `documentary` / `other` |
+| `temperature` | real                                     |                                                        |
+| `prompt`      | text                                     | style guidance (System Prompt)                         |
+| `glossary`    | text (JSON), default `'[]'`              | termbase injected at the top of the System Prompt      |
+| `model`       | text, nullable                           | `null` = `translation.defaultModel`                    |
+| `target_lang` | text, nullable                           | `null` = `translation.defaultTargetLang`               |
+| `copied_from` | text, nullable                           | origin preset id when duplicated                       |
+| `created_at`  | integer (ms), default `unixepoch()*1000` |                                                        |
 
 ### `settings`
 
-Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`), `preflight.autoConfirmBelowUsd` (USD or `null` = always ask).
+Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`), `preflight.autoConfirmBelowUsd` (USD or `null` = always ask), `translation.defaultModel` (`null`), `translation.defaultTargetLang` (`pt-BR`), `translation.defaultPresetId` (`builtin:series`).
 
 ### `secrets` and `vault_keys`
 
@@ -67,13 +72,13 @@ Envelope encryption (`src/main/settings/secret-vault.ts`):
 | `context_hash`    | text, not null                           | sha256 of `v1\0prev\0payload` (see [`job-memory.md`](./job-memory.md)) |
 | `target_lang`     | text, not null                           | canonical BCP-47 (`pt-BR` ≠ `pt-PT`)                                   |
 | `model`           | text, not null                           | OpenRouter model id                                                    |
-| `glossary_hash`   | text, not null, default `''`             | sha256 of the canonical glossary JSON; `''` without glossary           |
+| `prompt_hash`     | text, not null, default `''`             | sha256 of the canonical glossary JSON; `''` without glossary           |
 | `source_text`     | text, not null                           | source payload with markers (`<gN>`, `<xN/>`, `<br/>`)                 |
 | `translated_text` | text, not null                           | translated payload with markers                                        |
 | `updated_at`      | integer (ms), default `unixepoch()*1000` | last rewrite of the translation                                        |
 | `last_used_at`    | integer (ms), default `unixepoch()*1000` | last hit or write; the prune works on this column                      |
 
-Indexes: unique `(context_hash, target_lang, model, glossary_hash)`; `last_used_at`.
+Indexes: unique `(context_hash, target_lang, model, prompt_hash)`; `last_used_at`.
 
 Repository: `src/main/database/repositories/job-memory.repository.ts` (`lookupMany`, `upsertMany` in one transaction, `touch`, `prune` + `incremental_vacuum`, `stats` with real on-disk bytes from `dbstat`). Policy lives in the service; see [`job-memory.md`](./job-memory.md).
 
@@ -86,7 +91,7 @@ Repository: `src/main/database/repositories/job-memory.repository.ts` (`lookupMa
 | `batch_id`                                                 | text, nullable     | reserved for batch mode                                                  |
 | `status`                                                   | text               | see [`jobs.md`](./jobs.md)                                               |
 | `step`                                                     | text, nullable     | current step, or where it stopped                                        |
-| `spec`                                                     | JSON               | validated, frozen request (paths, options, **profile snapshot**)         |
+| `spec`                                                     | JSON               | validated, frozen request (paths, options, **resolved preset snapshot**) |
 | `progress`                                                 | JSON               | last persisted progress (per step / translation chunk)                   |
 | `artifacts`                                                | JSON               | per-step outputs with size + sha256 (retry resumes from the failed step) |
 | `result`                                                   | JSON, nullable     | outputs, warnings, LLM usage, cache hits, failed lines                   |
@@ -98,6 +103,6 @@ Indexes: `(status, created_at)` (FIFO queue), `batch_id`. Every transition is a 
 
 ### `batches`
 
-`id` text PK, `name`, `kind` (`extract` / `translate` / `pipeline`), `root` (source folder or `null`), `options` (JSON: profile id, languages, output dir, mux options), `created_at`. Created together with its jobs in one transaction (`BatchRepository.insertWithJobs`); status is aggregated from `jobs.batch_id`.
+`id` text PK, `name`, `kind` (`extract` / `translate` / `pipeline`), `root` (source folder or `null`), `options` (JSON: preset id, notes, languages, output dir, mux options), `created_at`. Created together with its jobs in one transaction (`BatchRepository.insertWithJobs`); status is aggregated from `jobs.batch_id`.
 
-Repositories: `profile.repository.ts` (profile CRUD; validation in `ProfileService`), `job.repository.ts`.
+Repositories: `preset.repository.ts` (custom presets; validation and built-ins in `PresetService`), `job.repository.ts`, `batch.repository.ts`.

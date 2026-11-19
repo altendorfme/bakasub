@@ -46,7 +46,7 @@ const ctx = (over: Partial<Parameters<typeof JobMemoryService.context>[0]> = {})
 
 describe('JobMemoryService', () => {
   it('context canoniza idioma e glossário', () => {
-    expect(ctx().key).toEqual({ targetLang: 'pt-BR', model: 'm/a', glossaryHash: '' })
+    expect(ctx().key).toEqual({ targetLang: 'pt-BR', model: 'm/a', promptHash: '' })
   })
 
   it('miss total, commit e hit no reprocessamento', async () => {

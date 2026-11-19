@@ -42,11 +42,14 @@ const api: BakaSubApi = {
     clearApiKey: () => invoke('settings:clear-api-key'),
     apiKeyStatus: () => invoke('settings:api-key-status')
   },
-  profiles: {
-    list: () => invoke('profiles:list'),
-    create: (profile) => invoke('profiles:create', profile),
-    update: (id, profile) => invoke('profiles:update', { id, profile }),
-    delete: (id) => invoke('profiles:delete', { id })
+  presets: {
+    list: () => invoke('presets:list'),
+    create: (preset) => invoke('presets:create', preset),
+    update: (id, preset) => invoke('presets:update', { id, preset }),
+    duplicate: (id, name) => invoke('presets:duplicate', { id, name }),
+    delete: (id) => invoke('presets:delete', { id }),
+    export: (ids) => invoke('presets:export', { ids }),
+    import: (onConflict) => invoke('presets:import', { onConflict })
   },
   models: {
     list: (force) => invoke('models:list', { force })

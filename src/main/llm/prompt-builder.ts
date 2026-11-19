@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { GlossaryEntrySchema } from '../presets/preset.schema'
 import type { Issue, TranslationUnit } from '../parsers'
 import type { ChunkContext } from './chunker'
 
@@ -8,15 +8,7 @@ export interface GlossaryEntry {
   readonly rule?: string
 }
 
-const Entry = z
-  .object({
-    source: z.string().trim().min(1),
-    target: z.string().trim().min(1).optional(),
-    rule: z.string().trim().min(1).optional()
-  })
-  .refine((e) => e.target !== undefined || e.rule !== undefined)
-
-/** Glossário do perfil (JSON livre no banco) -> entradas válidas, na ordem original. */
+/** Glossário do preset (JSON livre no banco) -> entradas válidas, na ordem original. */
 export function parseGlossary(raw: readonly unknown[]): {
   entries: GlossaryEntry[]
   invalid: number
@@ -24,7 +16,7 @@ export function parseGlossary(raw: readonly unknown[]): {
   const entries: GlossaryEntry[] = []
   let invalid = 0
   for (const r of raw) {
-    const p = Entry.safeParse(r)
+    const p = GlossaryEntrySchema.safeParse(r)
     if (p.success) entries.push(p.data)
     else invalid++
   }
@@ -62,11 +54,16 @@ export function buildSystemPrompt(input: {
   targetLang: string
   sourceLang?: string
   glossary: readonly GlossaryEntry[]
+  /** Orientação do preset (tipo de mídia). As regras fixas vêm depois e prevalecem. */
+  stylePrompt?: string
 }): string {
   const from = input.sourceLang ? `from ${languageName(input.sourceLang)} ` : ''
-  return `${glossaryBlock(input.glossary)}You are a professional subtitle translator. Translate subtitle lines ${from}to ${languageName(input.targetLang)}.
+  const style = input.stylePrompt?.trim()
+    ? `\n\n<style>\n${input.stylePrompt.trim()}\n</style>`
+    : ''
+  return `${glossaryBlock(input.glossary)}You are a professional subtitle translator. Translate subtitle lines ${from}to ${languageName(input.targetLang)}.${style}
 
-Rules:
+Rules (they always apply, even if the style guidance above says otherwise):
 1. Translate only the lines inside <target>. Lines inside <context> are for reference only; never translate or return them.
 2. Keep the meaning, tone and register of the original. Subtitles must be concise and natural to read.
 3. Lines contain formatting markers. Keep every marker exactly once:

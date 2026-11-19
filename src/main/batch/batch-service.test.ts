@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { JobResult, Profile } from '../../shared/ipc-contract'
+import type { JobResult } from '../../shared/ipc-contract'
+import { testPresetSource } from '../presets/test-presets'
 import { BatchRepository } from '../database/repositories/batch.repository'
 import { JobRepository } from '../database/repositories/job.repository'
 import { openTestDatabase } from '../database/test-db'
@@ -13,15 +14,6 @@ import type { JobSpec } from '../jobs/job-spec'
 import type { MkvInfo } from '../media/mkv-probe'
 import { BatchService, type BatchServiceDeps } from './batch-service'
 
-const profile: Profile = {
-  id: 1,
-  name: 'P',
-  model: 'a/b',
-  glossary: [],
-  targetLang: 'pt-BR',
-  temperature: 0.3,
-  createdAt: new Date(0).toISOString()
-}
 const tracks = (lang: string): MkvInfo => ({
   attachments: 0,
   subtitles: [
@@ -84,7 +76,7 @@ beforeEach(async () => {
     if (p.endsWith('broken.mkv')) throw new AppError('MEDIA_TOOL_FAILED', 'mkvmerge: bad file')
     return tracks('en')
   })
-  const profiles = { get: async () => profile }
+  const presets = testPresetSource()
   jobs = new JobManager({
     repo: new JobRepository(t.db),
     runner: {
@@ -98,7 +90,7 @@ beforeEach(async () => {
           )
         })
     },
-    profiles,
+    presets,
     workRoot: join(root, 'work'),
     concurrency: () => 1,
     emit: () => undefined
@@ -109,7 +101,7 @@ beforeEach(async () => {
     batches: new BatchRepository(t.db),
     jobs,
     mkv: { probe: probe as unknown as BatchServiceDeps['mkv']['probe'] },
-    profiles,
+    presets,
     preferredSourceLangs: async () => ['en'],
     newId: () => `batch-${++n}`
   })
@@ -168,7 +160,7 @@ describe('BatchService.create', () => {
         { path: join(root, 'show', 'ep1.mkv'), trackIds: [3] },
         { path: join(root, 'show', 'S02', 'ep1.mkv'), trackIds: [2] }
       ],
-      profileId: 1,
+      presetId: 'p-test',
       outputDir: out
     })
     expect(b).toMatchObject({
@@ -210,7 +202,7 @@ describe('BatchService.create', () => {
           { path: join(root, 'show', 'S02', 'ep1.mkv'), trackIds: [3] },
           { path: join(root, 'show', 'ep1.mkv'), trackIds: [3] }
         ],
-        profileId: 1,
+        presetId: 'p-test',
         outputDir: out
       })
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
@@ -219,21 +211,21 @@ describe('BatchService.create', () => {
         kind: 'pipeline',
         root: null,
         items: [{ path: join(root, 'show', 'ep1.mkv'), trackIds: [] }],
-        profileId: 1
+        presetId: 'p-test'
       })
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     expect(await svc.list()).toEqual([])
     expect(await jobs.list()).toEqual([])
   })
 
-  it('translate e pipeline exigem profileId', async () => {
-    await expect(
-      svc.create({
-        kind: 'translate',
-        root: null,
-        items: [{ path: join(root, 'show', 'ep1.en.srt') }]
-      })
-    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  it('sem presetId usa o preset padrão das configurações', async () => {
+    await svc.create({
+      kind: 'translate',
+      root: null,
+      items: [{ path: join(root, 'show', 'ep1.en.srt') }]
+    })
+    await until(() => runs.length === 1)
+    expect(runs[0].spec).toMatchObject({ preset: { id: 'p-test' } })
   })
 })
 
@@ -259,7 +251,7 @@ describe('BatchService: estado agregado, cancel e remove', () => {
       kind: 'pipeline',
       root: null,
       items: ['ep1.mkv', 'ep2.mkv'].map((f) => ({ path: join(root, 'show', f), trackIds: [3] })),
-      profileId: 1
+      presetId: 'p-test'
     })
     const est = (high: number): NonNullable<JobResult['preflight']> => ({
       model: { id: 'a/b', pricing: { prompt: 0, completion: 0 }, catalogFetchedAt: null },
@@ -298,7 +290,7 @@ describe('BatchService: estado agregado, cancel e remove', () => {
       kind: 'pipeline',
       root: null,
       items: [{ path: join(root, 'show', 'ep1.mkv'), trackIds: [3] }],
-      profileId: 1,
+      presetId: 'p-test',
       confirmBeforeTranslate: false
     })
     await until(() => runs.length === 1)

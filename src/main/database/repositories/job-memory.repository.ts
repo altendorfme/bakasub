@@ -6,7 +6,7 @@ import { jobMemory } from '../schema'
 export interface MemoryKey {
   readonly targetLang: string
   readonly model: string
-  readonly glossaryHash: string
+  readonly promptHash: string
 }
 
 export interface MemoryEntry {
@@ -58,7 +58,7 @@ export class JobMemoryRepository {
           and(
             eq(jobMemory.targetLang, key.targetLang),
             eq(jobMemory.model, key.model),
-            eq(jobMemory.glossaryHash, key.glossaryHash),
+            eq(jobMemory.promptHash, key.promptHash),
             inArray(jobMemory.contextHash, part)
           )
         )
@@ -81,7 +81,7 @@ export class JobMemoryRepository {
               jobMemory.contextHash,
               jobMemory.targetLang,
               jobMemory.model,
-              jobMemory.glossaryHash
+              jobMemory.promptHash
             ],
             set: {
               sourceText: sql`excluded.source_text`,

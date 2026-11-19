@@ -14,10 +14,11 @@ import { estimatePreflight } from './estimate'
 export interface PreflightInput {
   readonly doc: SubtitleDocument<unknown>
   readonly format: { readonly lexInline: InlineLexer }
-  readonly profile: {
+  readonly preset: {
     readonly model: string
     readonly glossary: readonly unknown[]
     readonly temperature: number
+    readonly prompt: string
   }
   readonly targetLang: string
   readonly sourceLang?: string
@@ -42,19 +43,20 @@ export class Preflighter {
   ) {}
 
   async run(input: PreflightInput, signal?: AbortSignal): Promise<PreflightOutput> {
-    const model = await this.deps.models.find(input.profile.model, signal)
+    const model = await this.deps.models.find(input.preset.model, signal)
     if (!model)
       throw new AppError(
         'LLM_UNKNOWN_MODEL',
-        `Model not found on OpenRouter: ${input.profile.model}`
+        `Model not found on OpenRouter: ${input.preset.model}`
       )
     const snapshot = await this.deps.models.get({ signal })
-    const glossary = parseGlossary(input.profile.glossary).entries
+    const glossary = parseGlossary(input.preset.glossary).entries
     // Mesma chave do `translateDocument`, para a taxa de acerto bater com a execução real.
     const ctx = JobMemoryService.context({
       targetLang: input.targetLang,
       model: model.id,
       glossary,
+      stylePrompt: input.preset.prompt,
       lexInline: input.format.lexInline,
       sourceLang: input.sourceLang
     })
@@ -62,7 +64,7 @@ export class Preflighter {
     return {
       estimate: estimatePreflight({
         doc: input.doc,
-        profile: { glossary },
+        preset: { glossary, prompt: input.preset.prompt },
         targetLang: input.targetLang,
         sourceLang: input.sourceLang,
         media: input.media,

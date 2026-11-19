@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, utimesSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { JobCreateRequest, JobProgressEvent, Profile } from '../../shared/ipc-contract'
+import type { JobCreateRequest, JobProgressEvent } from '../../shared/ipc-contract'
+import { testPresetSource } from '../presets/test-presets'
 import { JobRepository } from '../database/repositories/job.repository'
 import { openTestDatabase } from '../database/test-db'
 import { AppError } from '../errors'
@@ -28,16 +29,6 @@ let concurrency: number
 let repo: JobRepository
 let manager: JobManager
 let ids: number
-
-const profile: Profile = {
-  id: 1,
-  name: 'P',
-  model: 'a/b',
-  glossary: [],
-  targetLang: 'pt-BR',
-  temperature: 0.3,
-  createdAt: new Date(0).toISOString()
-}
 
 /** Espera a fila assentar: sem timers fixos (flaky sob carga). */
 async function tick(): Promise<void> {
@@ -79,7 +70,7 @@ beforeEach(async () => {
           )
         })
     },
-    profiles: { get: async () => profile },
+    presets: testPresetSource(),
     workRoot,
     concurrency: async () => concurrency,
     emit: (e) => events.push(e),
@@ -95,7 +86,7 @@ afterEach(async () => {
 const req = (): JobCreateRequest => ({
   kind: 'translate',
   source: join(root, 'a.srt'),
-  profileId: 1
+  presetId: 'p-test'
 })
 const done = (p: Pending, status: RunOutcome['status'] = 'completed'): void =>
   p.resolve({ status, result: { outputs: ['/out/a.pt-BR.srt'], warnings: [] } })
@@ -193,15 +184,15 @@ describe('JobManager', () => {
     await expect(manager.get('job-1')).rejects.toMatchObject({ code: 'JOB_NOT_FOUND' })
   })
 
-  it('isProfileInUse considera jobs não terminais', async () => {
+  it('isPresetInUse considera jobs não terminais', async () => {
     concurrency = 1
     await manager.create(req())
     await tick()
-    expect(await manager.isProfileInUse(1)).toBe(true)
-    expect(await manager.isProfileInUse(2)).toBe(false)
+    expect(await manager.isPresetInUse('p-test')).toBe(true)
+    expect(await manager.isPresetInUse('other')).toBe(false)
     done(pending[0])
     await tick()
-    expect(await manager.isProfileInUse(1)).toBe(false)
+    expect(await manager.isPresetInUse('p-test')).toBe(false)
   })
 
   it('dispose aborta e marca interrupted (não cancelled)', async () => {
@@ -227,7 +218,7 @@ describe('JobManager', () => {
     const m2 = new JobManager({
       repo,
       runner: { run: vi.fn() },
-      profiles: { get: async () => profile },
+      presets: testPresetSource(),
       workRoot,
       concurrency: async () => 1,
       emit: () => undefined
@@ -273,7 +264,7 @@ describe('JobManager', () => {
     expect(j.result?.preflight?.decision).toBe('needs-confirmation')
     expect(existsSync(join(workRoot, 'job-1'))).toBe(true)
     expect(await manager.preflight('job-1')).toEqual({ estimate, coverage: { byReason: {} } })
-    expect(await manager.isProfileInUse(1)).toBe(true)
+    expect(await manager.isPresetInUse('p-test')).toBe(true)
 
     await expect(manager.confirm('job-2')).rejects.toMatchObject({ code: 'JOB_INVALID_STATE' })
     expect((await manager.confirm('job-1')).status).toBe('queued')
@@ -291,7 +282,7 @@ describe('JobManager', () => {
     const m2 = new JobManager({
       repo,
       runner: { run: vi.fn() },
-      profiles: { get: async () => profile },
+      presets: testPresetSource(),
       workRoot,
       concurrency: async () => 1,
       emit: () => undefined

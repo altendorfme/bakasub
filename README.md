@@ -61,7 +61,7 @@ src/
     jobs/          job queue, runner, steps (probe/extract/translate/validate/write/mux), job specs
     batch/         batch planning (scan, probe, track selection) and batch service
     preflight/     token counting (js-tiktoken) and cost estimate
-    profiles/      profile schema and service
+    presets/       built-in (immutable) and custom translation presets
     settings/      typed settings registry and the encrypted secret vault
     window/        BrowserWindow factory
   preload/         the only surface exposed to the renderer (window.api), allowlisted
@@ -117,7 +117,7 @@ All external CLI execution must go through `ProcessRunner` (timeout, SIGTERM→S
 
 ## Database
 
-SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`) with Drizzle migrations applied on boot (`drizzle/` is shipped in `resources/`). Current tables: `profiles` (includes the glossary/termbase) and `job_memory` (translated-line cache, unique key `context_hash + target_lang + model + glossary_hash`; see [`docs/job-memory.md`](./docs/job-memory.md)). See [`docs/database.md`](./docs/database.md).
+SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`) with Drizzle migrations applied on boot (`drizzle/` is shipped in `resources/`). Main tables: `presets` (custom translation presets with glossary/termbase; built-ins live in code), `jobs`/`batches`, `settings`/`secrets` and `job_memory` (translated-line cache, unique key `context_hash + target_lang + model + prompt_hash`; see [`docs/job-memory.md`](./docs/job-memory.md)). See [`docs/database.md`](./docs/database.md).
 
 ## Releases
 
@@ -141,7 +141,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 
@@ -153,7 +153,7 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] Build and release (Linux + Windows)
 - [x] **SRT parser**: lossless AST (Text / Tag / LineBreak nodes), tolerant scanner with diagnostics, safe repair mode, XLIFF-style segmentation for the LLM, coverage report (see [`docs/parsing.md`](./docs/parsing.md))
 - [x] **ASS/SSA parser**: same `core/` AST; only `Dialogue:` becomes a cue, everything else is lossless trivia; drawings and karaoke are never sent to the LLM (see [`docs/parsing.md`](./docs/parsing.md))
-- [x] **Job Manager**: persisted jobs (`extract`, `translate`, `mux`, `pipeline`), FIFO queue with bounded concurrency, per-job `AbortController`, retry from the failed step, atomic outputs, graceful shutdown, profiles CRUD, validated paths (see [`docs/jobs.md`](./docs/jobs.md))
+- [x] **Job Manager**: persisted jobs (`extract`, `translate`, `mux`, `pipeline`), FIFO queue with bounded concurrency, per-job `AbortController`, retry from the failed step, atomic outputs, graceful shutdown, presets (4 immutable built-ins + custom, JSON export/import), validated paths (see [`docs/jobs.md`](./docs/jobs.md))
 - [x] **Batch mode**: folders (optionally recursive) or multiple files, plan with automatic track selection, atomic batch creation, mirrored output folders, batch cancel (see [`docs/jobs.md`](./docs/jobs.md))
 - [ ] **Subtitle formats**: WebVTT parser; OCR for PGS/VobSub
 - [x] **LLM layer**: sequential `<context>`/`<target>` chunks over cache misses, structured JSON (`json_schema` → `json_object` → prompt) validated with Zod + marker validation, per-line repair, transport retry policy, termbase in the System Prompt, OpenRouter SSE with cancellation and cost accounting, encrypted API key (see [`docs/llm.md`](./docs/llm.md))

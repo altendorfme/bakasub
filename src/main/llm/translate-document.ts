@@ -30,10 +30,13 @@ export const MAX_FAILED_RATIO = 0.1
 export interface TranslateInput<F> {
   readonly doc: SubtitleDocument<F>
   readonly format: { readonly lexInline: InlineLexer }
-  readonly profile: {
+  /** Preset já resolvido (modelo definido). */
+  readonly preset: {
     readonly model: string
     readonly glossary: readonly unknown[]
     readonly temperature: number
+    /** Orientação de estilo do tipo de mídia (System Prompt + chave do cache). */
+    readonly prompt: string
   }
   readonly targetLang: string
   readonly sourceLang?: string
@@ -95,17 +98,18 @@ export async function translateDocument<F>(
   const { signal, onProgress } = options
   const log = deps.log ?? silentLog
 
-  const model = await deps.models.find(input.profile.model, signal)
+  const model = await deps.models.find(input.preset.model, signal)
   if (!model)
-    throw new AppError('LLM_UNKNOWN_MODEL', `Model not found on OpenRouter: ${input.profile.model}`)
+    throw new AppError('LLM_UNKNOWN_MODEL', `Model not found on OpenRouter: ${input.preset.model}`)
 
-  const glossary = parseGlossary(input.profile.glossary)
+  const glossary = parseGlossary(input.preset.glossary)
   if (glossary.invalid) log.warn(`glossary: ${glossary.invalid} invalid entries ignored`)
 
   const ctx = JobMemoryService.context({
     targetLang: input.targetLang,
     model: model.id,
     glossary: glossary.entries,
+    stylePrompt: input.preset.prompt,
     lexInline: input.format.lexInline,
     sourceLang: input.sourceLang
   })
@@ -119,7 +123,7 @@ export async function translateDocument<F>(
 
   const session = new LlmSession(
     { llm: deps.llm, sleep: deps.sleep ?? realSleep, random: deps.random ?? Math.random, log },
-    { model, temperature: input.profile.temperature, signal }
+    { model, temperature: input.preset.temperature, signal }
   )
   const failed: LineFailure[] = []
   let validationFailed = 0
@@ -135,7 +139,8 @@ export async function translateDocument<F>(
       system: buildSystemPrompt({
         targetLang: input.targetLang,
         sourceLang: input.sourceLang,
-        glossary: glossary.entries
+        glossary: glossary.entries,
+        stylePrompt: input.preset.prompt
       }),
       media: input.media,
       timeline,

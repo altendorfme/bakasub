@@ -14,8 +14,8 @@ export const jobMemory = sqliteTable(
     /** BCP-47 canônico (`pt-BR` ≠ `pt-PT`). */
     targetLang: text('target_lang').notNull(),
     model: text('model').notNull(),
-    /** sha256 do glossário em JSON canônico; '' sem glossário. */
-    glossaryHash: text('glossary_hash').notNull().default(''),
+    /** sha256 de glossário + estilo do preset (ver `promptHash`); '' sem nenhum dos dois. */
+    promptHash: text('prompt_hash').notNull().default(''),
     sourceText: text('source_text').notNull(),
     translatedText: text('translated_text').notNull(),
     /** Última reescrita da tradução. */
@@ -28,7 +28,7 @@ export const jobMemory = sqliteTable(
       .default(sql`(unixepoch() * 1000)`)
   },
   (t) => [
-    uniqueIndex('job_memory_key_uq').on(t.contextHash, t.targetLang, t.model, t.glossaryHash),
+    uniqueIndex('job_memory_key_uq').on(t.contextHash, t.targetLang, t.model, t.promptHash),
     index('job_memory_last_used_idx').on(t.lastUsedAt)
   ]
 )

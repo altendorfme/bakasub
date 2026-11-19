@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalLang, glossaryHash } from './memory-key'
+import { canonicalLang, promptHash } from './memory-key'
 
 describe('canonicalLang', () => {
   it('canoniza BCP-47 e mantém a variante', () => {
@@ -12,21 +12,24 @@ describe('canonicalLang', () => {
   })
 })
 
-describe('glossaryHash', () => {
+describe('promptHash', () => {
   it("vazio => ''", () => {
-    expect(glossaryHash([])).toBe('')
+    expect(promptHash([])).toBe('')
+    expect(promptHash([], '   ')).toBe('')
   })
   it('independe da ordem das chaves dos objetos', () => {
-    expect(glossaryHash([{ source: 'senpai', rule: 'manter' }])).toBe(
-      glossaryHash([{ rule: 'manter', source: 'senpai' }])
+    expect(promptHash([{ source: 'senpai', rule: 'manter' }])).toBe(
+      promptHash([{ rule: 'manter', source: 'senpai' }])
     )
   })
   it('a ordem das entradas importa (é a ordem no prompt)', () => {
     const a = { source: 'a', rule: 'x' }
     const b = { source: 'b', rule: 'y' }
-    expect(glossaryHash([a, b])).not.toBe(glossaryHash([b, a]))
+    expect(promptHash([a, b])).not.toBe(promptHash([b, a]))
   })
-  it('sha256 hex', () => {
-    expect(glossaryHash([{ source: 'a' }])).toMatch(/^[0-9a-f]{64}$/)
+  it('o estilo do preset separa caches; espaços nas bordas não', () => {
+    expect(promptHash([], 'Anime')).not.toBe(promptHash([], 'Documentary'))
+    expect(promptHash([], ' Anime ')).toBe(promptHash([], 'Anime'))
+    expect(promptHash([{ source: 'a' }])).toMatch(/^[0-9a-f]{64}$/)
   })
 })

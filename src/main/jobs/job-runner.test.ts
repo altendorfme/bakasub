@@ -109,7 +109,15 @@ const runner = (): JobRunner =>
       autoConfirmBelowUsd: async () => threshold
     }
   })
-const profile = { id: 1, name: 'P', model: 'a/b', glossary: [], temperature: 0.3 }
+const preset = {
+  id: 'p1',
+  name: 'P',
+  mediaType: 'series' as const,
+  model: 'a/b',
+  glossary: [],
+  temperature: 0.3,
+  prompt: ''
+}
 const pipeline = (over: Partial<JobSpec> = {}): JobSpec =>
   ({
     kind: 'pipeline',
@@ -117,7 +125,7 @@ const pipeline = (over: Partial<JobSpec> = {}): JobSpec =>
     sourceSize: 10,
     outputDir: outDir,
     trackId: 2,
-    profile,
+    preset,
     targetLang: 'pt-BR',
     setDefault: true,
     keepOriginalSubtitles: true,
@@ -211,7 +219,7 @@ describe('JobRunner', () => {
       source: join(root, 'ep01.en.srt'),
       sourceSize: 1,
       outputDir: outDir,
-      profile,
+      preset,
       targetLang: 'pt-BR',
       sourceLang: 'en',
       confirmBeforeTranslate: false

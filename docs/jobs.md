@@ -3,7 +3,7 @@
 `src/main/jobs/` runs every user action on files as a persisted **job**: extract tracks, translate a subtitle, mux subtitles into an MKV, or the whole pipeline. Pure Node apart from the IPC handlers; composed in `create-job-module.ts`.
 
 ```
-jobs:create ──► resolveJobSpec (Zod + path guard + profile snapshot) ──► jobs row (queued)
+jobs:create ──► resolveJobSpec (Zod + path guard + resolved preset snapshot) ──► jobs row (queued)
 JobManager (FIFO, concurrency = settings 'jobs.concurrency', default 2)
   └─ JobRunner.run(spec, artifacts, workDir)       userData/cache/jobs/<id>/
         resume at the first step whose artifact does not verify
@@ -62,7 +62,7 @@ queued → running(step) → [awaiting-confirmation] → completed | completed-w
 - `jobs:retry` (failed / cancelled / interrupted): back to `queued`, `attempt + 1`. The runner resumes at the **first step whose artifact does not verify** (`artifacts.ts`: probe info, extracted and translated files with size + sha256); everything from there on is redone. Outputs (`write`, `mux`) are always redone. Translation is cheap anyway thanks to the Job Memory.
 - `jobs:cancel`: queued → `cancelled` directly; running → abort (LLM request and backoff, child processes); a translation already paid for is still written to the cache.
 - `jobs:remove`: terminal jobs only; deletes the row and the work dir.
-- Profiles: the job stores a **snapshot** of the profile (`spec.profile`), so editing the profile does not change a queued job or its retry; deleting a profile used by a non-terminal job → `PROFILE_IN_USE`.
+- Presets: the job stores a **resolved snapshot** of the preset (`spec.preset`, model and target language already decided, see [`presets.md`](./presets.md)), so editing the preset or updating the built-ins does not change a queued job or its retry; deleting a preset used by a non-terminal job → `PRESET_IN_USE`.
 
 ## Shutdown and housekeeping
 
@@ -90,7 +90,7 @@ dialog:open-folder | dialog:open-files (multiple) | drag & drop
   - `pipeline`: one track, by preferred source language (setting `tracks.preferredSourceLangs`, default `['en']`, list order, `en-US` matches `en`) → ASS/SSA before SRT → not forced → name not matching `sign|song|karaoke|lyric` → most events → lowest id.
   - `extract`: every supported text track.
   - Files without a usable track stay in the plan with `skipped` (`no-subtitle-track`, `no-supported-track`, `probe-failed` + `error`).
-- **Create** (`batch-service.ts`): all items are resolved (`resolveJobSpec`) before anything is written; one bad item rejects the whole batch (`INVALID_INPUT`, message `item N: …`). `translate`/`pipeline` require `profileId`.
+- **Create** (`batch-service.ts`): all items are resolved (`resolveJobSpec`) before anything is written; one bad item rejects the whole batch (`INVALID_INPUT`, message `item N: …`). `translate`/`pipeline` use `presetId` (default: setting `translation.defaultPresetId`) and optional `notes`.
 - **Output**: without `outputDir`, next to each source. With `outputDir` and a folder batch, the relative structure is **mirrored** (subfolders created on demand); items must be inside the batch folder. Loose-file batches with `outputDir` are flat; name collisions get ` (2)`.
 - **Order**: jobs keep the plan order in the FIFO queue (staggered `created_at`).
 - **State**: `Batch.counts` per job status, `total`, `state: active | finished`.

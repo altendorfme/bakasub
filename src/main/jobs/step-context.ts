@@ -4,7 +4,7 @@ import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import type { InlineLexer, SubtitleDocument } from '../parsers'
 import type { PreflightInput, PreflightOutput } from '../preflight/preflighter'
 import type { Artifacts } from './artifacts'
-import type { JobSpec, ProfileSnapshot } from './job-spec'
+import type { JobSpec, PresetSnapshot } from './job-spec'
 
 /** Tradução de um documento, já com LLM/Job Memory/catálogo ligados (ver `translateDocument`). */
 export interface SubtitleTranslator {
@@ -12,7 +12,9 @@ export interface SubtitleTranslator {
     input: {
       doc: SubtitleDocument<F>
       format: { lexInline: InlineLexer }
-      profile: ProfileSnapshot
+      preset: PresetSnapshot
+      /** Notas do usuário / contexto de mídia (`<media>`). */
+      media?: string
       targetLang: string
       sourceLang?: string
     },

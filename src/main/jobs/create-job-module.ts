@@ -2,7 +2,7 @@ import type { Database } from '../database/init'
 import { BatchRepository } from '../database/repositories/batch.repository'
 import { JobRepository } from '../database/repositories/job.repository'
 import { BatchService } from '../batch/batch-service'
-import { ProfileRepository } from '../database/repositories/profile.repository'
+import { PresetRepository } from '../database/repositories/preset.repository'
 import { SettingsRepository } from '../database/repositories/settings.repository'
 import type { LlmLog } from '../llm/llm-session'
 import { ModelCatalog } from '../llm/model-catalog'
@@ -10,7 +10,7 @@ import { OpenRouterClient } from '../llm/openrouter-client'
 import { translateDocument } from '../llm/translate-document'
 import { MkvToolnix, type CommandRunner, type ToolResolver } from '../media/mkvtoolnix-service'
 import type { JobMemoryService } from '../memory/job-memory.service'
-import { ProfileService } from '../profiles/profile.service'
+import { PresetService } from '../presets/preset.service'
 import type { SecretVault } from '../settings/secret-vault'
 import { SettingsService } from '../settings/settings.service'
 import type { JobProgressEvent } from '../../shared/ipc-contract'
@@ -40,7 +40,7 @@ export interface JobModuleOptions {
  */
 export function createJobModule(o: JobModuleOptions): {
   jobs: JobManager
-  profiles: ProfileService
+  presets: PresetService
   mkv: MkvToolnix
   models: ModelCatalog
   settings: SettingsService
@@ -60,11 +60,13 @@ export function createJobModule(o: JobModuleOptions): {
         {
           doc: input.doc,
           format: input.format,
-          profile: {
-            model: input.profile.model,
-            glossary: input.profile.glossary,
-            temperature: input.profile.temperature
+          preset: {
+            model: input.preset.model,
+            glossary: input.preset.glossary,
+            temperature: input.preset.temperature,
+            prompt: input.preset.prompt
           },
+          media: input.media,
           targetLang: input.targetLang,
           sourceLang: input.sourceLang
         },
@@ -73,11 +75,19 @@ export function createJobModule(o: JobModuleOptions): {
       )
   }
 
-  // `profiles` precisa de `jobs` (perfil em uso) e vice-versa (cópia do perfil): referência tardia.
+  // `presets` precisa de `jobs` (preset em uso) e vice-versa (cópia do preset): referência tardia.
   let jobsRef: JobManager | null = null
-  const profiles = new ProfileService(new ProfileRepository(o.db), {
-    isInUse: (id) => jobsRef?.isProfileInUse(id) ?? false
+  const presets = new PresetService(new PresetRepository(o.db), {
+    isInUse: (id) => jobsRef?.isPresetInUse(id) ?? false
   })
+  const presetSource = {
+    get: (id: string) => presets.get(id),
+    defaults: async () => ({
+      presetId: await settings.get('translation.defaultPresetId'),
+      model: await settings.get('translation.defaultModel'),
+      targetLang: await settings.get('translation.defaultTargetLang')
+    })
+  }
   const jobs = new JobManager({
     repo: new JobRepository(o.db),
     runner: new JobRunner({
@@ -88,7 +98,7 @@ export function createJobModule(o: JobModuleOptions): {
         autoConfirmBelowUsd: () => settings.get('preflight.autoConfirmBelowUsd')
       }
     }),
-    profiles,
+    presets: presetSource,
     workRoot: o.workRoot,
     concurrency: () => settings.get('jobs.concurrency'),
     emit: o.emit,
@@ -99,8 +109,8 @@ export function createJobModule(o: JobModuleOptions): {
     batches: new BatchRepository(o.db),
     jobs,
     mkv,
-    profiles,
+    presets: presetSource,
     preferredSourceLangs: () => settings.get('tracks.preferredSourceLangs')
   })
-  return { jobs, profiles, mkv, models, settings, batches }
+  return { jobs, presets, mkv, models, settings, batches }
 }

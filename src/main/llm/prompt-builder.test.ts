@@ -55,6 +55,22 @@ describe('buildSystemPrompt', () => {
     expect(p).toContain('<xN/>')
     expect(p).toContain('<br/>')
   })
+  it('estilo do preset entre o glossário e as regras fixas (que prevalecem)', () => {
+    const sp = buildSystemPrompt({
+      targetLang: 'pt-BR',
+      glossary: [{ source: 'senpai', rule: 'keep' }],
+      stylePrompt: '  Media type: anime.  '
+    })
+    const g = sp.indexOf('<glossary>')
+    const st = sp.indexOf('<style>\nMedia type: anime.\n</style>')
+    const rules = sp.indexOf('Rules (they always apply')
+    expect(g).toBeGreaterThanOrEqual(0)
+    expect(st).toBeGreaterThan(g)
+    expect(rules).toBeGreaterThan(st)
+    expect(
+      buildSystemPrompt({ targetLang: 'pt-BR', glossary: [], stylePrompt: ' ' })
+    ).not.toContain('<style>')
+  })
   it('sem glossário: sem bloco <glossary>', () => {
     expect(buildSystemPrompt({ targetLang: 'pt-BR', glossary: [] })).not.toContain('<glossary>')
   })

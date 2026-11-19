@@ -7,7 +7,7 @@ import { initDatabase } from '../init'
 import { JobMemoryRepository, type MemoryKey } from './job-memory.repository'
 
 const DAY = 86_400_000
-const KEY: MemoryKey = { targetLang: 'pt-BR', model: 'm/a', glossaryHash: '' }
+const KEY: MemoryKey = { targetLang: 'pt-BR', model: 'm/a', promptHash: '' }
 
 let dir: string
 let client: Client
@@ -59,7 +59,7 @@ describe('JobMemoryRepository', () => {
     for (const k of [
       { ...KEY, targetLang: 'pt-PT' },
       { ...KEY, model: 'm/b' },
-      { ...KEY, glossaryHash: 'g' }
+      { ...KEY, promptHash: 'g' }
     ])
       expect((await repo.lookupMany(k, ['a'])).size).toBe(0)
   })

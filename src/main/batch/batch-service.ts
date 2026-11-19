@@ -10,13 +10,13 @@ import type {
   Job,
   JobCreateRequest,
   JobStatus,
-  Profile,
   Range
 } from '../../shared/ipc-contract'
 import type { BatchRepository, BatchRow } from '../database/repositories/batch.repository'
 import { AppError } from '../errors'
 import type { JobManager } from '../jobs/job-manager'
-import { resolveJobSpec, type JobSpec } from '../jobs/job-spec'
+import { resolveJobSpec, type JobSpec, type PresetSource } from '../jobs/job-spec'
+import { MAX_USER_NOTES } from '../presets/preset.schema'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import {
   MEDIA_EXTENSIONS,
@@ -59,7 +59,8 @@ export const BatchCreateRequestSchema = z.object({
     )
     .min(1)
     .max(MAX_ITEMS),
-  profileId: z.number().int().optional(),
+  presetId: z.string().min(1).max(64).optional(),
+  notes: z.string().max(MAX_USER_NOTES).optional(),
   targetLang: z.string().min(1).max(64).optional(),
   sourceLang: z.string().min(1).max(64).optional(),
   outputDir: path.optional(),
@@ -77,7 +78,7 @@ export interface BatchServiceDeps {
   readonly batches: BatchRepository
   readonly jobs: JobManager
   readonly mkv: Pick<MkvToolnix, 'probe'>
-  readonly profiles: { get(id: number): Promise<Profile> }
+  readonly presets: PresetSource
   readonly preferredSourceLangs: () => Promise<string[]>
   readonly newId?: () => string
 }
@@ -99,8 +100,6 @@ export class BatchService {
 
   async create(raw: BatchCreateRequest): Promise<Batch> {
     const req = parse(BatchCreateRequestSchema, raw)
-    if (req.kind !== 'extract' && req.profileId === undefined)
-      throw new AppError('INVALID_INPUT', `profileId is required for ${req.kind}`)
 
     const realRoot = req.root ? await directory(req.root) : null
     const outRoot = req.outputDir ? await validateOutputDir(req.outputDir) : null
@@ -123,7 +122,7 @@ export class BatchService {
       specs.push(
         await resolveJobSpec(
           this.jobRequest(req, item, src.path, outputDir, i),
-          this.deps.profiles
+          this.deps.presets
         ).catch((err: unknown) => {
           if (
             err instanceof AppError &&
@@ -146,7 +145,8 @@ export class BatchService {
         kind: req.kind,
         root: realRoot,
         options: {
-          profileId: req.profileId,
+          presetId: req.presetId,
+          notes: req.notes,
           targetLang: req.targetLang,
           sourceLang: req.sourceLang,
           outputDir: outRoot,
@@ -226,7 +226,8 @@ export class BatchService {
         return {
           kind: 'translate',
           ...common,
-          profileId: req.profileId!,
+          presetId: req.presetId,
+          notes: req.notes,
           targetLang: req.targetLang,
           sourceLang: req.sourceLang,
           confirmBeforeTranslate: req.confirmBeforeTranslate
@@ -239,7 +240,8 @@ export class BatchService {
           kind: 'pipeline',
           ...common,
           trackId,
-          profileId: req.profileId!,
+          presetId: req.presetId,
+          notes: req.notes,
           targetLang: req.targetLang,
           sourceLang: req.sourceLang,
           options: req.options,

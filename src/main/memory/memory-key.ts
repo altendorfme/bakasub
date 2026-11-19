@@ -20,10 +20,12 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
- * Versão do glossário na chave do cache: sha256 do JSON canônico, ou '' quando vazio.
- * Perfis com o mesmo glossário compartilham cache; mudar o glossário invalida as entradas.
+ * O que, no prompt, muda a tradução e entra na chave do cache: glossário + orientação de estilo
+ * do preset. sha256 do JSON canônico, ou '' quando ambos são vazios. Presets com o mesmo
+ * glossário e estilo compartilham cache; temperatura e contexto de mídia (por episódio) não entram.
  */
-export function glossaryHash(glossary: readonly unknown[]): string {
-  if (glossary.length === 0) return ''
-  return createHash('sha256').update(canonicalJson(glossary), 'utf8').digest('hex')
+export function promptHash(glossary: readonly unknown[], stylePrompt = ''): string {
+  const style = stylePrompt.trim()
+  if (glossary.length === 0 && style === '') return ''
+  return createHash('sha256').update(canonicalJson({ glossary, style }), 'utf8').digest('hex')
 }

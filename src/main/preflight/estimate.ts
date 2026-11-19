@@ -28,7 +28,7 @@ const APPROX_HIGH = 1.2
 
 export interface EstimateInput {
   readonly doc: SubtitleDocument<unknown>
-  readonly profile: { readonly glossary: readonly unknown[] }
+  readonly preset: { readonly glossary: readonly unknown[]; readonly prompt: string }
   readonly targetLang: string
   readonly sourceLang?: string
   readonly media?: string
@@ -49,7 +49,8 @@ export function estimatePreflight(input: EstimateInput): Omit<PreflightEstimate,
   const system = buildSystemPrompt({
     targetLang: input.targetLang,
     sourceLang: input.sourceLang,
-    glossary: parseGlossary(input.profile.glossary).entries
+    glossary: parseGlossary(input.preset.glossary).entries,
+    stylePrompt: input.preset.prompt
   })
   const known = new Map<number, string>()
   for (const [cueId, hit] of lookup.hits) known.set(cueId, hit.translated)

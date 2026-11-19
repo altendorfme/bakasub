@@ -162,5 +162,5 @@ Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤1
 
 - No line-length/reflow checks on translated text (belongs to the LLM QC layer).
 - The context hash lives in the Job Memory module ([`job-memory.md`](./job-memory.md)); this layer only exposes `cuePlainText()` (tags removed, breaks and ASS `\\h` as spaces) and `normalizeForHash()` (NFC, `\\h` → space, collapsed whitespace, trim, case preserved).
-- No style filter in the parser API (`Cue.style` is exposed; filtering belongs to the Job/Profile iteration).
+- No style filter in the parser API (`Cue.style` is exposed; filtering belongs to a later jobs/presets iteration).
 - ASS `[Fonts]`/`[Graphics]`, `\\t` animations and `\\clip` are kept raw as trivia/tags; nothing is interpreted beyond what is listed above.

@@ -15,7 +15,7 @@ describe('initDatabase', () => {
 
     const cols = (await client.execute('PRAGMA table_info(job_memory)')).rows.map((r) => r.name)
     expect(cols).toEqual(
-      expect.arrayContaining(['glossary_hash', 'last_used_at', 'updated_at', 'model'])
+      expect.arrayContaining(['prompt_hash', 'last_used_at', 'updated_at', 'model'])
     )
 
     const idx = await client.execute(
@@ -25,7 +25,7 @@ describe('initDatabase', () => {
     const keyCols = (await client.execute(`PRAGMA index_info(${String(name)})`)).rows.map(
       (r) => r.name
     )
-    expect(keyCols).toEqual(['context_hash', 'target_lang', 'model', 'glossary_hash'])
+    expect(keyCols).toEqual(['context_hash', 'target_lang', 'model', 'prompt_hash'])
     client.close()
   })
 
@@ -36,7 +36,7 @@ describe('initDatabase', () => {
     client.close()
   })
 
-  it('cria settings, secrets e as colunas novas de profiles', async () => {
+  it('cria settings, secrets e presets (só personalizados)', async () => {
     const client = createClient({ url: 'file::memory:' })
     await initDatabase(client, MIGRATIONS)
     const cols = async (t: string): Promise<unknown[]> =>
@@ -50,7 +50,9 @@ describe('initDatabase', () => {
       'key_version',
       'updated_at'
     ])
-    expect(await cols('profiles')).toEqual(expect.arrayContaining(['target_lang', 'temperature']))
+    expect(await cols('presets')).toEqual(
+      expect.arrayContaining(['media_type', 'temperature', 'prompt', 'model', 'copied_from'])
+    )
     client.close()
   })
 })

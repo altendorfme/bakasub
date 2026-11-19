@@ -15,7 +15,8 @@ export const translateStep: Step = async (ctx) => {
       {
         doc,
         format,
-        profile: input.profile,
+        preset: input.preset,
+        media: input.media,
         targetLang: input.targetLang,
         sourceLang: input.sourceLang
       },

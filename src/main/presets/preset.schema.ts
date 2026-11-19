@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import type { PresetInput } from '../../shared/ipc-contract'
+
+export const MAX_PRESET_PROMPT = 4000
+export const MAX_USER_NOTES = 4000
 
 /** Entrada da termbase: `source` + ao menos `target` ou `rule`. */
 export const GlossaryEntrySchema = z
@@ -11,7 +15,7 @@ export const GlossaryEntrySchema = z
     message: 'glossary entry needs a target or a rule'
   })
 
-const LangTag = z.string().transform((tag, ctx) => {
+export const LangTagSchema = z.string().transform((tag, ctx) => {
   try {
     const [canonical] = Intl.getCanonicalLocales(tag)
     if (canonical) return canonical
@@ -22,13 +26,16 @@ const LangTag = z.string().transform((tag, ctx) => {
   return z.NEVER
 })
 
-export const ProfileInputSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  model: z.string().trim().min(1).max(200),
-  glossary: z.array(GlossaryEntrySchema).max(500),
-  targetLang: LangTag,
-  temperature: z.number().min(0).max(2)
-})
+export const MediaTypeSchema = z.enum(['movie', 'series', 'anime', 'documentary', 'other'])
 
-export type ProfileInput = z.input<typeof ProfileInputSchema>
-export type ProfileData = z.output<typeof ProfileInputSchema>
+export const PresetInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  mediaType: MediaTypeSchema,
+  temperature: z.number().min(0).max(2),
+  prompt: z.string().trim().max(MAX_PRESET_PROMPT),
+  glossary: z.array(GlossaryEntrySchema).max(500),
+  model: z.string().trim().min(1).max(200).nullable(),
+  targetLang: LangTagSchema.nullable()
+}) satisfies z.ZodType<PresetInput>
+
+export type PresetData = z.output<typeof PresetInputSchema>

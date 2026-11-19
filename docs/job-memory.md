@@ -17,14 +17,14 @@ Payloads, not plain text: `source_text` is the source payload and `translated_te
 
 ## Key
 
-`(context_hash, target_lang, model, glossary_hash)`:
+`(context_hash, target_lang, model, prompt_hash)`:
 
-| Part            | Rule                                                                                                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `context_hash`  | below                                                                                                                                                                                            |
-| `target_lang`   | canonical BCP-47 via `Intl.getCanonicalLocales` (`pt-br` → `pt-BR`; `pt-BR` ≠ `pt-PT`)                                                                                                           |
-| `model`         | OpenRouter model id. Another model starts cold (never an automatic hit)                                                                                                                          |
-| `glossary_hash` | sha256 of the glossary as canonical JSON (object keys sorted, array order kept: it is the prompt order); `''` if empty. Changing the glossary invalidates; profiles with the same glossary share |
+| Part           | Rule                                                                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `context_hash` | below                                                                                                                                                                                                                                         |
+| `target_lang`  | canonical BCP-47 via `Intl.getCanonicalLocales` (`pt-br` → `pt-BR`; `pt-BR` ≠ `pt-PT`)                                                                                                                                                        |
+| `model`        | OpenRouter model id. Another model starts cold (never an automatic hit)                                                                                                                                                                       |
+| `prompt_hash`  | sha256 of the canonical JSON of `{ glossary, style }` (preset glossary + style prompt); `''` if both are empty. Changing either invalidates; presets with the same glossary and style share. Temperature and media context are not part of it |
 
 `sourceLang` is **not** part of the key: the source text already determines it.
 

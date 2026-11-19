@@ -26,7 +26,7 @@ const doc = srtFormat.parse(
 const allMisses = (): DocumentLookup => ({ hits: new Map(), misses: computeContextHashes(doc) })
 const base = {
   doc,
-  profile: { glossary: [] as unknown[] },
+  preset: { glossary: [] as unknown[], prompt: '' },
   targetLang: 'pt-BR',
   catalogFetchedAt: 0
 }
@@ -83,7 +83,10 @@ describe('estimatePreflight', () => {
     const plain = estimatePreflight({ ...base, model: GPT, lookup: allMisses() })
     const withGlossary = estimatePreflight({
       ...base,
-      profile: { glossary: [{ source: 'senpai', rule: 'keep Japanese honorifics as they are' }] },
+      preset: {
+        glossary: [{ source: 'senpai', rule: 'keep Japanese honorifics as they are' }],
+        prompt: ''
+      },
       model: GPT,
       lookup: allMisses()
     })

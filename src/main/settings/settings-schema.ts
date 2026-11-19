@@ -16,6 +16,11 @@ export const SETTINGS_SCHEMA = {
       .nullable(),
     default: null
   },
+  /** Modelo OpenRouter usado quando o preset não define um. */
+  'translation.defaultModel': { schema: z.string().min(1).max(200).nullable(), default: null },
+  'translation.defaultTargetLang': { schema: z.string().min(1).max(35), default: 'pt-BR' },
+  /** Preset usado quando o job não escolhe um. */
+  'translation.defaultPresetId': { schema: z.string().min(1).max(64), default: 'builtin:series' },
   /** Jobs executados ao mesmo tempo. */
   'jobs.concurrency': { schema: z.number().int().min(1).max(4), default: 2 },
   /** Preflight: o job segue sozinho se o custo máximo estimado (USD) ficar abaixo disto. `null` = sempre perguntar. */

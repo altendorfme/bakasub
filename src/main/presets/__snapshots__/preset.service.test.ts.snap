@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`presets embutidos > prompts estáveis (mudanças são deliberadas) 1`] = `
+[
+  "Media type: feature film.
+- Write natural, idiomatic dialogue, as in a professional theatrical subtitle.
+- Keep each character's tone and register consistent (formal vs. informal address, how they speak).
+- Adapt slang, idioms, wordplay and jokes to natural equivalents instead of translating literally.
+- Keep lines short and easy to read at a glance; prefer concise phrasing over completeness.
+- Do not censor or soften profanity, insults or slurs; match their intensity.",
+  "Media type: TV series episode.
+- Write natural, idiomatic dialogue, as in a professional streaming subtitle.
+- Keep names, nicknames, forms of address and recurring terms consistent throughout the episode.
+- Keep each character's voice and register consistent; adapt slang and idioms to natural equivalents.
+- "Previously on" recaps, titles and on-screen text must stay concise.
+- Keep lines short and easy to read at a glance.
+- Do not censor or soften profanity; match its intensity.",
+  "Media type: anime (Japanese animation).
+- Keep Japanese honorifics (-san, -kun, -chan, -sama, -senpai, -sensei, -dono) attached to names.
+- Keep culturally specific terms without a natural equivalent (e.g. onii-chan, senpai, itadakimasu, baka) unless the glossary says otherwise.
+- Keep the names of attacks, techniques, transformations, organizations and places as in the source.
+- Preserve the expressive, energetic tone, exclamations and each character's speech quirks (catchphrases, verbal tics, archaic or rough speech).
+- Translate onomatopoeia and on-screen captions only when they carry meaning.
+- Keep lines short and easy to read at a glance.",
+  "Media type: documentary.
+- Prioritize accuracy over style: use the correct technical, scientific and historical terminology in the target language.
+- Keep numbers, dates, measurements, units, quantities and proper names exactly as stated; do not convert units.
+- Use a neutral, formal register for narration; keep interviews natural but faithful to what is said.
+- Keep the titles of works, institutions and species in their established target-language form when one exists.
+- Keep lines short and easy to read at a glance.",
+]
+`;
