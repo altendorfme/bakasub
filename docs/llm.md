@@ -39,7 +39,7 @@ translateDocument
 ## Prompt
 
 - **System** (identical for every chunk of a job, which helps provider prompt caching): the termbase on top (`<glossary>`, whole preset glossary, entries `{source, target?, rule?}`, invalid entries dropped and logged), then the preset style guidance (`<style>`, see [`presets.md`](./presets.md)), then fixed rules in English that always apply (translate only `<target>`, keep every `<gN>…</gN>`/`<xN/>`/`<br/>` exactly once and `<xN/>` in order, no new tags or line breaks, no notes), then the output format.
-- **User**: `<media>` (user notes now, external synopsis later), `<context>` (`<before>`/`<after>`), `<target>` with `<line id="N">payload</line>`.
+- **User**: `<media>` (frozen TMDB details + user notes, see [`media-context.md`](./media-context.md)), `<context>` (`<before>`/`<after>`), `<target>` with `<line id="N">payload</line>`.
 - **Repair**: same System; for each failing line, `<source>`, what was `<returned>` and the concrete `<problems>` (e.g. `<g1>…</g1> is missing`, `expected exactly 2 <br/>, got 1`).
 - Snapshots in `prompt-builder.test.ts` pin the exact text.
 
@@ -82,5 +82,4 @@ Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay 
 
 ## Open points
 
-- Media context (`<media>`) comes from the TMDB/TVDB module.
 - Chunk limits, context window and the failure ratio are constants; presets may override them later.

@@ -121,6 +121,68 @@ export interface RendererErrorReport {
   source: 'boundary' | 'window' | 'promise'
 }
 
+/** Contexto de mídia (TMDB). `series` = TV no TMDB. */
+export type MediaKind = 'movie' | 'series'
+
+export interface MediaRef {
+  provider: 'tmdb'
+  id: number
+  kind: MediaKind
+}
+
+/** URLs de arte são `bakasub-media://…`: o Main baixa e guarda em cache; o renderer nunca vai à rede. */
+export interface MediaSearchResult extends MediaRef {
+  title: string
+  originalTitle?: string
+  year?: number
+  posterUrl?: string
+}
+
+export interface MediaDetails extends MediaSearchResult {
+  genres: string[]
+  /** Minutos (filme) ou duração típica do episódio (série). */
+  runtime?: number
+  synopsis: string
+  backdropUrl?: string
+}
+
+export interface EpisodeDetails {
+  season: number
+  episode: number
+  title: string
+  synopsis?: string
+}
+
+/** O que o nome do arquivo diz sobre a mídia (parser de release). */
+export interface ReleaseNameInfo {
+  title: string
+  year?: number
+  season?: number
+  episode?: number
+  /** Numeração absoluta de anime (`Show - 28`): o usuário converte em temporada/episódio. */
+  absoluteEpisode?: number
+}
+
+/**
+ * Resultado da identificação automática. `matched` só quando o título (e o ano, se o nome tiver)
+ * batem; senão `not-found` e o usuário busca. `no-key`: sem chave do TMDB (recurso opcional).
+ */
+export interface MediaIdentification {
+  release: ReleaseNameInfo
+  status: 'matched' | 'not-found' | 'no-key' | 'offline'
+  match: MediaDetails | null
+  episode: EpisodeDetails | null
+}
+
+export interface MediaContextLookup {
+  details: MediaDetails
+  episode: EpisodeDetails | null
+}
+
+export interface TmdbKeyStatus {
+  present: boolean
+}
+
 export interface ApiKeyStatus {
   present: boolean
   /** `os`: protegida pelo cofre do sistema; `none`: sem keyring disponível (a UI deve avisar). */
@@ -173,6 +235,12 @@ export type JobStatus =
   | 'interrupted'
 export type JobStep = 'probe' | 'extract' | 'preflight' | 'translate' | 'validate' | 'write' | 'mux'
 
+export interface JobMediaRequest {
+  ref: MediaRef
+  season?: number
+  episode?: number
+}
+
 export interface MuxOptions {
   /** A faixa nova vira `default` e as legendas originais perdem o `default`. Padrão `true`. */
   setDefault?: boolean
@@ -192,6 +260,11 @@ export type JobCreateRequest =
       model?: string
       /** Notas/contexto do usuário (sinopse, personagens…), até 4000 caracteres; vai no `<media>`. */
       notes?: string
+      /**
+       * Contexto do TMDB escolhido na UI (só quando "Include" está marcado). O Main busca os
+       * detalhes e os congela no job.
+       */
+      media?: JobMediaRequest
       /** Padrão: `translation.defaultTargetLang`. */
       targetLang?: string
       sourceLang?: string
@@ -216,6 +289,11 @@ export type JobCreateRequest =
       model?: string
       /** Notas/contexto do usuário (sinopse, personagens…), até 4000 caracteres; vai no `<media>`. */
       notes?: string
+      /**
+       * Contexto do TMDB escolhido na UI (só quando "Include" está marcado). O Main busca os
+       * detalhes e os congela no job.
+       */
+      media?: JobMediaRequest
       /** Padrão: `translation.defaultTargetLang`. */
       targetLang?: string
       sourceLang?: string
@@ -424,6 +502,8 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError 
 export interface IpcInvokeContract {
   'app:get-info': { req: void; res: AppInfo }
   'app:check-update': { req: void; res: AppUpdateInfo }
+  /** Só HTTPS para hosts da allowlist do Main (TMDB, OpenRouter); senão `URL_NOT_ALLOWED`. */
+  'app:open-external': { req: { url: string }; res: { opened: true } }
   'sidecars:check': { req: void; res: SidecarReport }
   /** O Main exibe diálogo nativo de consentimento; sem aceite, nada é baixado. */
   'sidecars:install': { req: { tools: string[] }; res: SidecarInstallResult }
@@ -434,6 +514,17 @@ export interface IpcInvokeContract {
   /** Somente escrita: a chave nunca volta ao renderer. */
   'settings:set-api-key': { req: { apiKey: string }; res: ApiKeyStatus }
   'settings:clear-api-key': { req: void; res: ApiKeyStatus }
+  /** Validada no TMDB (`GET /configuration`) antes de ir para o vault: `TMDB_AUTH` se recusada. */
+  'settings:set-tmdb-key': { req: { key: string }; res: TmdbKeyStatus }
+  'settings:clear-tmdb-key': { req: void; res: TmdbKeyStatus }
+  'settings:tmdb-key-status': { req: void; res: TmdbKeyStatus }
+  /** Só o nome do arquivo é usado (nada é lido do disco). */
+  'media:identify': { req: { name: string }; res: MediaIdentification }
+  'media:search': { req: { query: string }; res: MediaSearchResult[] }
+  'media:lookup': {
+    req: { ref: MediaRef; season?: number; episode?: number }
+    res: MediaContextLookup
+  }
   'settings:api-key-status': { req: void; res: ApiKeyStatus }
   'settings:get': { req: void; res: PublicSettings }
   /** Patch parcial, validado por chave; aplica as regras de favoritos/idiomas (`SETTINGS_CONFLICT`). */
@@ -518,6 +609,7 @@ export type EventChannel = keyof IpcEventContract
 export const INVOKE_CHANNELS = [
   'app:get-info',
   'app:check-update',
+  'app:open-external',
   'sidecars:check',
   'sidecars:install',
   'sidecars:cancel',
@@ -525,6 +617,12 @@ export const INVOKE_CHANNELS = [
   'memory:prune',
   'settings:set-api-key',
   'settings:clear-api-key',
+  'settings:set-tmdb-key',
+  'settings:clear-tmdb-key',
+  'settings:tmdb-key-status',
+  'media:identify',
+  'media:search',
+  'media:lookup',
   'settings:api-key-status',
   'settings:get',
   'settings:update',
@@ -573,6 +671,7 @@ export interface BakaSubApi {
   app: {
     getInfo(): Promise<IpcResult<AppInfo>>
     checkUpdate(): Promise<IpcResult<AppUpdateInfo>>
+    openExternal(url: string): Promise<IpcResult<{ opened: true }>>
   }
   sidecars: {
     check(): Promise<IpcResult<SidecarReport>>
@@ -587,6 +686,9 @@ export interface BakaSubApi {
     setApiKey(apiKey: string): Promise<IpcResult<ApiKeyStatus>>
     clearApiKey(): Promise<IpcResult<ApiKeyStatus>>
     apiKeyStatus(): Promise<IpcResult<ApiKeyStatus>>
+    setTmdbKey(key: string): Promise<IpcResult<TmdbKeyStatus>>
+    clearTmdbKey(): Promise<IpcResult<TmdbKeyStatus>>
+    tmdbKeyStatus(): Promise<IpcResult<TmdbKeyStatus>>
     get(): Promise<IpcResult<PublicSettings>>
     update(patch: Partial<PublicSettings>): Promise<IpcResult<PublicSettings>>
   }
@@ -611,6 +713,12 @@ export interface BakaSubApi {
   }
   media: {
     probe(path: string): Promise<IpcResult<MediaProbe>>
+    identify(name: string): Promise<IpcResult<MediaIdentification>>
+    search(query: string): Promise<IpcResult<MediaSearchResult[]>>
+    lookup(
+      ref: MediaRef,
+      episode?: { season: number; episode: number }
+    ): Promise<IpcResult<MediaContextLookup>>
   }
   dialog: {
     openFiles(kind: OpenDialogKind, multiple?: boolean): Promise<IpcResult<{ paths: string[] }>>

@@ -57,6 +57,7 @@ src/
     parsers/       subtitle parsing: decoder, common AST, SRT, ASS/SSA, WebVTT, segmentation, coverage (pure, testable)
     llm/           OpenRouter client (SSE), model catalog, chunking, prompts, retries, translateDocument
     memory/        Job Memory: context hash and cache service
+    media-context/ TMDB media context: release-name parser, client, cache, artwork protocol
     media/         mkvtoolnix facade (probe/extract/mux), languages, output naming, path guard
     jobs/          job queue, runner, steps (probe/extract/translate/validate/write/mux), job specs
     batch/         batch planning (scan, probe, track selection) and batch service
@@ -141,7 +142,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Media context](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 
@@ -159,5 +160,5 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] **LLM layer**: sequential `<context>`/`<target>` chunks over cache misses, structured JSON (`json_schema` → `json_object` → prompt) validated with Zod + marker validation, per-line repair, transport retry policy, termbase in the System Prompt, OpenRouter SSE with cancellation and cost accounting, encrypted API key (see [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: validated cache keyed by _context hash_ + language + model + glossary, per-chunk transactional upsert, prune with incremental vacuum (see [`docs/job-memory.md`](./docs/job-memory.md))
 - [x] **Preflight**: local token estimate (`js-tiktoken`, exact for GPT, ±20% range for other tokenizers) × Job Memory hit rate × `/api/v1/models` pricing, coverage report, confirmation before translating (auto-confirm threshold), batch totals (see [`docs/preflight.md`](./docs/preflight.md))
-- [ ] **Media context**: scene-release filename parsing + TMDB/TVDB with manual override
+- [x] **Media context** (backend): scene-release filename parsing, TMDB search/details/episodes with a conservative auto-match, response cache, local artwork cache served through `bakasub-media://`, details frozen in the job and sent in `<media>` (see [`docs/media-context.md`](./docs/media-context.md))
 - [ ] **Frontend**: build the screens listed in [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (translation coverage report in the preflight, parser diagnostics, encoding confidence, sidecar onboarding)

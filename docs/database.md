@@ -101,6 +101,10 @@ Repository: `src/main/database/repositories/job-memory.repository.ts` (`lookupMa
 
 Indexes: `(status, created_at)` (FIFO queue), `batch_id`. Every transition is a single `UPDATE`.
 
+### `media_cache`
+
+`key` text PK (`tmdb:search:<query>`, `tmdb:movie:<id>`, `tmdb:tv:<id>`, `tmdb:episode:<id>:<s>:<e>`), `value` JSON (normalized response), `fetched_at` (ms). TTL is applied on read (searches 1 day, details 30 days; expired entries are still served offline). See [`media-context.md`](./media-context.md). Secrets: the TMDB credential lives in `secrets` as `tmdb.credential`.
+
 ### `batches`
 
 `id` text PK, `name`, `kind` (`extract` / `translate` / `pipeline`), `root` (source folder or `null`), `options` (JSON: preset id, notes, languages, output dir, mux options), `created_at`. Created together with its jobs in one transaction (`BatchRepository.insertWithJobs`); status is aggregated from `jobs.batch_id`.

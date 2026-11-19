@@ -12,6 +12,7 @@ import { MkvToolnix, type CommandRunner, type ToolResolver } from '../media/mkvt
 import type { JobMemoryService } from '../memory/job-memory.service'
 import { PresetService } from '../presets/preset.service'
 import type { SecretVault } from '../settings/secret-vault'
+import type { MediaContextService } from '../media-context/media-context.service'
 import { PreferencesService } from '../settings/preferences.service'
 import { SettingsService } from '../settings/settings.service'
 import type { JobProgressEvent } from '../../shared/ipc-contract'
@@ -31,8 +32,14 @@ export interface JobModuleOptions {
   readonly emit: (event: JobProgressEvent) => void
   /** Chaves públicas alteradas pelo usuário (além do que o módulo já trata). */
   readonly onSettingsChanged?: (keys: readonly string[]) => void
+  /** Busca de detalhes do TMDB para o contexto de mídia dos jobs. */
+  readonly mediaContext?: Pick<MediaContextService, 'lookup'>
   readonly log: {
-    jobs: { info(m: string): void; warn(m: string): void; error(m: string, e?: unknown): void }
+    jobs: {
+      info(m: string): void
+      warn(m: string, e?: unknown): void
+      error(m: string, e?: unknown): void
+    }
     llm: LlmLog
   }
 }
@@ -103,6 +110,15 @@ export function createJobModule(o: JobModuleOptions): {
       }
     }),
     presets: presetSource,
+    ...(o.mediaContext
+      ? {
+          media: {
+            lookup: (ref, ep) => o.mediaContext!.lookup(ref, ep),
+            onError: (err) =>
+              o.log.jobs.warn('media context lookup failed; the job continues without it', err)
+          }
+        }
+      : {}),
     workRoot: o.workRoot,
     concurrency: () => settings.get('jobs.concurrency'),
     emit: o.emit,

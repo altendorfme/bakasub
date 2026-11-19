@@ -74,3 +74,9 @@ CREATE TABLE `batches` (
 	`options` text NOT NULL,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
 );
+--> statement-breakpoint
+CREATE TABLE `media_cache` (
+	`key` text PRIMARY KEY NOT NULL,
+	`value` text NOT NULL,
+	`fetched_at` integer NOT NULL
+);

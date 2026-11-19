@@ -57,6 +57,7 @@ src/
     parsers/       parsing de legendas: decoder, AST comum, SRT, ASS/SSA, WebVTT, segmentação, cobertura (puro, testável)
     llm/           cliente OpenRouter (SSE), catálogo de modelos, chunking, prompts, retries, translateDocument
     memory/        Job Memory: context hash e serviço de cache
+    media-context/ contexto de mídia (TMDB): parser de nome, cliente, cache, protocolo de arte
     media/         fachada do mkvtoolnix (probe/extract/mux), idiomas, nomes de saída, validação de caminhos
     jobs/          fila de jobs, runner, etapas (probe/extract/translate/validate/write/mux), specs
     batch/         planejamento de batch (varredura, probe, seleção de faixas) e serviço de batch
@@ -152,7 +153,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 
@@ -170,5 +171,5 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] **Camada LLM**: chunks sequenciais `<context>`/`<target>` sobre os misses do cache, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
 - [x] **Preflight**: estimativa local de tokens (`js-tiktoken`, exata para GPT, faixa de ±20% para outros tokenizers) × taxa de acerto do Job Memory × preços de `/api/v1/models`, relatório de cobertura, confirmação antes de traduzir (limite de auto-confirmação), totais do batch (veja [`docs/preflight.md`](./docs/preflight.md))
-- [ ] **Contexto de mídia**: parse do nome do arquivo (scene release) + TMDB/TVDB com override manual
+- [x] **Contexto de mídia** (backend): parse do nome do release, busca/detalhes/episódios no TMDB com identificação conservadora, cache das respostas, cache local de arte servido por `bakasub-media://`, detalhes congelados no job e enviados no `<media>` (veja [`docs/media-context.md`](./docs/media-context.md))
 - [ ] **Frontend**: construir as telas listadas em [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (relatório de cobertura da tradução no preflight, diagnósticos do parser, confiança de encoding, onboarding de sidecars)

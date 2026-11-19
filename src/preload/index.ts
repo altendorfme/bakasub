@@ -26,7 +26,8 @@ function invoke<C extends InvokeChannel>(
 const api: BakaSubApi = {
   app: {
     getInfo: () => invoke('app:get-info'),
-    checkUpdate: () => invoke('app:check-update')
+    checkUpdate: () => invoke('app:check-update'),
+    openExternal: (url) => invoke('app:open-external', { url })
   },
   sidecars: {
     check: () => invoke('sidecars:check'),
@@ -41,6 +42,9 @@ const api: BakaSubApi = {
     setApiKey: (apiKey) => invoke('settings:set-api-key', { apiKey }),
     clearApiKey: () => invoke('settings:clear-api-key'),
     apiKeyStatus: () => invoke('settings:api-key-status'),
+    setTmdbKey: (key) => invoke('settings:set-tmdb-key', { key }),
+    clearTmdbKey: () => invoke('settings:clear-tmdb-key'),
+    tmdbKeyStatus: () => invoke('settings:tmdb-key-status'),
     get: () => invoke('settings:get'),
     update: (patch) => invoke('settings:update', patch)
   },
@@ -64,7 +68,10 @@ const api: BakaSubApi = {
     list: (force) => invoke('models:list', { force })
   },
   media: {
-    probe: (path) => invoke('media:probe', { path })
+    probe: (path) => invoke('media:probe', { path }),
+    identify: (name) => invoke('media:identify', { name }),
+    search: (query) => invoke('media:search', { query }),
+    lookup: (ref, episode) => invoke('media:lookup', { ref, ...episode })
   },
   dialog: {
     openFiles: (kind, multiple) => invoke('dialog:open-files', { kind, multiple }),

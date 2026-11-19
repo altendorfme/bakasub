@@ -33,7 +33,10 @@ export const APP_ERROR_CODES = [
   'MEDIA_TOOL_FAILED',
   'INVALID_SUBTITLE',
   'SETTINGS_CONFLICT',
-  'TARGET_LANG_NOT_SET'
+  'TARGET_LANG_NOT_SET',
+  'TMDB_AUTH',
+  'TMDB_KEY_MISSING',
+  'URL_NOT_ALLOWED'
 ] as const
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number]
 

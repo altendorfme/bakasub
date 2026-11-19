@@ -4,6 +4,8 @@ import type { BatchService } from '../batch/batch-service'
 import type { JobManager } from '../jobs/job-manager'
 import type { ModelCatalog } from '../llm/model-catalog'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
+import type { MediaContextService } from '../media-context/media-context.service'
+import type { TmdbClient } from '../media-context/tmdb-client'
 import type { JobMemoryService } from '../memory/job-memory.service'
 import type { PresetService } from '../presets/preset.service'
 import type { PreferencesService } from '../settings/preferences.service'
@@ -14,6 +16,7 @@ import { registerBatchHandlers } from './handlers/batches.handler'
 import { registerJobHandlers } from './handlers/jobs.handler'
 import { registerLogHandlers } from './handlers/logs.handler'
 import { registerMediaHandlers } from './handlers/media.handler'
+import { registerMediaContextHandlers } from './handlers/media-context.handler'
 import { registerMemoryHandlers } from './handlers/memory.handler'
 import { registerPresetHandlers } from './handlers/presets.handler'
 import { registerSettingsHandlers } from './handlers/settings.handler'
@@ -31,6 +34,8 @@ export interface IpcDependencies {
   mkv: MkvToolnix
   models: ModelCatalog
   batches: BatchService
+  tmdb: TmdbClient
+  mediaContext: MediaContextService
 }
 
 /** Composition root dos handlers IPC. Um arquivo por domínio em ./handlers. */
@@ -44,4 +49,5 @@ export function registerIpc(deps: IpcDependencies): void {
   registerMediaHandlers(deps)
   registerBatchHandlers(deps)
   registerLogHandlers()
+  registerMediaContextHandlers(deps)
 }

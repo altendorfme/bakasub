@@ -1,4 +1,5 @@
 import { AppError } from '../../errors'
+import { buildMediaContext } from '../../media-context/media-block'
 import type { SubtitleDocument, SubtitleFormat } from '../../parsers'
 import type { PresetSnapshot } from '../job-spec'
 import type { StepContext } from '../step-context'
@@ -9,7 +10,7 @@ export interface TranslationInput {
   readonly format: SubtitleFormat<unknown>
   readonly formatId: TextFormatId
   readonly preset: PresetSnapshot
-  /** Notas do usuário (e, no futuro, a sinopse da API externa). */
+  /** Bloco `<media>`: detalhes do TMDB congelados no job + notas do usuário. */
   readonly media?: string
   readonly targetLang: string
   readonly sourceLang?: string
@@ -43,8 +44,10 @@ export async function translationInput(ctx: StepContext): Promise<TranslationInp
     format,
     formatId,
     preset: spec.preset,
-    ...(spec.notes ? { media: spec.notes } : {}),
+    ...withMedia(buildMediaContext(spec.media, spec.notes)),
     targetLang: spec.targetLang,
     ...(sourceLang ? { sourceLang } : {})
   }
 }
+
+const withMedia = (media: string | undefined): { media?: string } => (media ? { media } : {})

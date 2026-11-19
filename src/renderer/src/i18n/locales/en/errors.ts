@@ -38,6 +38,9 @@ const codes = {
     'The default model and language must stay in your lists. Pick another default before removing it.',
   TARGET_LANG_NOT_SET:
     'Choose a target language first: add one in Languages and make it the default.',
+  TMDB_AUTH: 'TMDB rejected the key. Check it in Settings.',
+  TMDB_KEY_MISSING: 'Add a TMDB key in Settings to look up titles. It is optional.',
+  URL_NOT_ALLOWED: 'This link cannot be opened from BakaSub.',
   FORBIDDEN: 'The request was blocked.',
   INTERNAL: 'Something went wrong inside BakaSub. Details are in the logs.'
 } satisfies Record<ErrorCode, string>

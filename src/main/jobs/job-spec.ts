@@ -1,6 +1,12 @@
 import { dirname } from 'node:path'
 import { z } from 'zod'
-import type { JobCreateRequest, MediaType, Preset } from '../../shared/ipc-contract'
+import type {
+  JobCreateRequest,
+  JobMediaRequest,
+  MediaContextLookup,
+  MediaType,
+  Preset
+} from '../../shared/ipc-contract'
 import { AppError } from '../errors'
 import { languageName } from '../llm/prompt-builder'
 import { MAX_USER_NOTES } from '../presets/preset.schema'
@@ -26,6 +32,28 @@ export interface PresetSnapshot {
   readonly glossary: Preset['glossary']
   readonly temperature: number
   readonly prompt: string
+}
+
+/** Busca dos detalhes do TMDB para congelar no job. Falha = job sem contexto (`onError`). */
+export interface MediaLookupSource {
+  lookup(
+    ref: JobMediaRequest['ref'],
+    episode: { season?: number; episode?: number }
+  ): Promise<MediaContextLookup>
+  onError?: (err: unknown) => void
+}
+
+async function resolveMedia(
+  req: JobMediaRequest | undefined,
+  source: MediaLookupSource | undefined
+): Promise<{ media?: MediaContextLookup }> {
+  if (!req || !source) return {}
+  try {
+    return { media: await source.lookup(req.ref, { season: req.season, episode: req.episode }) }
+  } catch (err) {
+    source.onError?.(err)
+    return {}
+  }
 }
 
 /** Presets + padrões das configurações (`translation.*`). */
@@ -60,6 +88,8 @@ export type JobSpec =
       readonly sourceLang?: string
       /** Contexto do usuário (vai no `<media>`). */
       readonly notes?: string
+      /** Detalhes do TMDB congelados na criação (retry usa os mesmos, mesmo offline). */
+      readonly media?: MediaContextLookup
       readonly confirmBeforeTranslate: boolean
     })
   | (Base &
@@ -73,12 +103,23 @@ export type JobSpec =
         readonly sourceLang?: string
         readonly alsoWriteSubtitle: boolean
         readonly notes?: string
+        readonly media?: MediaContextLookup
         readonly confirmBeforeTranslate: boolean
       })
 
 const path = z.string().min(1).max(4096)
 const lang = z.string().min(1).max(64)
 const trackId = z.number().int().min(0).max(10_000)
+const episodeNumber = z.number().int().min(0).max(9999)
+const mediaRequest = z.object({
+  ref: z.object({
+    provider: z.literal('tmdb'),
+    id: z.number().int().positive(),
+    kind: z.enum(['movie', 'series'])
+  }),
+  season: episodeNumber.optional(),
+  episode: episodeNumber.optional()
+}) satisfies z.ZodType<JobMediaRequest>
 const muxOptions = z
   .object({ setDefault: z.boolean().optional(), keepOriginalSubtitles: z.boolean().optional() })
   .optional()
@@ -96,6 +137,7 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     presetId: z.string().min(1).max(64).optional(),
     model: z.string().trim().min(1).max(200).optional(),
     notes: z.string().max(MAX_USER_NOTES).optional(),
+    media: mediaRequest.optional(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
     outputDir: path.optional(),
@@ -125,6 +167,7 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     presetId: z.string().min(1).max(64).optional(),
     model: z.string().trim().min(1).max(200).optional(),
     notes: z.string().max(MAX_USER_NOTES).optional(),
+    media: mediaRequest.optional(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
     outputDir: path.optional(),
@@ -182,7 +225,8 @@ const withNotes = (notes: string | undefined): { notes?: string } =>
  */
 export async function resolveJobSpec(
   raw: JobCreateRequest,
-  presets: PresetSource
+  presets: PresetSource,
+  media?: MediaLookupSource
 ): Promise<JobSpec> {
   const parsed = JobCreateRequestSchema.safeParse(raw)
   if (!parsed.success) throw new AppError('INVALID_INPUT', parsed.error.message)
@@ -212,6 +256,7 @@ export async function resolveJobSpec(
         preset,
         targetLang,
         ...withNotes(req.notes),
+        ...(await resolveMedia(req.media, media)),
         ...withLang(optionalLang(req.sourceLang) ?? langFromFilename(src.path)),
         confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
       }
@@ -246,6 +291,7 @@ export async function resolveJobSpec(
         preset,
         targetLang,
         ...withNotes(req.notes),
+        ...(await resolveMedia(req.media, media)),
         ...withLang(optionalLang(req.sourceLang)),
         setDefault: req.options?.setDefault ?? true,
         keepOriginalSubtitles: req.options?.keepOriginalSubtitles ?? true,

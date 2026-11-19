@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { TEST_PRESET, testPresetSource } from '../presets/test-presets'
 import { resolveJobSpec } from './job-spec'
 
@@ -194,6 +194,64 @@ describe('resolveJobSpec', () => {
     await expect(
       resolveJobSpec(
         { kind: 'translate', source: join(dir, 'ep01.en.srt'), notes: 'x'.repeat(4001) },
+        presets
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+
+  it('media context: the Main looks the details up and freezes them in the spec', async () => {
+    const lookup = vi.fn(async () => ({
+      details: {
+        provider: 'tmdb' as const,
+        id: 7,
+        kind: 'series' as const,
+        title: 'Frieren',
+        genres: [],
+        synopsis: 'syn'
+      },
+      episode: { season: 1, episode: 5, title: 'E5' }
+    }))
+    const s = await resolveJobSpec(
+      {
+        kind: 'translate',
+        source: join(dir, 'ep01.en.srt'),
+        media: { ref: { provider: 'tmdb', id: 7, kind: 'series' }, season: 1, episode: 5 }
+      },
+      presets,
+      { lookup }
+    )
+    expect(lookup).toHaveBeenCalledWith(
+      { provider: 'tmdb', id: 7, kind: 'series' },
+      { season: 1, episode: 5 }
+    )
+    expect(s).toMatchObject({
+      media: { details: { id: 7, title: 'Frieren' }, episode: { episode: 5 } }
+    })
+  })
+
+  it('media lookup failure: the job is created without context and the error is reported', async () => {
+    const onError = vi.fn()
+    const s = await resolveJobSpec(
+      {
+        kind: 'translate',
+        source: join(dir, 'ep01.en.srt'),
+        media: { ref: { provider: 'tmdb', id: 7, kind: 'movie' } }
+      },
+      presets,
+      { lookup: async () => Promise.reject(new Error('offline')), onError }
+    )
+    expect(s).not.toHaveProperty('media')
+    expect(onError).toHaveBeenCalled()
+  })
+
+  it('media ref is validated', async () => {
+    await expect(
+      resolveJobSpec(
+        {
+          kind: 'translate',
+          source: join(dir, 'ep01.en.srt'),
+          media: { ref: { provider: 'imdb', id: -1, kind: 'movie' } } as never
+        },
         presets
       )
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' })

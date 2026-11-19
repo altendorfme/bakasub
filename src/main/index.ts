@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, protocol, safeStorage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { initLogger, logFile, logger, redactor, setLogLevel } from './logging/logger'
 import { openDatabase } from './database/client'
@@ -7,6 +7,8 @@ import { JobMemoryService } from './memory/job-memory.service'
 import { SecretsRepository } from './database/repositories/secrets.repository'
 import { SecretVault } from './settings/secret-vault'
 import { createJobModule } from './jobs/create-job-module'
+import { artworkProtocolHandler } from './media-context/artwork-protocol'
+import { createMediaContextModule } from './media-context/create-media-context-module'
 import { join } from 'node:path'
 import { emitToRenderers } from './ipc/events'
 import { registerIpc } from './ipc/register'
@@ -21,6 +23,12 @@ import { shutdown } from './services/shutdown-coordinator'
 import { createMainWindow } from './window/create-main-window'
 
 initLogger({ emitEntries: (batch) => emitToRenderers('logs:entry', batch) })
+
+// TMDB artwork, served from the disk cache (CSP: `img-src bakasub-media:`). Must be registered
+// before `ready`.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'bakasub-media', privileges: { standard: true, secure: true, supportFetchAPI: true } }
+])
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -45,6 +53,14 @@ if (!app.requestSingleInstanceLock()) {
       if (vault.recovered)
         logger.app.warn('secret vault master key was unrecoverable; secrets reset')
       redactor.add(await vault.get('openrouter.apiKey'))
+      redactor.add(await vault.get('tmdb.credential'))
+
+      const mediaContext = createMediaContextModule({
+        db: database.db,
+        vault,
+        cacheDir: paths.cache()
+      })
+      protocol.handle('bakasub-media', artworkProtocolHandler(mediaContext.artwork))
 
       const sidecarModule = createSidecarModule({
         binDir: paths.bin(),
@@ -68,6 +84,7 @@ if (!app.requestSingleInstanceLock()) {
         tools: sidecarModule.manager,
         workRoot: join(paths.cache(), 'jobs'),
         emit: (e) => emitToRenderers('jobs:progress', e),
+        mediaContext: mediaContext.service,
         onSettingsChanged: (keys) => {
           if (keys.includes('logs.level'))
             void jobModule.settings.get('logs.level').then(setLogLevel)
@@ -92,7 +109,9 @@ if (!app.requestSingleInstanceLock()) {
         jobs: jobModule.jobs,
         mkv: jobModule.mkv,
         models: jobModule.models,
-        batches: jobModule.batches
+        batches: jobModule.batches,
+        tmdb: mediaContext.tmdb,
+        mediaContext: mediaContext.service
       })
       createMainWindow()
 

@@ -15,7 +15,7 @@ import { TranslationCancelled } from '../llm/translate-document'
 import type { Artifacts } from './artifacts'
 import type { RunHooks, RunOutcome } from './job-runner'
 import { StepFailure } from './job-runner'
-import { resolveJobSpec, type JobSpec, type PresetSource } from './job-spec'
+import { resolveJobSpec, type JobSpec, type PresetSource, type MediaLookupSource } from './job-spec'
 import { createThrottle, type Throttle } from './throttle'
 
 const TERMINAL: ReadonlySet<JobStatus> = new Set([
@@ -40,6 +40,8 @@ export interface JobManagerDeps {
   readonly repo: JobRepository
   readonly runner: JobRunnerLike
   readonly presets: PresetSource
+  /** Contexto do TMDB pedido pela UI, congelado no spec. Opcional. */
+  readonly media?: MediaLookupSource
   /** `userData/cache/jobs`. */
   readonly workRoot: string
   readonly concurrency: () => Promise<number> | number
@@ -116,7 +118,7 @@ export class JobManager {
 
   async create(request: JobCreateRequest): Promise<Job> {
     if (this.disposed) throw new AppError('CANCELLED', 'Shutting down')
-    const spec = await resolveJobSpec(request, this.deps.presets)
+    const spec = await resolveJobSpec(request, this.deps.presets, this.deps.media)
     const row = await this.deps.repo.insert({
       id: this.newId(),
       kind: spec.kind,
