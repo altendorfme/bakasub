@@ -32,7 +32,8 @@ Reason codes the UI needs messages for:
 | `UNTRANSLATED_KARAOKE`           | warn     | ASS/SSA karaoke line (`\k`, `\kf`, `\ko`, `\K`): syllable timing would break; kept as is        |
 | `UNTRANSLATED_BAD_EVENT`         | warn     | ASS/SSA `Dialogue:` line that could not be read (missing columns or unreadable time)            |
 | `UNTRANSLATED_MARKER_COLLISION`  | warn     | Text resembles an internal marker (`<g1>`); the cue is passed through untouched                 |
-| `UNTRANSLATED_VALIDATION_FAILED` | warn     | Reserved for the LLM layer                                                                      |
+| `UNTRANSLATED_VALIDATION_FAILED` | warn     | The model kept breaking the formatting markers after 3 attempts; the line stays in the original |
+| `UNTRANSLATED_CONTENT_FILTERED`  | warn     | The provider's moderation blocked the line; it stays in the original                            |
 
 UX rules already decided:
 
@@ -46,10 +47,28 @@ UX rules already decided:
 - `report`-only issues (`end < start`, overlap, empty cue, `X1:` coordinates, `SRT_AMBIGUOUS_INDEX`, `ASS_TIME_FORMAT`, `ASS_FORMAT_MISSING`) need a visible warning; they are never fixed automatically. The only ASS/SSA auto-fix is `ASS_EOL_MIXED`.
 - `Cue.style` and `Cue.actor` (ASS/SSA) are available for grouping/filtering in the UI. There is no style filter in the parser API yet (planned for the Job/Profile iteration, e.g. to skip sign/OP/ED styles).
 
-## 3. Encoding confidence
+## 3. Translation cache (Job Memory) in the settings
+
+Source: `memory:stats` / `memory:prune` (see [`job-memory.md`](./job-memory.md)).
+
+- Always show the cache size on disk (`bytes`, real value from SQLite `dbstat`), the entry count and the oldest `last used` date.
+- Prune options: "not used for more than 1 / 3 / 7 / 30 days" and "clear everything". Show the size before and after (`MemoryPruneResult.stats`); the file really shrinks (incremental vacuum).
+- Pruning is refused with `MEMORY_BUSY` while a job is running: disable the action (and explain why) instead of only surfacing the error.
+
+## 4. Model selection, API key and translation (from the LLM layer design)
+
+The goal is that the edge cases handled defensively by the backend never happen through the UI.
+
+- **Model picker** built from the `/api/v1/models` catalog (`ModelCatalog`, cached 24 h with offline fallback; an IPC channel will be added with the Job Manager). For each model show: name/id, price per 1M tokens (prompt/completion; `pricing: null` means dynamic price), context length, **moderation** (`isModerated`: the main provider applies content moderation; lines may come back blocked as `UNTRANSLATED_CONTENT_FILTERED`), and structured-output support (`structuredOutputs` gives the most reliable JSON; models without it work but retry more). Selecting from the catalog prevents `LLM_UNKNOWN_MODEL`; a saved profile whose model left the catalog must be flagged.
+- **API key**: input field that only writes (`settings:set-api-key`), status from `settings:api-key-status`. When `protection === 'none'`, warn that the OS has no keyring and the key is stored without OS protection. Map `LLM_AUTH` (invalid key) and `LLM_CREDITS` (no credits / key limit) to actionable messages.
+- **Cancel**: cancelling a running job is immediate, but some providers keep generating and billing the request in flight (Google, Groq, Mistral, Bedrock…). The cancel confirmation should say so; the final cost includes interrupted generations, and `costIncomplete: true` means it could not be fully determined.
+- **Result**: `completed-with-warnings` lists the lines left untranslated (coverage report with `failures`). `LLM_TOO_MANY_FAILURES` (more than 10% of the lines failed validation) should suggest another model; the lines already translated stay in the cache.
+- **Progress**: `onProgress` reports `done/total`, cached lines, chunk `index/count` and the cost so far, once per chunk.
+
+## 5. Encoding confidence
 
 - `decodeSubtitle()` returns `meta.encoding` and `meta.confidence`. When confidence is low (legacy single-byte encodings), the UI must say which encoding was assumed and let the user override it.
 
-## 4. Sidecars (already implemented API)
+## 6. Sidecars (already implemented API)
 
 - `sidecars:check`, `sidecars:install` (native consent dialog), `sidecars:progress`, `app:check-update`: the current `App.tsx` is a placeholder. A proper onboarding/settings screen is still missing.

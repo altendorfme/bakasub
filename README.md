@@ -4,7 +4,7 @@
 
 Desktop application for extracting, AI-translating and re-muxing subtitles from `.mkv` videos.
 
-> Status: **base infrastructure and the SRT and ASS/SSA parsers are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The Job Manager and LLM translation are not implemented yet. See the [roadmap](#roadmap).
+> Status: **base infrastructure, the SRT and ASS/SSA parsers, the Job Memory cache and the LLM translation layer are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The Job Manager (queue, IPC for translation jobs) and the UI are not implemented yet. See the [roadmap](#roadmap).
 
 ## Stack
 
@@ -15,7 +15,7 @@ Desktop application for extracting, AI-translating and re-muxing subtitles from 
 | Communication     | Strict native IPC: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, preload bridge |
 | Database          | SQLite (WAL) via Drizzle ORM + LibSQL driver                                                           |
 | Validation        | Zod (IPC payloads and remote manifests)                                                                |
-| LLM               | OpenRouter over SSE _(planned)_                                                                        |
+| LLM               | OpenRouter over SSE (native `fetch`)                                                                   |
 | Sidecars          | mkvtoolnix (`mkvextract`/`mkvmerge`) and ffmpeg via `child_process`                                    |
 | Logging           | `electron-log`, rotating file in `userData/logs`                                                       |
 
@@ -110,7 +110,7 @@ All external CLI execution must go through `ProcessRunner` (timeout, SIGTERM→S
 
 ## Database
 
-SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`) with Drizzle migrations applied on boot (`drizzle/` is shipped in `resources/`). Current tables: `profiles` (includes the glossary/termbase) and `job_memory` (translated-line cache, unique index on `context_hash + target_lang`). See [`docs/database.md`](./docs/database.md).
+SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`) with Drizzle migrations applied on boot (`drizzle/` is shipped in `resources/`). Current tables: `profiles` (includes the glossary/termbase) and `job_memory` (translated-line cache, unique key `context_hash + target_lang + model + glossary_hash`; see [`docs/job-memory.md`](./docs/job-memory.md)). See [`docs/database.md`](./docs/database.md).
 
 ## Releases
 
@@ -134,7 +134,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 
@@ -147,8 +147,8 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] **SRT parser**: lossless AST (Text / Tag / LineBreak nodes), tolerant scanner with diagnostics, safe repair mode, XLIFF-style segmentation for the LLM, coverage report (see [`docs/parsing.md`](./docs/parsing.md))
 - [x] **ASS/SSA parser**: same `core/` AST; only `Dialogue:` becomes a cue, everything else is lossless trivia; drawings and karaoke are never sent to the LLM (see [`docs/parsing.md`](./docs/parsing.md))
 - [ ] **Job Manager**: bounded-concurrency queue, `AbortController` cancellation, transaction rollback
-- [ ] **LLM strategy**: `<context>`/`<target>` chunking, Zod-validated JSON with per-chunk retry, termbase in the System Prompt, OpenRouter SSE streaming
-- [ ] **Job Memory**: SQLite upsert, _context hash_ (≤ 3 words includes the normalized previous line)
+- [x] **LLM layer**: sequential `<context>`/`<target>` chunks over cache misses, structured JSON (`json_schema` → `json_object` → prompt) validated with Zod + marker validation, per-line repair, transport retry policy, termbase in the System Prompt, OpenRouter SSE with cancellation and cost accounting, encrypted API key (see [`docs/llm.md`](./docs/llm.md))
+- [x] **Job Memory**: validated cache keyed by _context hash_ + language + model + glossary, per-chunk transactional upsert, prune with incremental vacuum (see [`docs/job-memory.md`](./docs/job-memory.md))
 - [ ] **Preflight**: local token estimate (`tiktoken`) × cache hit rate × `/api/v1/models` pricing
 - [ ] **Media context**: scene-release filename parsing + TMDB/TVDB with manual override
 - [ ] **Frontend**: build the screens listed in [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (translation coverage report in the preflight, parser diagnostics, encoding confidence, sidecar onboarding)

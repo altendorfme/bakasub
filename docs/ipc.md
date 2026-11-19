@@ -35,15 +35,20 @@ React hook ──► window.api.<domain>.<method>()          (preload, typed by 
 
 ## Current channels
 
-| Channel                   | Request               | Response                 |
-| ------------------------- | --------------------- | ------------------------ |
-| `app:get-info`            | none                  | `AppInfo`                |
-| `app:check-update`        | none                  | `AppUpdateInfo`          |
-| `sidecars:check`          | none                  | `SidecarReport`          |
-| `sidecars:install`        | `{ tools: string[] }` | `SidecarInstallResult`   |
-| `sidecars:cancel`         | none                  | `{ cancelled: boolean }` |
-| event `sidecars:progress` | n/a                   | `SidecarProgress`        |
+| Channel                   | Request                                               | Response                                                   |
+| ------------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
+| `app:get-info`            | none                                                  | `AppInfo`                                                  |
+| `app:check-update`        | none                                                  | `AppUpdateInfo`                                            |
+| `sidecars:check`          | none                                                  | `SidecarReport`                                            |
+| `sidecars:install`        | `{ tools: string[] }`                                 | `SidecarInstallResult`                                     |
+| `sidecars:cancel`         | none                                                  | `{ cancelled: boolean }`                                   |
+| `memory:stats`            | none                                                  | `MemoryStats`                                              |
+| `memory:prune`            | `{ olderThanDays: 1 \| 3 \| 7 \| 30 \| 'all' }`       | `MemoryPruneResult` (`deleted` + stats after the prune)    |
+| `settings:set-api-key`    | `{ apiKey: string }` (8–512 printable ASCII, trimmed) | `ApiKeyStatus` (write-only: the key is never returned)     |
+| `settings:clear-api-key`  | none                                                  | `ApiKeyStatus`                                             |
+| `settings:api-key-status` | none                                                  | `ApiKeyStatus` (`{ present, protection: 'os' \| 'none' }`) |
+| event `sidecars:progress` | n/a                                                   | `SidecarProgress`                                          |
 
 ## Error codes
 
-`NETWORK`, `INVALID_MANIFEST`, `CHECKSUM_MISMATCH`, `EXTRACT_FAILED`, `PROBE_FAILED`, `PROCESS_TIMEOUT`, `UNSUPPORTED_PLATFORM`, `SIDECAR_BUSY`, `SIDECAR_MISSING`, `UNKNOWN_TOOL`, `CANCELLED`, plus `FORBIDDEN`, `INVALID_INPUT`, `INTERNAL` from `createHandler`.
+`NETWORK`, `INVALID_MANIFEST`, `CHECKSUM_MISMATCH`, `EXTRACT_FAILED`, `PROBE_FAILED`, `PROCESS_TIMEOUT`, `UNSUPPORTED_PLATFORM`, `SIDECAR_BUSY`, `SIDECAR_MISSING`, `UNKNOWN_TOOL`, `CANCELLED`, `MEMORY_BUSY` (prune while a job is running), `LLM_AUTH`, `LLM_CREDITS`, `LLM_BAD_REQUEST`, `LLM_UNAVAILABLE`, `LLM_UNKNOWN_MODEL`, `LLM_TOO_MANY_FAILURES` (translation layer, see [`llm.md`](./llm.md)), plus `FORBIDDEN`, `INVALID_INPUT`, `INTERNAL` from `createHandler`.

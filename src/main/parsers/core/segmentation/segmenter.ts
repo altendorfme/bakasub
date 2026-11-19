@@ -16,8 +16,10 @@ export type UntranslatedReason =
   | 'UNTRANSLATED_MARKER_COLLISION'
   | 'UNTRANSLATED_KARAOKE'
   | 'UNTRANSLATED_BAD_EVENT'
-  /** Reservado para a camada de LLM (chunk esgotou as tentativas). */
+  /** Camada de LLM: a linha esgotou as tentativas de validação. */
   | 'UNTRANSLATED_VALIDATION_FAILED'
+  /** Camada de LLM: bloqueada pela moderação do provedor. */
+  | 'UNTRANSLATED_CONTENT_FILTERED'
 
 export type Classification =
   | { status: 'translatable'; unit: TranslationUnit }

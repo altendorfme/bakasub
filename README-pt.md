@@ -4,7 +4,7 @@
 
 Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
 
-> Status: **infraestrutura base e parsers SRT e ASS/SSA concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). Job Manager e tradução via LLM ainda não foram implementados. Veja o [roadmap](#roadmap).
+> Status: **infraestrutura base, parsers SRT e ASS/SSA, cache Job Memory e camada de tradução LLM concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). Job Manager (fila, IPC de jobs de tradução) e a UI ainda não foram implementados. Veja o [roadmap](#roadmap).
 
 ## Stack
 
@@ -15,7 +15,7 @@ Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos 
 | Comunicação       | IPC nativo estrito: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, bridge no preload |
 | Banco             | SQLite (WAL) via Drizzle ORM + driver LibSQL                                                               |
 | Validação         | Zod (IPC e manifests)                                                                                      |
-| LLM               | OpenRouter via SSE _(planejado)_                                                                           |
+| LLM               | OpenRouter via SSE (`fetch` nativo)                                                                        |
 | Sidecars          | mkvtoolnix (`mkvextract`/`mkvmerge`) e ffmpeg via `child_process`                                          |
 | Logs              | `electron-log` com rotação em `userData/logs`                                                              |
 
@@ -119,7 +119,7 @@ Toda execução de CLI externo deve passar pelo `ProcessRunner` (timeout, SIGTER
 
 ## Banco de dados
 
-SQLite em modo WAL (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), com migrations Drizzle aplicadas no boot (`drizzle/` é copiado para `resources/` no pacote). Tabelas atuais: `profiles` (inclui glossário/termbase) e `job_memory` (cache de linhas traduzidas, índice único `context_hash + target_lang`).
+SQLite em modo WAL (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), com migrations Drizzle aplicadas no boot (`drizzle/` é copiado para `resources/` no pacote). Tabelas atuais: `profiles` (inclui glossário/termbase) e `job_memory` (cache de linhas traduzidas, chave única `context_hash + target_lang + model + glossary_hash`; veja [`docs/job-memory.md`](./docs/job-memory.md)).
 
 ## Releases
 
@@ -145,7 +145,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 
@@ -158,8 +158,8 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] **Parser SRT**: AST lossless (nós Text / Tag / LineBreak), scanner tolerante com diagnósticos, modo de reparo seguro, segmentação estilo XLIFF para o LLM, relatório de cobertura (veja [`docs/parsing.md`](./docs/parsing.md))
 - [x] **Parser ASS/SSA**: mesma AST de `core/`; só `Dialogue:` vira cue e o resto é trivia lossless; desenhos e karaokê nunca vão ao LLM (veja [`docs/parsing.md`](./docs/parsing.md))
 - [ ] **Job Manager**: fila com concorrência controlada, cancelamento via `AbortController`, rollback de transações
-- [ ] **Estratégia LLM**: chunking com `<context>`/`<target>`, resposta JSON validada com Zod e retry por chunk, termbase no System Prompt, streaming SSE do OpenRouter
-- [ ] **Job Memory**: upsert no SQLite, _context hash_ (≤ 3 palavras inclui a linha anterior normalizada)
+- [x] **Camada LLM**: chunks sequenciais `<context>`/`<target>` sobre os misses do cache, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))
+- [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
 - [ ] **Preflight**: estimativa local de tokens (`tiktoken`) × taxa de cache × preços de `/api/v1/models`
 - [ ] **Contexto de mídia**: parse do nome do arquivo (scene release) + TMDB/TVDB com override manual
 - [ ] **Frontend**: construir as telas listadas em [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (relatório de cobertura da tradução no preflight, diagnósticos do parser, confiança de encoding, onboarding de sidecars)

@@ -1,0 +1,124 @@
+import { describe, expect, it } from 'vitest'
+import { srtFormat } from '../parsers/srt'
+import { toTranslationUnit, type Cue } from '../parsers'
+import {
+  buildRepairMessage,
+  buildSystemPrompt,
+  buildTranslateMessage,
+  languageName,
+  parseGlossary,
+  responseSchema
+} from './prompt-builder'
+
+describe('parseGlossary', () => {
+  it('aceita {source, target?, rule?}; descarta inválidos', () => {
+    const r = parseGlossary([
+      { source: 'senpai', rule: 'keep as is' },
+      { source: 'Konoha', target: 'Folha' },
+      { source: '' },
+      { target: 'x' },
+      'lixo',
+      { source: 'só source' }
+    ])
+    expect(r.entries).toEqual([
+      { source: 'senpai', rule: 'keep as is' },
+      { source: 'Konoha', target: 'Folha' }
+    ])
+    expect(r.invalid).toBe(4)
+  })
+})
+
+describe('languageName', () => {
+  it('nome por extenso em inglês, com variante', () => {
+    expect(languageName('pt-BR')).toBe('Brazilian Portuguese')
+    expect(languageName('ja')).toBe('Japanese')
+  })
+})
+
+describe('buildSystemPrompt', () => {
+  const p = buildSystemPrompt({
+    targetLang: 'pt-BR',
+    sourceLang: 'en',
+    glossary: [
+      { source: 'senpai', rule: 'keep Japanese honorifics' },
+      { source: 'Konoha', target: 'Folha' }
+    ]
+  })
+  it('glossário no topo, antes das regras', () => {
+    expect(p.indexOf('<glossary>')).toBeLessThan(p.indexOf('Rules'))
+    expect(p).toContain('1. "senpai": keep Japanese honorifics')
+    expect(p).toContain('2. "Konoha" → "Folha"')
+  })
+  it('idiomas por extenso e regras de marcadores', () => {
+    expect(p).toContain('from English to Brazilian Portuguese')
+    expect(p).toMatch(/<gN>…<\/gN>/)
+    expect(p).toContain('<xN/>')
+    expect(p).toContain('<br/>')
+  })
+  it('sem glossário: sem bloco <glossary>', () => {
+    expect(buildSystemPrompt({ targetLang: 'pt-BR', glossary: [] })).not.toContain('<glossary>')
+  })
+  it('estável (cache de prompt do provedor)', () => {
+    expect(p).toMatchSnapshot()
+  })
+})
+
+describe('mensagens', () => {
+  it('translate: media, context (com traduções) e target com payload', () => {
+    const m = buildTranslateMessage({
+      media: 'Anime X, S01E02',
+      context: {
+        before: [{ cueId: 1, source: 'Hi', translation: 'Oi' }],
+        after: [{ cueId: 4, source: 'Bye' }]
+      },
+      targets: [
+        { cueId: 2, payload: 'Hello <g1>world</g1>' },
+        { cueId: 3, payload: 'Line<br/>two' }
+      ]
+    })
+    expect(m).toMatchSnapshot()
+    expect(m).toContain('<line id="2">Hello <g1>world</g1></line>')
+    expect(m).toContain('<line id="1"><source>Hi</source><translation>Oi</translation></line>')
+  })
+  it('translate sem media/contexto omite os blocos', () => {
+    const m = buildTranslateMessage({
+      context: { before: [], after: [] },
+      targets: [{ cueId: 1, payload: 'a' }]
+    })
+    expect(m).not.toContain('<media>')
+    expect(m).not.toContain('<context>')
+  })
+  it('repair: descreve cada problema com o marcador concreto', () => {
+    const cue = srtFormat.parse('1\n00:00:01,000 --> 00:00:02,000\nA <i>b</i> c {\\an8} d\n')
+      .items[0] as Cue<unknown>
+    const unit = toTranslationUnit(cue)!
+    const m = buildRepairMessage({
+      context: { before: [], after: [] },
+      failures: [
+        {
+          unit,
+          returned: 'A b c d',
+          issues: [
+            { code: 'MISSING_MARKER', id: 1 },
+            { code: 'MISSING_MARKER', id: 2 }
+          ]
+        }
+      ]
+    })
+    expect(m).toContain('<g1>…</g1> is missing')
+    expect(m).toContain('<x2/> is missing')
+    expect(m).toContain('<returned>A b c d</returned>')
+    expect(m).toMatchSnapshot()
+  })
+})
+
+describe('responseSchema', () => {
+  it('chaves exatas, todas obrigatórias, sem extras', () => {
+    expect(responseSchema([3, 1])).toEqual({
+      type: 'object',
+      properties: { '3': { type: 'string' }, '1': { type: 'string' } },
+      required: ['3', '1'],
+      additionalProperties: false
+    })
+  })
+})

@@ -149,9 +149,10 @@ output:   {\an8}Hello <i>world</i>, how are you?
 | untranslated | `UNTRANSLATED_MARKER_COLLISION`  | text resembles a marker                                          |
 | untranslated | `UNTRANSLATED_KARAOKE`           | ASS/SSA karaoke tags                                             |
 | untranslated | `UNTRANSLATED_BAD_EVENT`         | unreadable ASS/SSA `Dialogue:`                                   |
-| untranslated | `UNTRANSLATED_VALIDATION_FAILED` | reserved for the LLM layer                                       |
+| untranslated | `UNTRANSLATED_VALIDATION_FAILED` | LLM layer: the line exhausted its validation attempts            |
+| untranslated | `UNTRANSLATED_CONTENT_FILTERED`  | LLM layer: blocked by the provider's moderation                  |
 
-Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤120-char `excerpt` with line breaks/control characters made visible, `outcome` (`kept-original` or `omitted`, following the `unparsed` export option), `params`, `cause` and `actions`. Untranslated entries come first and `maxEntries` (default 500) caps the payload while the totals stay complete. The UI requirements are tracked in [`frontend-requirements.md`](./frontend-requirements.md).
+Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤120-char `excerpt` with line breaks/control characters made visible, `outcome` (`kept-original` or `omitted`, following the `unparsed` export option), `params`, `cause` and `actions`. Untranslated entries come first and `maxEntries` (default 500) caps the payload while the totals stay complete. After a translation, pass `{ failures: result.failed }` so lines the LLM could not translate are reported with their LLM reason. The UI requirements are tracked in [`frontend-requirements.md`](./frontend-requirements.md).
 
 ## Tests
 
@@ -160,6 +161,6 @@ Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤1
 ## Non-goals and open points
 
 - No line-length/reflow checks on translated text (belongs to the LLM QC layer).
-- `normalized_previous_line` and the context hash live in the Job Memory module; this layer only exposes `cuePlainText()`.
+- The context hash lives in the Job Memory module ([`job-memory.md`](./job-memory.md)); this layer only exposes `cuePlainText()` (tags removed, breaks and ASS `\\h` as spaces) and `normalizeForHash()` (NFC, `\\h` → space, collapsed whitespace, trim, case preserved).
 - No style filter in the parser API (`Cue.style` is exposed; filtering belongs to the Job/Profile iteration).
 - ASS `[Fonts]`/`[Graphics]`, `\\t` animations and `\\clip` are kept raw as trivia/tags; nothing is interpreted beyond what is listed above.

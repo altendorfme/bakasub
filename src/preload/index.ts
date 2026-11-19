@@ -33,6 +33,15 @@ const api: BakaSubApi = {
     install: (tools) => invoke('sidecars:install', { tools }),
     cancel: () => invoke('sidecars:cancel')
   },
+  memory: {
+    stats: () => invoke('memory:stats'),
+    prune: (olderThanDays) => invoke('memory:prune', { olderThanDays })
+  },
+  settings: {
+    setApiKey: (apiKey) => invoke('settings:set-api-key', { apiKey }),
+    clearApiKey: () => invoke('settings:clear-api-key'),
+    apiKeyStatus: () => invoke('settings:api-key-status')
+  },
   events: {
     on(channel: EventChannel, listener) {
       if (!eventAllowlist.has(channel)) throw new Error(`IPC event not allowed: ${channel}`)

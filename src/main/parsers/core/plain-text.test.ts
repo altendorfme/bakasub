@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cuePlainText } from './plain-text'
+import { cuePlainText, normalizeForHash } from './plain-text'
 import type { Node } from './types'
 
 const t = (value: string): Node => ({ type: 'text', value })
@@ -20,5 +20,31 @@ describe('cuePlainText', () => {
 
   it('cue sem texto resulta em string vazia', () => {
     expect(cuePlainText({ nodes: [open('i'), close('i')] })).toBe('')
+  })
+})
+
+describe('cuePlainText: ASS', () => {
+  it('\\h (espaço rígido ASS) vira espaço', () => {
+    expect(cuePlainText({ nodes: [t('Olá\\hmundo')] })).toBe('Olá mundo')
+  })
+})
+
+describe('normalizeForHash', () => {
+  it('NFC: formas compostas e decompostas são iguais', () => {
+    expect(normalizeForHash('café')).toBe(normalizeForHash('café'))
+    expect(normalizeForHash('café')).toBe('café')
+  })
+  it('\\h vira espaço, espaços (inclusive NBSP e tab) colapsam, trim', () => {
+    expect(normalizeForHash('  Olá\\h\\h \tmundo  ')).toBe('Olá mundo')
+  })
+  it('preserva caixa e pontuação', () => {
+    expect(normalizeForHash('OK.')).not.toBe(normalizeForHash('ok.'))
+  })
+  it('preserva marcadores do payload', () => {
+    expect(normalizeForHash('Olá  <g1>mundo</g1> <br/> x')).toBe('Olá <g1>mundo</g1> <br/> x')
+  })
+  it('idempotente', () => {
+    const s = ' a\\h b  c '
+    expect(normalizeForHash(normalizeForHash(s))).toBe(normalizeForHash(s))
   })
 })

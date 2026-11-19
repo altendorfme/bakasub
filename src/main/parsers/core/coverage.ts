@@ -47,6 +47,11 @@ export interface CoverageOptions {
   maxEntries?: number
   /** Deve refletir a opção de exportação; define `outcome` dos blocos não parseados. */
   unparsed?: 'keep' | 'drop'
+  /** Linhas que o LLM não traduziu (resultado de `translateDocument`); sobrepõem a classificação. */
+  failures?: readonly {
+    cueId: number
+    reason: 'UNTRANSLATED_VALIDATION_FAILED' | 'UNTRANSLATED_CONTENT_FILTERED'
+  }[]
 }
 
 const EXCERPT_MAX = 120
@@ -70,9 +75,13 @@ function cueRaw(cue: Cue<unknown>): string {
 function toEntry(
   item: Item<unknown>,
   format: SubtitleDocument<unknown>['format'],
-  opts: CoverageOptions
+  opts: CoverageOptions,
+  failures: ReadonlyMap<number, UntranslatedReason>
 ): CoverageEntry | null {
-  const c = classify(item)
+  const failure = item.kind === 'cue' ? failures.get(item.id) : undefined
+  const c: ReturnType<typeof classify> = failure
+    ? { status: 'untranslated', reason: failure }
+    : classify(item)
   if (c.status === 'translatable') return null
 
   const base = {
@@ -116,6 +125,9 @@ export function analyzeCoverage(
   opts: CoverageOptions = {}
 ): CoverageReport {
   const maxEntries = opts.maxEntries ?? 500
+  const failures = new Map<number, UntranslatedReason>(
+    (opts.failures ?? []).map((f) => [f.cueId, f.reason])
+  )
   const untranslated: CoverageEntry[] = []
   const skipped: CoverageEntry[] = []
   const byReason: Partial<Record<CoverageReason, number>> = {}
@@ -126,7 +138,7 @@ export function analyzeCoverage(
   doc.items.forEach((item) => {
     if (item.kind === 'cue') cues++
     else blocks++
-    const entry = toEntry(item, doc.format, opts)
+    const entry = toEntry(item, doc.format, opts, failures)
     if (!entry) {
       translatable++
       return

@@ -1,7 +1,11 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, safeStorage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { initLogger, logger } from './logging/logger'
 import { openDatabase } from './database/client'
+import { JobMemoryRepository } from './database/repositories/job-memory.repository'
+import { JobMemoryService } from './memory/job-memory.service'
+import { SecretsRepository } from './database/repositories/secrets.repository'
+import { SecretVault } from './settings/secret-vault'
 import { emitToRenderers } from './ipc/events'
 import { registerIpc } from './ipc/register'
 import { paths } from './config/paths'
@@ -24,6 +28,14 @@ if (!app.requestSingleInstanceLock()) {
 
     const database = await openDatabase()
     shutdown.register('database', () => database.close())
+    // LIFO: registrado depois do banco => termina as escritas em andamento antes do close.
+    // `isBusy` passa a consultar o Job Manager quando ele existir.
+    const memory = new JobMemoryService(new JobMemoryRepository(database.db))
+    shutdown.register('job-memory', () => memory.dispose())
+
+    const vault = await SecretVault.open(new SecretsRepository(database.db), safeStorage)
+    logger.app.info(`secret vault ready (protection: ${vault.protection})`)
+    if (vault.recovered) logger.app.warn('secret vault master key was unrecoverable; secrets reset')
 
     const sidecarModule = createSidecarModule({
       binDir: paths.bin(),
@@ -42,7 +54,9 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc({
       appInfo: new AppInfoService(),
       appUpdate: new AppUpdateService(sidecarModule.manifests),
-      sidecars: sidecarModule.manager
+      sidecars: sidecarModule.manager,
+      memory,
+      vault
     })
     createMainWindow()
 

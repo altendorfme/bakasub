@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const profiles = sqliteTable('profiles', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -10,6 +10,9 @@ export const profiles = sqliteTable('profiles', {
     .$type<unknown[]>()
     .notNull()
     .default(sql`'[]'`),
+  /** Idioma de destino padrão (BCP-47) pré-preenchido na UI; o job pode sobrescrever. */
+  targetLang: text('target_lang').notNull().default('pt-BR'),
+  temperature: real('temperature').notNull().default(0.3),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(unixepoch() * 1000)`)

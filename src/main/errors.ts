@@ -10,6 +10,13 @@ export type AppErrorCode =
   | 'SIDECAR_MISSING'
   | 'UNKNOWN_TOOL'
   | 'CANCELLED'
+  | 'MEMORY_BUSY'
+  | 'LLM_AUTH'
+  | 'LLM_CREDITS'
+  | 'LLM_BAD_REQUEST'
+  | 'LLM_UNAVAILABLE'
+  | 'LLM_UNKNOWN_MODEL'
+  | 'LLM_TOO_MANY_FAILURES'
 
 /** Erro de domínio com código estável, propagado pelo IPC como `{ code, message }`. */
 export class AppError extends Error {
