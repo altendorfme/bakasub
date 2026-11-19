@@ -23,6 +23,7 @@ export function registerBatchHandlers(deps: { batches: BatchService }): void {
   createHandler('batches:get', { input: byId, handle: ({ id }) => deps.batches.get(id) })
   createHandler('batches:jobs', { input: byId, handle: ({ id }) => deps.batches.jobs(id) })
   createHandler('batches:cancel', { input: byId, handle: ({ id }) => deps.batches.cancel(id) })
+  createHandler('batches:confirm', { input: byId, handle: ({ id }) => deps.batches.confirm(id) })
   createHandler('batches:remove', {
     input: byId,
     handle: async ({ id }) => {

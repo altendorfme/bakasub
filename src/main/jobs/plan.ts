@@ -3,6 +3,7 @@ import type { JobSpec } from './job-spec'
 import type { Step } from './step-context'
 import { extractStep } from './steps/extract.step'
 import { muxStep } from './steps/mux.step'
+import { preflightStep } from './steps/preflight.step'
 import { probeStep } from './steps/probe.step'
 import { translateStep } from './steps/translate.step'
 import { validateStep } from './steps/validate.step'
@@ -11,6 +12,7 @@ import { writeStep } from './steps/write.step'
 export const STEPS: Readonly<Record<JobStep, Step>> = {
   probe: probeStep,
   extract: extractStep,
+  preflight: preflightStep,
   translate: translateStep,
   validate: validateStep,
   write: writeStep,
@@ -23,13 +25,14 @@ export function planFor(spec: JobSpec): JobStep[] {
     case 'extract':
       return ['probe', 'extract', 'write']
     case 'translate':
-      return ['translate', 'write']
+      return ['preflight', 'translate', 'write']
     case 'mux':
       return ['probe', 'validate', 'mux']
     case 'pipeline':
       return [
         'probe',
         'extract',
+        'preflight',
         'translate',
         ...(spec.alsoWriteSubtitle ? (['write'] as const) : []),
         'mux'

@@ -4,7 +4,7 @@
 
 Desktop application for extracting, AI-translating and re-muxing subtitles from `.mkv` videos.
 
-> Status: **base infrastructure, the SRT and ASS/SSA parsers, the Job Memory cache, the LLM translation layer and the Job Manager are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI and the cost preflight are not implemented yet. See the [roadmap](#roadmap).
+> Status: **base infrastructure, the SRT and ASS/SSA parsers, the Job Memory cache, the LLM translation layer, the Job Manager (with batch mode) and the cost preflight are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI is not implemented yet. See the [roadmap](#roadmap).
 
 ## Stack
 
@@ -60,6 +60,7 @@ src/
     media/         mkvtoolnix facade (probe/extract/mux), languages, output naming, path guard
     jobs/          job queue, runner, steps (probe/extract/translate/validate/write/mux), job specs
     batch/         batch planning (scan, probe, track selection) and batch service
+    preflight/     token counting (js-tiktoken) and cost estimate
     profiles/      profile schema and service
     settings/      typed settings registry and the encrypted secret vault
     window/        BrowserWindow factory
@@ -140,7 +141,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 
@@ -157,6 +158,6 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [ ] **Subtitle formats**: WebVTT parser; OCR for PGS/VobSub
 - [x] **LLM layer**: sequential `<context>`/`<target>` chunks over cache misses, structured JSON (`json_schema` → `json_object` → prompt) validated with Zod + marker validation, per-line repair, transport retry policy, termbase in the System Prompt, OpenRouter SSE with cancellation and cost accounting, encrypted API key (see [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: validated cache keyed by _context hash_ + language + model + glossary, per-chunk transactional upsert, prune with incremental vacuum (see [`docs/job-memory.md`](./docs/job-memory.md))
-- [ ] **Preflight**: local token estimate (`tiktoken`) × cache hit rate × `/api/v1/models` pricing
+- [x] **Preflight**: local token estimate (`js-tiktoken`, exact for GPT, ±20% range for other tokenizers) × Job Memory hit rate × `/api/v1/models` pricing, coverage report, confirmation before translating (auto-confirm threshold), batch totals (see [`docs/preflight.md`](./docs/preflight.md))
 - [ ] **Media context**: scene-release filename parsing + TMDB/TVDB with manual override
 - [ ] **Frontend**: build the screens listed in [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (translation coverage report in the preflight, parser diagnostics, encoding confidence, sidecar onboarding)

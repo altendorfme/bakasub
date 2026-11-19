@@ -66,7 +66,8 @@ const api: BakaSubApi = {
     get: (id) => invoke('batches:get', { id }),
     jobs: (id) => invoke('batches:jobs', { id }),
     cancel: (id) => invoke('batches:cancel', { id }),
-    remove: (id) => invoke('batches:remove', { id })
+    remove: (id) => invoke('batches:remove', { id }),
+    confirm: (id) => invoke('batches:confirm', { id })
   },
   jobs: {
     create: (request) => invoke('jobs:create', request),
@@ -74,7 +75,9 @@ const api: BakaSubApi = {
     get: (id) => invoke('jobs:get', { id }),
     cancel: (id) => invoke('jobs:cancel', { id }),
     retry: (id) => invoke('jobs:retry', { id }),
-    remove: (id) => invoke('jobs:remove', { id })
+    remove: (id) => invoke('jobs:remove', { id }),
+    confirm: (id) => invoke('jobs:confirm', { id }),
+    preflight: (id) => invoke('jobs:preflight', { id })
   },
   files: {
     pathFor: (file) => webUtils.getPathForFile(file)

@@ -109,7 +109,7 @@ export type JobStatus =
   | 'failed'
   | 'cancelled'
   | 'interrupted'
-export type JobStep = 'probe' | 'extract' | 'translate' | 'validate' | 'write' | 'mux'
+export type JobStep = 'probe' | 'extract' | 'preflight' | 'translate' | 'validate' | 'write' | 'mux'
 
 export interface MuxOptions {
   /** A faixa nova vira `default` e as legendas originais perdem o `default`. Padrão `true`. */
@@ -128,6 +128,8 @@ export type JobCreateRequest =
       targetLang?: string
       sourceLang?: string
       outputDir?: string
+      /** Para em `awaiting-confirmation` com a estimativa de custo. Padrão `true`. */
+      confirmBeforeTranslate?: boolean
     }
   | {
       kind: 'mux'
@@ -145,6 +147,8 @@ export type JobCreateRequest =
       sourceLang?: string
       outputDir?: string
       options?: MuxOptions & { alsoWriteSubtitle?: boolean }
+      /** Para em `awaiting-confirmation` com a estimativa de custo. Padrão `true`. */
+      confirmBeforeTranslate?: boolean
     }
 
 export interface JobProgress {
@@ -174,6 +178,8 @@ export interface JobResult {
   }
   cache?: { hits: number; misses: number }
   failedLines?: { cueId: number; reason: string }[]
+  /** Estimativa do preflight (a cobertura completa vem de `jobs:preflight`). */
+  preflight?: PreflightEstimate
 }
 
 export interface Job {
@@ -229,6 +235,8 @@ export interface ModelSummary {
   pricing: { prompt: number; completion: number } | null
   structuredOutputs: boolean
   responseFormat: boolean
+  /** Família do tokenizer (GPT, Claude…): só GPT tem contagem local exata. */
+  tokenizer?: string
 }
 
 export interface ModelList {
@@ -285,6 +293,7 @@ export interface BatchCreateRequest {
   /** Sem `outputDir`: saída ao lado de cada arquivo. Com `outputDir` e `root`: estrutura espelhada. */
   outputDir?: string
   options?: MuxOptions & { alsoWriteSubtitle?: boolean }
+  confirmBeforeTranslate?: boolean
 }
 
 export interface Batch {
@@ -297,6 +306,31 @@ export interface Batch {
   counts: Partial<Record<JobStatus, number>>
   /** `active` enquanto algum job não é terminal. */
   state: 'active' | 'finished'
+  /** Soma das estimativas dos jobs em `awaiting-confirmation` (`cost: null` se algum preço é dinâmico). */
+  preflight?: { awaiting: number; toTranslate: number; cost: Range | null; approximate: boolean }
+}
+
+export interface Range {
+  low: number
+  high: number
+}
+
+/** Estimativa do preflight (antes de qualquer chamada ao LLM). */
+export interface PreflightEstimate {
+  model: {
+    id: string
+    /** USD por token; `null` = preço dinâmico. */
+    pricing: { prompt: number; completion: number } | null
+    catalogFetchedAt: string | null
+  }
+  /** Tokenizer local (o200k) diferente do do modelo: faixa alargada em ±20%. */
+  approximate: boolean
+  lines: { total: number; cached: number; toTranslate: number; chunks: number }
+  tokens: { input: Range; output: Range }
+  /** USD; `null` quando o preço é dinâmico. */
+  cost: Range | null
+  /** Decisão tomada pelo job. */
+  decision: 'auto-confirmed' | 'needs-confirmation' | 'confirmed'
 }
 
 export type IpcError = { code: string; message: string }
@@ -338,6 +372,13 @@ export interface IpcInvokeContract {
   'jobs:cancel': { req: { id: string }; res: Job }
   'jobs:retry': { req: { id: string }; res: Job }
   'jobs:remove': { req: { id: string }; res: { removed: true } }
+  /** `awaiting-confirmation` -> fila; retoma na tradução, sem reextrair nem reestimar. */
+  'jobs:confirm': { req: { id: string }; res: Job }
+  /** Estimativa + cobertura completa (o que não será traduzido, onde e por quê). */
+  'jobs:preflight': {
+    req: { id: string }
+    res: { estimate: PreflightEstimate; coverage: unknown } | null
+  }
   /** Pasta de entrada de um batch (legível). `null` se cancelado. */
   'dialog:open-folder': { req: void; res: { path: string | null } }
   /** Varre, faz o probe e pré-seleciona faixas; não cria nada. */
@@ -350,6 +391,8 @@ export interface IpcInvokeContract {
   'batches:cancel': { req: { id: string }; res: Batch }
   /** Só batches sem jobs ativos; remove também os jobs. */
   'batches:remove': { req: { id: string }; res: { removed: true } }
+  /** Confirma todos os jobs do batch em `awaiting-confirmation`. */
+  'batches:confirm': { req: { id: string }; res: Batch }
 }
 
 /** Canais push (main -> renderer). Payload tipado por canal. */
@@ -395,7 +438,10 @@ export const INVOKE_CHANNELS = [
   'batches:get',
   'batches:jobs',
   'batches:cancel',
-  'batches:remove'
+  'batches:remove',
+  'batches:confirm',
+  'jobs:confirm',
+  'jobs:preflight'
 ] as const satisfies readonly InvokeChannel[]
 export const EVENT_CHANNELS = [
   'sidecars:progress',
@@ -447,6 +493,7 @@ export interface BakaSubApi {
     jobs(id: string): Promise<IpcResult<Job[]>>
     cancel(id: string): Promise<IpcResult<Batch>>
     remove(id: string): Promise<IpcResult<{ removed: true }>>
+    confirm(id: string): Promise<IpcResult<Batch>>
   }
   jobs: {
     create(request: JobCreateRequest): Promise<IpcResult<Job>>
@@ -455,6 +502,10 @@ export interface BakaSubApi {
     cancel(id: string): Promise<IpcResult<Job>>
     retry(id: string): Promise<IpcResult<Job>>
     remove(id: string): Promise<IpcResult<{ removed: true }>>
+    confirm(id: string): Promise<IpcResult<Job>>
+    preflight(
+      id: string
+    ): Promise<IpcResult<{ estimate: PreflightEstimate; coverage: unknown } | null>>
   }
   files: {
     /** Drag & drop: caminho real de um `File` (`webUtils.getPathForFile`). Revalidado no Main. */

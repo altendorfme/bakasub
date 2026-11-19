@@ -2,6 +2,7 @@ import type { JobProgress, JobResult } from '../../shared/ipc-contract'
 import type { TranslateProgress, TranslateResult } from '../llm/translate-document'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import type { InlineLexer, SubtitleDocument } from '../parsers'
+import type { PreflightInput, PreflightOutput } from '../preflight/preflighter'
 import type { Artifacts } from './artifacts'
 import type { JobSpec, ProfileSnapshot } from './job-spec'
 
@@ -19,9 +20,16 @@ export interface SubtitleTranslator {
   ): Promise<TranslateResult<F>>
 }
 
+export interface PreflightDeps {
+  run(input: PreflightInput, signal?: AbortSignal): Promise<PreflightOutput>
+  /** Setting `preflight.autoConfirmBelowUsd`. */
+  autoConfirmBelowUsd(): Promise<number | null>
+}
+
 export interface StepDeps {
   readonly mkv: Pick<MkvToolnix, 'probe' | 'extract' | 'mux'>
   readonly translator: SubtitleTranslator
+  readonly preflight: PreflightDeps
 }
 
 export interface StepContext {

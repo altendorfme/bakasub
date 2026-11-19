@@ -74,7 +74,8 @@ export class JobRepository {
     const res = await this.db
       .update(jobs)
       .set({ status: 'interrupted', updatedAt: new Date(this.now()) })
-      .where(inArray(jobs.status, ['running', 'awaiting-confirmation']))
+      // `awaiting-confirmation` não estava rodando: continua aguardando após o reinício.
+      .where(eq(jobs.status, 'running'))
     return res.rowsAffected
   }
 

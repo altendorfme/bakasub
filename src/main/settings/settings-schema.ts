@@ -18,6 +18,11 @@ export const SETTINGS_SCHEMA = {
   },
   /** Jobs executados ao mesmo tempo. */
   'jobs.concurrency': { schema: z.number().int().min(1).max(4), default: 2 },
+  /** Preflight: o job segue sozinho se o custo máximo estimado (USD) ficar abaixo disto. `null` = sempre perguntar. */
+  'preflight.autoConfirmBelowUsd': {
+    schema: z.number().min(0).max(1000).nullable(),
+    default: null
+  },
   /** Idiomas de origem preferidos (ordem) na seleção automática de faixas do batch. */
   'tracks.preferredSourceLangs': {
     schema: z.array(z.string().min(1).max(35)).max(10),

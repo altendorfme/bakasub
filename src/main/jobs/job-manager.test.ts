@@ -248,4 +248,57 @@ describe('JobManager', () => {
     expect((await manager.get('job-1')).progress.translation?.done).toBe(41)
     expect(events.filter((e) => e.status === 'running').length).toBeLessThanOrEqual(2)
   })
+
+  it('awaiting-confirmation libera o slot; confirm retoma com a decisão confirmada', async () => {
+    concurrency = 1
+    await manager.create(req())
+    await manager.create(req())
+    await until(() => pending.length === 1)
+    const estimate = {
+      model: { id: 'a/b', pricing: null, catalogFetchedAt: null },
+      approximate: true,
+      lines: { total: 1, cached: 0, toTranslate: 1, chunks: 1 },
+      tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
+      cost: null,
+      decision: 'needs-confirmation' as const
+    }
+    await pending[0].hooks.onArtifacts({ preflight: { estimate, coverage: { byReason: {} } } })
+    pending[0].resolve({
+      status: 'awaiting-confirmation',
+      result: { outputs: [], warnings: [], preflight: estimate }
+    })
+    await until(() => pending.length === 2) // o slot foi liberado para o job-2
+    const j = await manager.get('job-1')
+    expect(j).toMatchObject({ status: 'awaiting-confirmation', finishedAt: null })
+    expect(j.result?.preflight?.decision).toBe('needs-confirmation')
+    expect(existsSync(join(workRoot, 'job-1'))).toBe(true)
+    expect(await manager.preflight('job-1')).toEqual({ estimate, coverage: { byReason: {} } })
+    expect(await manager.isProfileInUse(1)).toBe(true)
+
+    await expect(manager.confirm('job-2')).rejects.toMatchObject({ code: 'JOB_INVALID_STATE' })
+    expect((await manager.confirm('job-1')).status).toBe('queued')
+    done(pending[1])
+    await until(() => pending.length === 3)
+    expect(pending[2].input.artifacts.preflight?.estimate.decision).toBe('confirmed')
+  })
+
+  it('awaiting-confirmation sobrevive ao reinício (não vira interrupted) e pode ser cancelado', async () => {
+    await manager.create(req())
+    await until(() => pending.length === 1)
+    pending[0].resolve({ status: 'awaiting-confirmation', result: { outputs: [], warnings: [] } })
+    await until(async () => (await manager.get('job-1')).status === 'awaiting-confirmation')
+    await manager.dispose(50)
+    const m2 = new JobManager({
+      repo,
+      runner: { run: vi.fn() },
+      profiles: { get: async () => profile },
+      workRoot,
+      concurrency: async () => 1,
+      emit: () => undefined
+    })
+    await m2.init()
+    expect((await m2.get('job-1')).status).toBe('awaiting-confirmation')
+    expect((await m2.cancel('job-1')).status).toBe('cancelled')
+    await m2.dispose(10)
+  })
 })

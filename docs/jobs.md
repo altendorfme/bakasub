@@ -7,24 +7,25 @@ jobs:create ──► resolveJobSpec (Zod + path guard + profile snapshot) ─�
 JobManager (FIFO, concurrency = settings 'jobs.concurrency', default 2)
   └─ JobRunner.run(spec, artifacts, workDir)       userData/cache/jobs/<id>/
         resume at the first step whose artifact does not verify
-        probe → extract → translate → write → mux   (subset per kind)
+        probe → extract → preflight → translate → write → mux   (subset per kind)
   └─ status, step, progress, artifacts, result, error persisted at every transition
 jobs:progress (throttled 250 ms; state transitions immediately)
 ```
 
 ## Kinds
 
-| `kind`      | Input                                           | Steps                                       | Output                                                        |
-| ----------- | ----------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
-| `extract`   | MKV + track ids                                 | probe → extract → write                     | `<base>.<trackId>.<lang\|und>.<ext>` per track                |
-| `translate` | `.srt` / `.ass` / `.ssa`                        | translate → write                           | `<base>.<targetLang>.<ext>`                                   |
-| `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                      | `<base>.<lang>.mkv`                                           |
-| `pipeline`  | MKV + track id                                  | probe → extract → translate → [write] → mux | `<base>.<targetLang>.mkv` (+ subtitle if `alsoWriteSubtitle`) |
+| `kind`      | Input                                           | Steps                                                   | Output                                                        |
+| ----------- | ----------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
+| `extract`   | MKV + track ids                                 | probe → extract → write                                 | `<base>.<trackId>.<lang\|und>.<ext>` per track                |
+| `translate` | `.srt` / `.ass` / `.ssa`                        | translate → write                                       | `<base>.<targetLang>.<ext>`                                   |
+| `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                                  | `<base>.<lang>.mkv`                                           |
+| `pipeline`  | MKV + track id                                  | probe → extract → preflight → translate → [write] → mux | `<base>.<targetLang>.mkv` (+ subtitle if `alsoWriteSubtitle`) |
 
 Steps (`steps/*.step.ts`) are shared by every kind (`plan.ts`):
 
 - **probe**: `mkvmerge -J` → subtitle tracks (`media/mkv-probe.ts`). Supported: `S_TEXT/UTF8`, `S_TEXT/ASS`, `S_TEXT/SSA`. PGS/VobSub (`image-based`, would need OCR) and WebVTT (`no-parser`) are listed but rejected. Track language: `language_ietf`, else ISO 639-2 → BCP-47 table (`media/languages.ts`); `und` = unknown.
 - **extract**: one `mkvextract` pass for all requested tracks into the work dir.
+- **preflight**: token/cost estimate and coverage; may stop the job in `awaiting-confirmation` (see [`preflight.md`](./preflight.md)).
 - **translate**: decode → parse → `translateDocument` (see [`llm.md`](./llm.md)) → `serializeRepaired` → UTF-8 (BOM if the source had one). `sourceLang`: job option, else filename suffix (`ep01.en.srt`), else the track language.
 - **validate** (mux): each subtitle must parse; nothing is repaired. Failure → `INVALID_SUBTITLE` before touching the MKV.
 - **write**: publishes work-dir files into the output dir (unique name, atomic copy).
@@ -50,7 +51,7 @@ queued → running(step) → [awaiting-confirmation] → completed | completed-w
                         ↘ failed | cancelled | interrupted
 ```
 
-- `awaiting-confirmation` is reserved for the preflight (not used yet).
+- `awaiting-confirmation`: the preflight is waiting for the user ([`preflight.md`](./preflight.md)); not running, the slot is free, survives restarts; `jobs:confirm` re-queues it, `jobs:cancel` discards it.
 - `completed-with-warnings`: translation left lines untranslated (`result.failedLines`) or mkvtoolnix reported warnings (`result.warnings`).
 - `failed`: `error = { code, message }` (`AppError` code, or `INTERNAL` for bugs) and `step` = where it stopped. The work dir is kept.
 - `cancelled` (user) deletes the work dir; `interrupted` (shutdown or crash) keeps it. On boot, `running` rows become `interrupted`.
@@ -99,4 +100,3 @@ dialog:open-folder | dialog:open-files (multiple) | drag & drop
 ## Pending
 
 - WebVTT parser; OCR for PGS/VobSub.
-- Preflight (cost estimate) using `awaiting-confirmation`.

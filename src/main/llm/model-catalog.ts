@@ -17,6 +17,8 @@ export interface ModelInfo {
   readonly structuredOutputs: boolean
   /** `response_format: json_object`. */
   readonly responseFormat: boolean
+  /** `architecture.tokenizer` (GPT, Claude, Gemini…); define se a contagem local é exata. */
+  readonly tokenizer?: string
 }
 
 const price = z.union([z.string(), z.number()]).transform(Number)
@@ -26,6 +28,7 @@ const RawModel = z.looseObject({
   context_length: z.number().nullish(),
   pricing: z.looseObject({ prompt: price, completion: price }).optional(),
   supported_parameters: z.array(z.string()).optional(),
+  architecture: z.looseObject({ tokenizer: z.string().nullish() }).optional(),
   top_provider: z
     .looseObject({
       max_completion_tokens: z.number().nullish(),
@@ -50,7 +53,8 @@ export function parseModel(raw: unknown): ModelInfo | null {
     isModerated: m.top_provider?.is_moderated ?? false,
     pricing: validPrice ? { prompt: p.prompt, completion: p.completion } : null,
     structuredOutputs: params.has('structured_outputs'),
-    responseFormat: params.has('response_format')
+    responseFormat: params.has('response_format'),
+    ...(m.architecture?.tokenizer ? { tokenizer: m.architecture.tokenizer } : {})
   }
 }
 
@@ -62,7 +66,8 @@ const CachedModel = z.object({
   isModerated: z.boolean(),
   pricing: z.object({ prompt: z.number(), completion: z.number() }).nullable(),
   structuredOutputs: z.boolean(),
-  responseFormat: z.boolean()
+  responseFormat: z.boolean(),
+  tokenizer: z.string().optional()
 })
 
 export interface CatalogSnapshot {

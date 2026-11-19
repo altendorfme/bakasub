@@ -10,7 +10,8 @@ import type {
   Job,
   JobCreateRequest,
   JobStatus,
-  Profile
+  Profile,
+  Range
 } from '../../shared/ipc-contract'
 import type { BatchRepository, BatchRow } from '../database/repositories/batch.repository'
 import { AppError } from '../errors'
@@ -68,7 +69,8 @@ export const BatchCreateRequestSchema = z.object({
       keepOriginalSubtitles: z.boolean().optional(),
       alsoWriteSubtitle: z.boolean().optional()
     })
-    .optional()
+    .optional(),
+  confirmBeforeTranslate: z.boolean().optional()
 }) satisfies z.ZodType<BatchCreateRequest>
 
 export interface BatchServiceDeps {
@@ -148,7 +150,8 @@ export class BatchService {
           targetLang: req.targetLang,
           sourceLang: req.sourceLang,
           outputDir: outRoot,
-          options: req.options
+          options: req.options,
+          confirmBeforeTranslate: req.confirmBeforeTranslate
         }
       },
       specs.map((spec) => ({ id: randomUUID(), kind: spec.kind, spec, status: 'queued' as const }))
@@ -169,6 +172,11 @@ export class BatchService {
 
   async jobs(id: string): Promise<Job[]> {
     await this.get(id)
+    return this.jobsOf(id)
+  }
+
+  /** Sem validar a existência: usado por `toDto` (evita get -> toDto -> jobs -> get…). */
+  private async jobsOf(id: string): Promise<Job[]> {
     const ids = new Set(await this.deps.batches.jobIds(id))
     return (await this.deps.jobs.list()).filter((j) => ids.has(j.id))
   }
@@ -184,6 +192,13 @@ export class BatchService {
         await this.deps.jobs.cancel(j.id).catch((err: unknown) => {
           if (!(err instanceof AppError && err.code === 'JOB_INVALID_STATE')) throw err
         })
+    return this.get(id)
+  }
+
+  /** Confirma todos os jobs do batch que aguardam a estimativa. */
+  async confirm(id: string): Promise<Batch> {
+    for (const j of await this.jobs(id))
+      if (j.status === 'awaiting-confirmation') await this.deps.jobs.confirm(j.id)
     return this.get(id)
   }
 
@@ -213,7 +228,8 @@ export class BatchService {
           ...common,
           profileId: req.profileId!,
           targetLang: req.targetLang,
-          sourceLang: req.sourceLang
+          sourceLang: req.sourceLang,
+          confirmBeforeTranslate: req.confirmBeforeTranslate
         }
       case 'pipeline': {
         const [trackId] = item.trackIds ?? []
@@ -226,17 +242,35 @@ export class BatchService {
           profileId: req.profileId!,
           targetLang: req.targetLang,
           sourceLang: req.sourceLang,
-          options: req.options
+          options: req.options,
+          confirmBeforeTranslate: req.confirmBeforeTranslate
         }
       }
     }
+  }
+
+  private async preflightTotals(id: string): Promise<Batch['preflight']> {
+    const waiting = (await this.jobsOf(id)).filter((j) => j.status === 'awaiting-confirmation')
+    let cost: Range | null = { low: 0, high: 0 }
+    let toTranslate = 0
+    let approximate = false
+    for (const j of waiting) {
+      const e = j.result?.preflight
+      if (!e) continue
+      toTranslate += e.lines.toTranslate
+      approximate ||= e.approximate
+      cost = cost && e.cost ? sum(cost, e.cost) : null
+    }
+    return { awaiting: waiting.length, toTranslate, cost, approximate }
   }
 
   private async toDto(r: BatchRow): Promise<Batch> {
     const counts = await this.deps.batches.counts(r.id)
     const total = Object.values(counts).reduce((n, c) => n + (c ?? 0), 0)
     const active = Object.entries(counts).some(([s, c]) => c && !TERMINAL.has(s as JobStatus))
+    const preflight = counts['awaiting-confirmation'] ? await this.preflightTotals(r.id) : undefined
     return {
+      ...(preflight ? { preflight } : {}),
       id: r.id,
       name: r.name,
       kind: r.kind,
@@ -247,6 +281,10 @@ export class BatchService {
       state: active ? 'active' : 'finished'
     }
   }
+}
+
+function sum(a: Range, b: Range): Range {
+  return { low: a.low + b.low, high: a.high + b.high }
 }
 
 function parse<T extends z.ZodType>(schema: T, raw: unknown): z.output<T> {

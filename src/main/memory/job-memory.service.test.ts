@@ -141,3 +141,15 @@ describe('JobMemoryService', () => {
     await expect(svc.prune('all')).rejects.toMatchObject({ code: 'MEMORY_BUSY' })
   })
 })
+
+describe('lookupDocument com peek', () => {
+  it('não atualiza last_used_at (preflight cancelado não segura entradas velhas)', async () => {
+    const c = ctx()
+    const { misses } = await svc.lookupDocument(doc, c)
+    await svc.commitChunk(c, [{ hashed: misses[1], translated: 'All good?' }])
+    now += 10 * DAY
+    const r = await svc.lookupDocument(doc, c, { peek: true })
+    expect(r.hits.size).toBe(1)
+    expect(await svc.prune(7)).toEqual({ deleted: 1 })
+  })
+})

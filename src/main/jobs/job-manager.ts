@@ -148,6 +148,27 @@ export class JobManager {
     return this.get(id)
   }
 
+  /** `awaiting-confirmation` -> fila, com a decisão do preflight marcada como confirmada. */
+  async confirm(id: string): Promise<Job> {
+    const row = await this.row(id)
+    if (row.status !== 'awaiting-confirmation')
+      throw new AppError('JOB_INVALID_STATE', `Job ${id} is ${row.status}`)
+    const artifacts = structuredClone(row.artifacts) as Artifacts
+    if (artifacts.preflight) artifacts.preflight.estimate.decision = 'confirmed'
+    await this.deps.repo.update(id, {
+      status: 'queued',
+      artifacts: artifacts as Record<string, unknown>
+    })
+    this.pump()
+    return this.get(id)
+  }
+
+  /** Estimativa + cobertura completa guardadas pela etapa de preflight. */
+  async preflight(id: string): Promise<Artifacts['preflight'] | null> {
+    const row = await this.row(id)
+    return (row.artifacts as Artifacts).preflight ?? null
+  }
+
   async retry(id: string): Promise<Job> {
     const row = await this.row(id)
     if (!RETRYABLE.has(row.status) || this.running.has(id))
@@ -258,7 +279,10 @@ export class JobManager {
     const done = this.deps.runner
       .run({ spec: row.spec as JobSpec, artifacts: row.artifacts as Artifacts, workDir }, hooks)
       .then(
-        (outcome) => this.finish(id, outcome.status, progress, { result: outcome.result }),
+        (outcome) =>
+          outcome.status === 'awaiting-confirmation'
+            ? this.pause(id, progress, outcome.result)
+            : this.finish(id, outcome.status, progress, { result: outcome.result }),
         (err) => this.fail(id, err, progress, controller.signal.aborted)
       )
       .catch((err) => this.log.error(`job ${id} bookkeeping failed`, err))
@@ -268,6 +292,19 @@ export class JobManager {
         this.pump()
       })
     this.running.set(id, { controller, done, throttle })
+  }
+
+  /** Parado antes da tradução: não terminal, sem `finishedAt`, mantém o diretório de trabalho. */
+  private async pause(id: string, progress: JobProgress, result: Job['result']): Promise<void> {
+    const p: JobProgress = { ...progress, step: 'preflight' }
+    await this.deps.repo.update(id, {
+      status: 'awaiting-confirmation',
+      step: 'preflight',
+      progress: p,
+      result
+    })
+    this.running.get(id)?.throttle.cancel()
+    this.emitNow(id, 'awaiting-confirmation', p)
   }
 
   private async fail(

@@ -6,7 +6,7 @@ Requirements that the backend/API work has already committed to exposing, but th
 
 Some subtitle content will not be sent to the LLM. The user must be told **what, where and why**, before the Job starts; silent omissions are not acceptable.
 
-Source: `analyzeCoverage(doc): CoverageReport` (`src/main/parsers/core/coverage.ts`, implemented; see [`parsing.md`](./parsing.md)), computed by the same `classify()` the segmenter uses, so the report cannot diverge from the pipeline. It travels to the renderer as part of the preflight response, capped with `maxEntries` (`truncated: true` when cut).
+Source: `analyzeCoverage(doc): CoverageReport` (`src/main/parsers/core/coverage.ts`, implemented; see [`parsing.md`](./parsing.md)), computed by the same `classify()` the segmenter uses, so the report cannot diverge from the pipeline. It travels to the renderer through `jobs:preflight(id)` (estimate + coverage) while the job is in `awaiting-confirmation` (see [`preflight.md`](./preflight.md)), capped with `maxEntries` (`truncated: true` when cut).
 
 What the UI must show:
 
@@ -39,6 +39,13 @@ UX rules already decided:
 
 - Only `untranslated` entries count as "lines you need to look at"; `skipped` is informational.
 - Unparsed blocks go to the output verbatim by default; export can drop them (`repair: { unparsed: 'drop' }`), which must be an explicit, visible user choice with the resulting diagnostic shown.
+
+### Cost estimate and confirmation
+
+- Jobs in `awaiting-confirmation` need a confirmation screen: lines total / cached / to translate, chunks, input and output token ranges, **cost range** ("≈ US$ 0.12–0.18"), model and price used with the catalog date, and the coverage report above. `approximate: true` must be explicit ("estimate; this model uses a different tokenizer"); `cost: null` means dynamic pricing (show tokens only).
+- Actions: confirm (`jobs:confirm`) or cancel (`jobs:cancel`). Batches: total of the waiting jobs (`Batch.preflight`) and "confirm all" (`batches:confirm`).
+- Settings: `preflight.autoConfirmBelowUsd` ("continue without asking when the maximum estimated cost is below US$ X") and the per-job `confirmBeforeTranslate` toggle.
+- Waiting jobs survive restarts; list them prominently.
 
 ## 2. Parser diagnostics and auto-fixes
 

@@ -14,6 +14,11 @@ export function registerJobHandlers(deps: { jobs: JobManager }): void {
   createHandler('jobs:get', { input: byId, handle: ({ id }) => deps.jobs.get(id) })
   createHandler('jobs:cancel', { input: byId, handle: ({ id }) => deps.jobs.cancel(id) })
   createHandler('jobs:retry', { input: byId, handle: ({ id }) => deps.jobs.retry(id) })
+  createHandler('jobs:confirm', { input: byId, handle: ({ id }) => deps.jobs.confirm(id) })
+  createHandler('jobs:preflight', {
+    input: byId,
+    handle: async ({ id }) => (await deps.jobs.preflight(id)) ?? null
+  })
   createHandler('jobs:remove', {
     input: byId,
     handle: async ({ id }) => {

@@ -4,7 +4,7 @@
 
 Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
 
-> Status: **infraestrutura base, parsers SRT e ASS/SSA, cache Job Memory, camada de tradução LLM e Job Manager concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI e o preflight de custo ainda não foram implementados. Veja o [roadmap](#roadmap).
+> Status: **infraestrutura base, parsers SRT e ASS/SSA, cache Job Memory, camada de tradução LLM, Job Manager (com modo batch) e preflight de custo concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI ainda não foi implementada. Veja o [roadmap](#roadmap).
 
 ## Stack
 
@@ -60,6 +60,7 @@ src/
     media/         fachada do mkvtoolnix (probe/extract/mux), idiomas, nomes de saída, validação de caminhos
     jobs/          fila de jobs, runner, etapas (probe/extract/translate/validate/write/mux), specs
     batch/         planejamento de batch (varredura, probe, seleção de faixas) e serviço de batch
+    preflight/     contagem de tokens (js-tiktoken) e estimativa de custo
     profiles/      schema e serviço de perfis
     settings/      registro tipado de configurações e o cofre de segredos cifrado
     window/        criação da BrowserWindow
@@ -151,7 +152,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 
@@ -168,6 +169,6 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [ ] **Formatos de legenda**: parser de WebVTT; OCR para PGS/VobSub
 - [x] **Camada LLM**: chunks sequenciais `<context>`/`<target>` sobre os misses do cache, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
-- [ ] **Preflight**: estimativa local de tokens (`tiktoken`) × taxa de cache × preços de `/api/v1/models`
+- [x] **Preflight**: estimativa local de tokens (`js-tiktoken`, exata para GPT, faixa de ±20% para outros tokenizers) × taxa de acerto do Job Memory × preços de `/api/v1/models`, relatório de cobertura, confirmação antes de traduzir (limite de auto-confirmação), totais do batch (veja [`docs/preflight.md`](./docs/preflight.md))
 - [ ] **Contexto de mídia**: parse do nome do arquivo (scene release) + TMDB/TVDB com override manual
 - [ ] **Frontend**: construir as telas listadas em [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (relatório de cobertura da tradução no preflight, diagnósticos do parser, confiança de encoding, onboarding de sidecars)

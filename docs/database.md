@@ -49,7 +49,7 @@ Schema files live in `src/main/database/schema/` and are re-exported from `index
 
 ### `settings`
 
-Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`).
+Plain (non-secret) settings: `key` text PK, `value` JSON, `updated_at`. Every key, its Zod schema and its default live in one registry, `SETTINGS_SCHEMA` (`src/main/settings/settings-schema.ts`); `SettingsService` returns the default for a missing or invalid value (logged) and validates on write. Current keys: `models.cache` (normalized `/api/v1/models` catalog, see [`llm.md`](./llm.md)), `jobs.concurrency` (1–4, default 2), `tracks.preferredSourceLangs` (default `['en']`), `preflight.autoConfirmBelowUsd` (USD or `null` = always ask).
 
 ### `secrets` and `vault_keys`
 

@@ -46,6 +46,7 @@ export type JobSpec =
       readonly profile: ProfileSnapshot
       readonly targetLang: string
       readonly sourceLang?: string
+      readonly confirmBeforeTranslate: boolean
     })
   | (Base &
       MuxSpecOptions & { readonly kind: 'mux'; readonly subtitles: readonly MuxSubtitleSpec[] })
@@ -57,6 +58,7 @@ export type JobSpec =
         readonly targetLang: string
         readonly sourceLang?: string
         readonly alsoWriteSubtitle: boolean
+        readonly confirmBeforeTranslate: boolean
       })
 
 const path = z.string().min(1).max(4096)
@@ -79,7 +81,8 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     profileId: z.number().int(),
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
-    outputDir: path.optional()
+    outputDir: path.optional(),
+    confirmBeforeTranslate: z.boolean().optional()
   }),
   z.object({
     kind: z.literal('mux'),
@@ -112,7 +115,8 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
         keepOriginalSubtitles: z.boolean().optional(),
         alsoWriteSubtitle: z.boolean().optional()
       })
-      .optional()
+      .optional(),
+    confirmBeforeTranslate: z.boolean().optional()
   })
 ]) satisfies z.ZodType<JobCreateRequest>
 
@@ -167,7 +171,8 @@ export async function resolveJobSpec(
         kind: 'translate',
         profile: snapshot(profile),
         targetLang: requiredLang(req.targetLang ?? profile.targetLang),
-        ...withLang(optionalLang(req.sourceLang) ?? langFromFilename(src.path))
+        ...withLang(optionalLang(req.sourceLang) ?? langFromFilename(src.path)),
+        confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
       }
     }
     case 'mux': {
@@ -202,7 +207,8 @@ export async function resolveJobSpec(
         ...withLang(optionalLang(req.sourceLang)),
         setDefault: req.options?.setDefault ?? true,
         keepOriginalSubtitles: req.options?.keepOriginalSubtitles ?? true,
-        alsoWriteSubtitle: req.options?.alsoWriteSubtitle ?? false
+        alsoWriteSubtitle: req.options?.alsoWriteSubtitle ?? false,
+        confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
       }
     }
   }

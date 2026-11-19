@@ -5,7 +5,7 @@ import type {
 } from '../database/repositories/job-memory.repository'
 import { AppError } from '../errors'
 import { validateTranslation, type InlineLexer, type SubtitleDocument } from '../parsers'
-import { computeContextHashes, type ContextHashOptions, type HashedUnit } from './context-hash'
+import { computeContextHashes, type HashedUnit } from './context-hash'
 import { canonicalLang, glossaryHash } from './memory-key'
 
 const DAY_MS = 86_400_000
@@ -92,9 +92,10 @@ export class JobMemoryService {
   async lookupDocument(
     doc: SubtitleDocument<unknown>,
     ctx: MemoryContext,
-    hashOptions: ContextHashOptions = { sourceLang: ctx.sourceLang }
+    /** `peek`: consulta sem marcar uso (preflight); um preflight cancelado não segura entradas. */
+    options: { peek?: boolean } = {}
   ): Promise<DocumentLookup> {
-    const units = computeContextHashes(doc, hashOptions)
+    const units = computeContextHashes(doc, { sourceLang: ctx.sourceLang })
     const rows = await this.repo.lookupMany(
       ctx.key,
       units.map((u) => u.hash)
@@ -114,7 +115,7 @@ export class JobMemoryService {
         touched.push(row.id)
       } else misses.push(u)
     }
-    await this.track(this.repo.touch(touched))
+    if (!options.peek) await this.track(this.repo.touch(touched))
     return { hits, misses }
   }
 

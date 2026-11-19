@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Profile } from '../../shared/ipc-contract'
+import type { JobResult, Profile } from '../../shared/ipc-contract'
 import { BatchRepository } from '../database/repositories/batch.repository'
 import { JobRepository } from '../database/repositories/job.repository'
 import { openTestDatabase } from '../database/test-db'
@@ -252,5 +252,56 @@ describe('BatchService: estado agregado, cancel e remove', () => {
     await svc.remove(b.id)
     await expect(svc.get(b.id)).rejects.toMatchObject({ code: 'BATCH_NOT_FOUND' })
     expect(await jobs.list()).toEqual([])
+  })
+
+  it('preflight do batch: soma das estimativas em espera; confirm confirma todos', async () => {
+    const b = await svc.create({
+      kind: 'pipeline',
+      root: null,
+      items: ['ep1.mkv', 'ep2.mkv'].map((f) => ({ path: join(root, 'show', f), trackIds: [3] })),
+      profileId: 1
+    })
+    const est = (high: number): NonNullable<JobResult['preflight']> => ({
+      model: { id: 'a/b', pricing: { prompt: 0, completion: 0 }, catalogFetchedAt: null },
+      approximate: false,
+      lines: { total: 10, cached: 2, toTranslate: 8, chunks: 1 },
+      tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
+      cost: { low: high / 2, high },
+      decision: 'needs-confirmation' as const
+    })
+    for (const high of [0.1, 0.3]) {
+      await until(() => runs.length >= (high === 0.1 ? 1 : 2))
+      const r = runs.at(-1)!
+      await r.hooks.onArtifacts({ preflight: { estimate: est(high), coverage: {} } })
+      r.resolve({
+        status: 'awaiting-confirmation',
+        result: { outputs: [], warnings: [], preflight: est(high) }
+      })
+    }
+    await until(async () => (await svc.get(b.id)).counts['awaiting-confirmation'] === 2)
+    const got = await svc.get(b.id)
+    expect(got.state).toBe('active')
+    expect(got.preflight).toEqual({
+      awaiting: 2,
+      toTranslate: 16,
+      cost: { low: 0.2, high: 0.4 },
+      approximate: false
+    })
+
+    const c = await svc.confirm(b.id)
+    expect(c.counts.queued).toBe(2)
+    expect(c.preflight).toBeUndefined()
+  })
+
+  it('confirmBeforeTranslate repassado aos jobs', async () => {
+    await svc.create({
+      kind: 'pipeline',
+      root: null,
+      items: [{ path: join(root, 'show', 'ep1.mkv'), trackIds: [3] }],
+      profileId: 1,
+      confirmBeforeTranslate: false
+    })
+    await until(() => runs.length === 1)
+    expect(runs[0].spec).toMatchObject({ confirmBeforeTranslate: false })
   })
 })

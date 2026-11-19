@@ -23,6 +23,11 @@ export interface Artifacts {
     usage: NonNullable<import('../../shared/ipc-contract').JobResult['usage']>
     cache: { hits: number; misses: number }
   }
+  preflight?: {
+    estimate: import('../../shared/ipc-contract').PreflightEstimate
+    /** `CoverageReport` completa (servida por `jobs:preflight`). */
+    coverage: unknown
+  }
   validate?: { ok: true }
   write?: { outputs: string[] }
   mux?: { output: string; warnings: string[] }
@@ -54,6 +59,8 @@ export async function isStepComplete(step: JobStep, a: Artifacts): Promise<boole
       return a.extract !== undefined && (await allValid(a.extract.files))
     case 'translate':
       return a.translate !== undefined && (await verifyArtifact(a.translate.file))
+    case 'preflight':
+      return a.preflight !== undefined
     case 'validate':
       return a.validate !== undefined
     case 'write':

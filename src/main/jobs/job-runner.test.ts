@@ -48,6 +48,8 @@ let mkv: { probe: Mock; extract: Mock; mux: Mock }
 let translator: { translate: Mock }
 
 beforeEach(() => {
+  threshold = null
+  preflightRuns = 0
   root = mkdtempSync(join(tmpdir(), 'bakasub-runner-'))
   workDir = join(root, 'work')
   outDir = join(root, 'out')
@@ -86,10 +88,26 @@ beforeEach(() => {
   }
 })
 
+const ESTIMATE = {
+  model: { id: 'a/b', pricing: { prompt: 0, completion: 0 }, catalogFetchedAt: null },
+  approximate: false,
+  lines: { total: 1, cached: 0, toTranslate: 1, chunks: 1 },
+  tokens: { input: { low: 100, high: 115 }, output: { low: 20, high: 23 } },
+  cost: { low: 0.01, high: 0.02 }
+}
+let threshold: number | null
+let preflightRuns: number
 const runner = (): JobRunner =>
   new JobRunner({
     mkv: mkv as unknown as StepDeps['mkv'],
-    translator: translator as unknown as SubtitleTranslator
+    translator: translator as unknown as SubtitleTranslator,
+    preflight: {
+      run: async () => {
+        preflightRuns++
+        return { estimate: ESTIMATE, coverage: { totals: {} } as never }
+      },
+      autoConfirmBelowUsd: async () => threshold
+    }
   })
 const profile = { id: 1, name: 'P', model: 'a/b', glossary: [], temperature: 0.3 }
 const pipeline = (over: Partial<JobSpec> = {}): JobSpec =>
@@ -104,6 +122,7 @@ const pipeline = (over: Partial<JobSpec> = {}): JobSpec =>
     setDefault: true,
     keepOriginalSubtitles: true,
     alsoWriteSubtitle: false,
+    confirmBeforeTranslate: false,
     ...over
   }) as JobSpec
 
@@ -131,7 +150,8 @@ describe('JobRunner', () => {
   it('pipeline completo: MKV novo ao lado, faixa com idioma/nome, avisos do mux', async () => {
     const h = hooks()
     const r = await runner().run({ spec: pipeline(), artifacts: {}, workDir }, h)
-    expect(h.steps).toEqual(['probe', 'extract', 'translate', 'mux'])
+    expect(h.steps).toEqual(['probe', 'extract', 'preflight', 'translate', 'mux'])
+    expect(r.result.preflight?.decision).toBe('auto-confirmed')
     expect(r.status).toBe('completed-with-warnings')
     expect(r.result.outputs).toEqual([join(outDir, 'ep01.pt-BR.mkv')])
     expect(r.result.warnings).toEqual(['odd timestamps'])
@@ -193,7 +213,8 @@ describe('JobRunner', () => {
       outputDir: outDir,
       profile,
       targetLang: 'pt-BR',
-      sourceLang: 'en'
+      sourceLang: 'en',
+      confirmBeforeTranslate: false
     } as JobSpec
     const r = await runner().run({ spec, artifacts: {}, workDir }, hooks())
     expect(r.result.outputs).toEqual([join(outDir, 'ep01.pt-BR (2).srt')])
@@ -234,6 +255,7 @@ describe('JobRunner', () => {
     const second = hooks()
     await runner().run({ spec: pipeline(), artifacts, workDir }, second)
     expect(second.steps).toEqual(['translate', 'mux'])
+    expect(preflightRuns).toBe(1)
     expect(mkv.extract).toHaveBeenCalledTimes(1)
   })
 
@@ -247,7 +269,7 @@ describe('JobRunner', () => {
     writeFileSync(artifacts.extract!.files[0].path, 'mudou')
     const second = hooks()
     await runner().run({ spec: pipeline(), artifacts, workDir }, second)
-    expect(second.steps).toEqual(['extract', 'translate', 'mux'])
+    expect(second.steps).toEqual(['extract', 'preflight', 'translate', 'mux'])
   })
 
   it('falha no mux remove o .partial', async () => {
@@ -288,5 +310,63 @@ describe('JobRunner', () => {
     expect(err.cause).toBeInstanceOf(TranslationCancelled)
     expect(err.partial.usage.cost).toBe(0.2)
     expect(existsSync(join(outDir, 'ep01.pt-BR.mkv'))).toBe(false)
+  })
+
+  it('confirmação exigida: para em awaiting-confirmation antes de traduzir', async () => {
+    const h = hooks()
+    const r = await runner().run(
+      {
+        spec: pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>),
+        artifacts: {},
+        workDir
+      },
+      h
+    )
+    expect(r.status).toBe('awaiting-confirmation')
+    expect(h.steps).toEqual(['probe', 'extract', 'preflight'])
+    expect(r.result.preflight).toMatchObject({
+      decision: 'needs-confirmation',
+      cost: { high: 0.02 }
+    })
+    expect(translator.translate).not.toHaveBeenCalled()
+
+    // Confirmado: retoma em translate, sem refazer extract nem preflight.
+    const artifacts = structuredClone(h.saved.at(-1)!)
+    artifacts.preflight!.estimate.decision = 'confirmed'
+    const h2 = hooks()
+    const r2 = await runner().run(
+      { spec: pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>), artifacts, workDir },
+      h2
+    )
+    expect(h2.steps).toEqual(['translate', 'mux'])
+    expect(r2.result.preflight?.decision).toBe('confirmed')
+    expect(preflightRuns).toBe(1)
+  })
+
+  it('auto-confirma abaixo do limite configurado', async () => {
+    threshold = 0.05
+    const r = await runner().run(
+      {
+        spec: pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>),
+        artifacts: {},
+        workDir
+      },
+      hooks()
+    )
+    expect(r.result.preflight?.decision).toBe('auto-confirmed')
+    expect(translator.translate).toHaveBeenCalled()
+  })
+
+  it('limite abaixo do custo máximo: pede confirmação', async () => {
+    threshold = 0.015
+    const r = await runner().run(
+      {
+        spec: pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>),
+        artifacts: {},
+        workDir
+      },
+      hooks()
+    )
+    expect(r.status).toBe('awaiting-confirmation')
   })
 })

@@ -16,6 +16,7 @@ import { SettingsService } from '../settings/settings.service'
 import type { JobProgressEvent } from '../../shared/ipc-contract'
 import { JobManager } from './job-manager'
 import { JobRunner } from './job-runner'
+import { Preflighter } from '../preflight/preflighter'
 import type { SubtitleTranslator } from './step-context'
 
 export interface JobModuleOptions {
@@ -51,6 +52,7 @@ export function createJobModule(o: JobModuleOptions): {
   const client = new OpenRouterClient({ apiKey: () => o.vault.get('openrouter.apiKey') })
   const models = new ModelCatalog(client, settings)
   const mkv = new MkvToolnix(o.runner, o.tools)
+  const preflighter = new Preflighter({ models, memory: o.memory })
 
   const translator: SubtitleTranslator = {
     translate: (input, opts) =>
@@ -78,7 +80,14 @@ export function createJobModule(o: JobModuleOptions): {
   })
   const jobs = new JobManager({
     repo: new JobRepository(o.db),
-    runner: new JobRunner({ mkv, translator }),
+    runner: new JobRunner({
+      mkv,
+      translator,
+      preflight: {
+        run: (input, signal) => preflighter.run(input, signal),
+        autoConfirmBelowUsd: () => settings.get('preflight.autoConfirmBelowUsd')
+      }
+    }),
     profiles,
     workRoot: o.workRoot,
     concurrency: () => settings.get('jobs.concurrency'),

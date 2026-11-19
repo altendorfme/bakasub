@@ -14,7 +14,7 @@ export interface RunHooks {
 }
 
 export interface RunOutcome {
-  readonly status: 'completed' | 'completed-with-warnings'
+  readonly status: 'completed' | 'completed-with-warnings' | 'awaiting-confirmation'
   readonly result: JobResult
 }
 
@@ -54,6 +54,9 @@ export class JobRunner {
     const partial = (): JobResult => this.result(artifacts, warnings, usage)
 
     for (const step of plan.slice(start)) {
+      // Preflight pediu confirmação: encerra aqui (libera o slot); `jobs:confirm` retoma.
+      if (step === 'translate' && artifacts.preflight?.estimate.decision === 'needs-confirmation')
+        return { status: 'awaiting-confirmation', result: partial() }
       await hooks.onStep(step)
       hooks.onProgress({ step })
       try {
@@ -85,7 +88,8 @@ export class JobRunner {
       outputs: [...(a.write?.outputs ?? []), ...(a.mux ? [a.mux.output] : [])],
       warnings: [...warnings],
       ...(usage ? { usage } : {}),
-      ...(a.translate ? { cache: a.translate.cache, failedLines: a.translate.failedLines } : {})
+      ...(a.translate ? { cache: a.translate.cache, failedLines: a.translate.failedLines } : {}),
+      ...(a.preflight ? { preflight: a.preflight.estimate } : {})
     }
   }
 }

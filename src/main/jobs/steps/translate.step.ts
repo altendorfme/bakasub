@@ -1,35 +1,24 @@
 import { join } from 'node:path'
-import { AppError } from '../../errors'
 import { TranslationCancelled } from '../../llm/translate-document'
 import { fileArtifact } from '../artifacts'
 import type { Step } from '../step-context'
-import { formatFromPath, readSubtitle, writeSubtitle, type TextFormatId } from './subtitle-io'
+import { writeSubtitle } from './subtitle-io'
+import { translationInput } from './translation-input'
 
 /** Lê a legenda (origem ou faixa extraída), traduz e grava o resultado no diretório de trabalho. */
 export const translateStep: Step = async (ctx) => {
-  const { spec } = ctx
-  if (spec.kind !== 'translate' && spec.kind !== 'pipeline')
-    throw new AppError('INVALID_INPUT', `translate step in a ${spec.kind} job`)
-
-  let input: string
-  let id: TextFormatId
-  let sourceLang = spec.sourceLang
-  if (spec.kind === 'translate') {
-    input = spec.source
-    id = formatFromPath(spec.source)
-  } else {
-    const f = ctx.artifacts.extract?.files.find((x) => x.trackId === spec.trackId)
-    if (!f) throw new AppError('INVALID_INPUT', 'Extracted track is missing')
-    input = f.path
-    id = f.format
-    sourceLang ??= f.language
-  }
-
-  const { doc, format } = await readSubtitle(input, id)
+  const input = await translationInput(ctx)
+  const { doc, format, formatId: id } = input
   let result
   try {
     result = await ctx.deps.translator.translate(
-      { doc, format, profile: spec.profile, targetLang: spec.targetLang, sourceLang },
+      {
+        doc,
+        format,
+        profile: input.profile,
+        targetLang: input.targetLang,
+        sourceLang: input.sourceLang
+      },
       {
         signal: ctx.signal,
         onProgress: (p) =>

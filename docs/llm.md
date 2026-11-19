@@ -32,7 +32,7 @@ translateDocument
 ## Chunks and context
 
 - Only Job Memory **misses** are sent. Chunks run **sequentially** in timeline order (`HashedUnit.timeIndex`: `start.ms`, file order on ties), so each chunk sees the previous translations: consistency of names and forms of address beats speed. Parallelism belongs between jobs.
-- A chunk holds up to **40 lines or ~2,000 estimated tokens** of `<target>` (`token-estimate.ts`: ~4 chars/token, ~1 per CJK character; for limits only, the preflight will use a real tokenizer). A line larger than the budget goes alone.
+- A chunk holds up to **40 lines or ~2,000 estimated tokens** of `<target>` (`token-estimate.ts`: ~4 chars/token, ~1 per CJK character; for limits only, the preflight uses a real tokenizer, see [`preflight.md`](./preflight.md)). A line larger than the budget goes alone.
 - `<context>`: the 5 translatable cues before the chunk (source **and** translation when known, from the cache or an earlier chunk) and 2 after (source only), as plain text without markers.
 - `max_tokens` ≈ 2.5 × the target estimate + JSON overhead, at least 256, capped by `top_provider.max_completion_tokens`.
 

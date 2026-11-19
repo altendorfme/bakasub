@@ -42,7 +42,8 @@ describe('resolveJobSpec', () => {
       profile: { id: 7, name: 'P', model: 'a/b', glossary: profile.glossary, temperature: 0.3 },
       targetLang: 'pt-BR',
       sourceLang: 'en',
-      outputDir: dir
+      outputDir: dir,
+      confirmBeforeTranslate: true
     })
   })
 
@@ -67,7 +68,8 @@ describe('resolveJobSpec', () => {
       outputDir: join(dir, 'out'),
       setDefault: true,
       keepOriginalSubtitles: true,
-      alsoWriteSubtitle: false
+      alsoWriteSubtitle: false,
+      confirmBeforeTranslate: true
     })
   })
 

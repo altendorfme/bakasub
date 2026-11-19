@@ -45,7 +45,7 @@ describe('JobRepository', () => {
     expect(j.updatedAt.getTime()).toBe(now)
   })
 
-  it('markInterrupted: running e awaiting viram interrupted', async () => {
+  it('markInterrupted: só running vira interrupted', async () => {
     await repo.insert(job('a'))
     await repo.insert({ ...job('b'), status: 'running' })
     await repo.insert({ ...job('c'), status: 'completed' })
