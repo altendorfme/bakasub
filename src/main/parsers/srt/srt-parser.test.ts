@@ -249,3 +249,13 @@ describe('serializeSrt: round-trip exato', () => {
     )
   })
 })
+
+describe('parseSrt: SRT_AMBIGUOUS_INDEX', () => {
+  it('relata e mantém o número como texto do cue anterior', () => {
+    const src = `1\n${T1}\nEm\n1999\n${T2}\nFim\n`
+    const doc = parseSrt(src)
+    const d = doc.diagnostics.find((x) => x.code === 'SRT_AMBIGUOUS_INDEX')
+    expect(d).toMatchObject({ severity: 'warn', fix: 'report', line: 4, params: { value: '1999' } })
+    expect(serializeSrt(doc)).toBe(src)
+  })
+})

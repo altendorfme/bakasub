@@ -23,6 +23,13 @@ export type DiagnosticCode =
   | 'SRT_EMPTY_CUE'
   | 'SRT_TIMING_EXTRAS'
   | 'SRT_UNPARSEABLE_BLOCK'
+  | 'SRT_AMBIGUOUS_INDEX'
+  // ASS/SSA
+  | 'ASS_EOL_MIXED'
+  | 'ASS_TIME_FORMAT'
+  | 'ASS_END_BEFORE_START'
+  | 'ASS_FORMAT_MISSING'
+  | 'ASS_UNPARSEABLE_EVENT'
   // Segmentação
   | 'SEG_MARKER_COLLISION'
 
@@ -42,6 +49,12 @@ export const FIX_POLICY: Readonly<Record<DiagnosticCode, FixPolicy>> = {
   SRT_EMPTY_CUE: 'report',
   SRT_TIMING_EXTRAS: 'report',
   SRT_UNPARSEABLE_BLOCK: 'report',
+  SRT_AMBIGUOUS_INDEX: 'report',
+  ASS_EOL_MIXED: 'auto',
+  ASS_TIME_FORMAT: 'report',
+  ASS_END_BEFORE_START: 'report',
+  ASS_FORMAT_MISSING: 'report',
+  ASS_UNPARSEABLE_EVENT: 'report',
   SEG_MARKER_COLLISION: 'report'
 }
 

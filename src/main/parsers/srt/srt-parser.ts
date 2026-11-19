@@ -113,6 +113,16 @@ export function parseSrt(
       seenIndexes.add(n)
     }
 
+    if (s.ambiguousIndex)
+      push(
+        diagnostic(
+          'SRT_AMBIGUOUS_INDEX',
+          'warn',
+          { line: s.ambiguousIndex.line },
+          { ref, params: { value: s.ambiguousIndex.value } }
+        )
+      )
+
     // Separação entre cues
     if (position > 0 && countEols(leading) < 2)
       push(diagnostic('SRT_MISSING_BLANK_LINE', 'info', at, { ref }))

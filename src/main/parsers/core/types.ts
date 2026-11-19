@@ -46,7 +46,7 @@ export interface LineBreakNode {
 export type Node = TextNode | TagNode | LineBreakNode
 
 /** Texto cru que ocupa o lugar de um item que o parser não conseguiu classificar. */
-export type UnparsedReason = 'orphan-text' | 'bad-timing' | 'empty-block'
+export type UnparsedReason = 'orphan-text' | 'bad-timing' | 'empty-block' | 'bad-event'
 
 export interface Cue<F = unknown> {
   readonly kind: 'cue'
@@ -55,6 +55,10 @@ export interface Cue<F = unknown> {
   readonly start: Timecode
   readonly end: Timecode
   readonly nodes: readonly Node[]
+  /** Estilo do evento (ASS/SSA); `undefined` em formatos sem estilo (SRT). */
+  readonly style?: string
+  /** Falante/ator (coluna `Name` do ASS/SSA); `undefined` quando vazio ou inexistente. */
+  readonly actor?: string
   /** Texto cru entre o item anterior (ou o início do arquivo) e este item. */
   readonly leading: string
   /** Dados lossless específicos do formato (opacos para as camadas acima). */

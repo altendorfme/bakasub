@@ -4,7 +4,7 @@
 
 Desktop application for extracting, AI-translating and re-muxing subtitles from `.mkv` videos.
 
-> Status: **base infrastructure and the SRT parser are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The Job Manager, LLM translation and ASS/SSA parsers are not implemented yet. See the [roadmap](#roadmap).
+> Status: **base infrastructure and the SRT and ASS/SSA parsers are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The Job Manager and LLM translation are not implemented yet. See the [roadmap](#roadmap).
 
 ## Stack
 
@@ -54,7 +54,7 @@ src/
     logging/       electron-log (scopes: app, db, ipc, sidecar, llm)
     services/      shutdown-coordinator, app-info, app-update, native consent dialog
     sidecars/      sidecar module (no `electron` dependency, testable in plain Node)
-    parsers/       subtitle parsing: decoder, common AST, SRT, segmentation, coverage (pure, testable)
+    parsers/       subtitle parsing: decoder, common AST, SRT, ASS/SSA, segmentation, coverage (pure, testable)
     jobs/ llm/     reserved for business logic
     window/        BrowserWindow factory
   preload/         the only surface exposed to the renderer (window.api), allowlisted
@@ -145,7 +145,7 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] App version check
 - [x] Build and release (Linux + Windows)
 - [x] **SRT parser**: lossless AST (Text / Tag / LineBreak nodes), tolerant scanner with diagnostics, safe repair mode, XLIFF-style segmentation for the LLM, coverage report (see [`docs/parsing.md`](./docs/parsing.md))
-- [ ] **ASS/SSA parsers** on top of the same `core/` AST
+- [x] **ASS/SSA parser**: same `core/` AST; only `Dialogue:` becomes a cue, everything else is lossless trivia; drawings and karaoke are never sent to the LLM (see [`docs/parsing.md`](./docs/parsing.md))
 - [ ] **Job Manager**: bounded-concurrency queue, `AbortController` cancellation, transaction rollback
 - [ ] **LLM strategy**: `<context>`/`<target>` chunking, Zod-validated JSON with per-chunk retry, termbase in the System Prompt, OpenRouter SSE streaming
 - [ ] **Job Memory**: SQLite upsert, _context hash_ (≤ 3 words includes the normalized previous line)

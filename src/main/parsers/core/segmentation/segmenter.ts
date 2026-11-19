@@ -9,11 +9,13 @@ export interface TranslationUnit {
   readonly skeleton: Skeleton
 }
 
-export type SkipReason = 'SKIPPED_NO_LETTERS' | 'SKIPPED_EMPTY_BLOCK'
+export type SkipReason = 'SKIPPED_NO_LETTERS' | 'SKIPPED_EMPTY_BLOCK' | 'SKIPPED_DRAWING'
 export type UntranslatedReason =
   | 'UNTRANSLATED_ORPHAN_TEXT'
   | 'UNTRANSLATED_BAD_TIMING'
   | 'UNTRANSLATED_MARKER_COLLISION'
+  | 'UNTRANSLATED_KARAOKE'
+  | 'UNTRANSLATED_BAD_EVENT'
   /** Reservado para a camada de LLM (chunk esgotou as tentativas). */
   | 'UNTRANSLATED_VALIDATION_FAILED'
 
@@ -23,6 +25,14 @@ export type Classification =
   | { status: 'untranslated'; reason: UntranslatedReason; params?: Record<string, string> }
 
 const HAS_LETTER = /\p{L}/u
+/** Desenho vetorial ASS: `\p1`, `\p2`… (`\p0` encerra; `\pos` não casa: `p` seguido de dígito). */
+const DRAWING = /\\p0*[1-9]/
+/** Karaokê ASS: `\k`, `\K`, `\kf`, `\ko` seguidos de duração. */
+const KARAOKE = /\\(?:kf|ko|k|K)\d/
+
+function hasOverride(cue: Cue<unknown>, re: RegExp): boolean {
+  return cue.nodes.some((n) => n.type === 'tag' && n.kind === 'override' && re.test(n.raw))
+}
 
 /**
  * Única fonte de verdade sobre "isto vai para o LLM?". Tanto a segmentação quanto o relatório
@@ -37,12 +47,17 @@ export function classify(item: Item<unknown>): Classification {
         return { status: 'untranslated', reason: 'UNTRANSLATED_BAD_TIMING' }
       case 'orphan-text':
         return { status: 'untranslated', reason: 'UNTRANSLATED_ORPHAN_TEXT' }
+      case 'bad-event':
+        return { status: 'untranslated', reason: 'UNTRANSLATED_BAD_EVENT' }
     }
   }
   return classifyCue(item)
 }
 
 export function classifyCue(cue: Cue<unknown>): Classification {
+  // Reconhecido pelas tags, não pelo formato: o núcleo continua agnóstico.
+  if (hasOverride(cue, DRAWING)) return { status: 'skipped', reason: 'SKIPPED_DRAWING' }
+  if (hasOverride(cue, KARAOKE)) return { status: 'untranslated', reason: 'UNTRANSLATED_KARAOKE' }
   const hasLetters = cue.nodes.some((n) => n.type === 'text' && HAS_LETTER.test(n.value))
   if (!hasLetters) return { status: 'skipped', reason: 'SKIPPED_NO_LETTERS' }
 

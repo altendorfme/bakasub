@@ -1,6 +1,7 @@
 /** API pública dos parsers. Tudo aqui é puro (sem `electron`) e roda em Node simples. */
 export { decodeSubtitle, metaFromText, type DecodedSubtitle } from './decode/subtitle-decoder'
 export { srtFormat, type SrtCueData } from './srt'
+export { assFormat, ssaFormat, type AssCueData } from './ass'
 export { SubtitleParseError } from './core/format'
 export type { InlineLexer, RepairOptions, RepairResult, SubtitleFormat } from './core/format'
 export { cuePlainText } from './core/plain-text'

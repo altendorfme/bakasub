@@ -27,7 +27,10 @@ Reason codes the UI needs messages for:
 | `SKIPPED_NO_LETTERS`             | info     | Cue contains no letters (e.g. `♪♪`, `...`, only tags). Not an alert: count it, make it listable |
 | `UNTRANSLATED_ORPHAN_TEXT`       | warn     | Text after a blank line with no timing; it stays in the original language                       |
 | `UNTRANSLATED_BAD_TIMING`        | warn     | A `-->` line could not be read                                                                  |
-| `UNTRANSLATED_EMPTY_BLOCK`       | info     | Empty block                                                                                     |
+| `SKIPPED_EMPTY_BLOCK`            | info     | Empty block (lone SRT index)                                                                    |
+| `SKIPPED_DRAWING`                | info     | ASS/SSA vector drawing (`\p1`…): nothing to translate; kept as is                               |
+| `UNTRANSLATED_KARAOKE`           | warn     | ASS/SSA karaoke line (`\k`, `\kf`, `\ko`, `\K`): syllable timing would break; kept as is        |
+| `UNTRANSLATED_BAD_EVENT`         | warn     | ASS/SSA `Dialogue:` line that could not be read (missing columns or unreadable time)            |
 | `UNTRANSLATED_MARKER_COLLISION`  | warn     | Text resembles an internal marker (`<g1>`); the cue is passed through untouched                 |
 | `UNTRANSLATED_VALIDATION_FAILED` | warn     | Reserved for the LLM layer                                                                      |
 
@@ -40,7 +43,8 @@ UX rules already decided:
 
 - Show syntax diagnostics (`Diagnostic { code, severity, fix: 'auto' | 'report', line, col }`) separately from coverage: diagnostics describe the file, coverage describes what will be translated.
 - Exports for muxing use the repaired serializer by default; list the applied `fixed` diagnostics so the user knows what changed (renumbered indexes, `.` → `,`, etc.).
-- `report`-only issues (`end < start`, overlap, empty cue, `X1:` coordinates) need a visible warning; they are never fixed automatically.
+- `report`-only issues (`end < start`, overlap, empty cue, `X1:` coordinates, `SRT_AMBIGUOUS_INDEX`, `ASS_TIME_FORMAT`, `ASS_FORMAT_MISSING`) need a visible warning; they are never fixed automatically. The only ASS/SSA auto-fix is `ASS_EOL_MIXED`.
+- `Cue.style` and `Cue.actor` (ASS/SSA) are available for grouping/filtering in the UI. There is no style filter in the parser API yet (planned for the Job/Profile iteration, e.g. to skip sign/OP/ED styles).
 
 ## 3. Encoding confidence
 

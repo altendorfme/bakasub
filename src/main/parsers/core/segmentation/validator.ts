@@ -9,6 +9,7 @@ export type IssueCode =
   | 'BR_COUNT_MISMATCH'
   | 'RAW_NEWLINE'
   | 'INVENTED_TAG'
+  | 'MARKER_ORDER'
   | 'EMPTY_TRANSLATION'
 
 export interface Issue {
@@ -21,7 +22,8 @@ export interface Issue {
 /**
  * Valida a tradução contra o esqueleto: cada marcador exatamente uma vez, pares bem aninhados,
  * mesma quantidade de <br/>, sem quebra de linha crua e sem tags inventadas pelo modelo.
- * A posição dos marcadores (e das palavras) é livre: idiomas reordenam.
+ * A posição das palavras e dos pares é livre (idiomas reordenam); marcadores soltos (`<xN/>`)
+ * mantêm a ordem relativa original (`MARKER_ORDER`).
  */
 export function validateTokens(
   skeleton: Skeleton,
@@ -33,6 +35,7 @@ export function validateTokens(
   const opened = new Set<number>()
   const closed = new Set<number>()
   const singles = new Set<number>()
+  let lastSingle = 0
   const stack: number[] = []
   let brCount = 0
   let sawNewline = false
@@ -43,11 +46,13 @@ export function validateTokens(
     switch (tok.t) {
       case 'text': {
         if (tok.value.trim() !== '') anyText = true
-        if (!sawNewline && /[\r\n]/.test(tok.value)) {
+        const lexed = lexInline(tok.value)
+        // Quebra "crua" = qualquer quebra que o lexer do formato reconheça (EOL no SRT, `\N` no ASS).
+        if (!sawNewline && (/[\r\n]/.test(tok.value) || lexed.some((n) => n.type === 'br'))) {
           sawNewline = true
           issues.push({ code: 'RAW_NEWLINE' })
         }
-        if (!sawInvented && lexInline(tok.value).some((n) => n.type === 'tag')) {
+        if (!sawInvented && lexed.some((n) => n.type === 'tag')) {
           sawInvented = true
           issues.push({ code: 'INVENTED_TAG' })
         }
@@ -80,7 +85,12 @@ export function validateTokens(
         if (markers[tok.id]?.kind !== 'single')
           issues.push({ code: 'UNEXPECTED_MARKER', id: tok.id })
         else if (singles.has(tok.id)) issues.push({ code: 'DUPLICATE_MARKER', id: tok.id })
-        else singles.add(tok.id)
+        else {
+          singles.add(tok.id)
+          // Overrides soltos têm efeito posicional: a ordem relativa original é preservada.
+          if (tok.id < lastSingle) issues.push({ code: 'MARKER_ORDER', id: tok.id })
+          lastSingle = Math.max(lastSingle, tok.id)
+        }
         break
       }
     }

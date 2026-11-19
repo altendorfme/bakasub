@@ -1,12 +1,12 @@
 # Subtitle parsing
 
-Everything lives in `src/main/parsers/` and is **pure** (no `electron` import), so it runs in plain Node and under vitest. Public API: `src/main/parsers/index.ts`. Current format: **SRT**. ASS/SSA will reuse `core/` and add only a scanner, an inline lexer and a serializer.
+Everything lives in `src/main/parsers/` and is **pure** (no `electron` import), so it runs in plain Node and under vitest. Public API: `src/main/parsers/index.ts`. Formats: **SRT** and **ASS/SSA** (`srt/` and `ass/` reuse `core/` and add only a scanner, an inline lexer, a parser and a serializer).
 
 Parsers only take text apart and put it back together. They know nothing about LLMs, the database or IPC.
 
 ```
 bytes ──► decodeSubtitle ──► text + DocumentMeta
-text  ──► srtFormat.parse ──► SubtitleDocument (cues + unparsed blocks + diagnostics)
+text  ──► srtFormat.parse | assFormat.parse ──► SubtitleDocument (cues + unparsed blocks + diagnostics)
 cue   ──► toTranslationUnit ──► payload (text + markers) + skeleton
 LLM   ──► applyTranslation(cue, unit, translated, lexInline) ──► new Cue | Issue[]
 doc   ──► srtFormat.serialize (exact)  |  srtFormat.serializeRepaired (safe fixes)
@@ -33,7 +33,8 @@ Order: BOM (UTF-8, UTF-16 LE/BE) → strict UTF-8 → `chardet` restricted to an
 
 - `Node` = `TextNode | TagNode | LineBreakNode`. `TagNode.raw` keeps the exact source; `kind` is `open | close | override`.
 - `Cue<F>`: `id` (document ordinal, **not** the file index), `start`/`end` (`{ ms, raw }`), `nodes`, `leading`, `line`/`endLine`, and `format: F` (lossless, format-specific data; for SRT: index line, timing line, EOLs, extras).
-- `UnparsedBlock`: raw text the scanner could not classify (`orphan-text | bad-timing | empty-block`).
+- `Cue.style?` / `Cue.actor?`: ASS/SSA `Style` and `Name` columns (`undefined` in SRT or when empty).
+- `UnparsedBlock`: raw text the scanner could not classify (`orphan-text | bad-timing | empty-block | bad-event`).
 - `SubtitleDocument`: `items`, `trailing`, `meta`, `diagnostics`. Everything is immutable.
 
 ### Round-trip invariant
@@ -49,7 +50,7 @@ Anchored on the timing line (`-->`), not on blank lines, which is what makes rec
 - A cue starts at a valid timing line; a digits-only line right before it is the index.
 - Text ends at a blank line (whitespace-only counts), another timing line, or an index+timing pair (glued cues).
 - Non-blank lines outside any cue form an `UnparsedBlock`: `bad-timing` if it contains `-->`, `empty-block` for a lone number, `orphan-text` otherwise.
-- Known ambiguity: if a cue's text ends with a number-only line directly followed by a timing line (no blank line), the number is read as the next cue's index.
+- Glued case (no blank line before a number-only line + timing): the number is the next cue's index **only if** it equals the previous index + 1. Otherwise it stays as text of the previous cue, the next cue has no index and `SRT_AMBIGUOUS_INDEX` (warn, report) is raised. With a blank line before it, any number is an index.
 - A blank line inside a cue ends it; the continuation becomes an orphan block (reported, never silently merged).
 
 ### Timing (`srt/timing-line.ts`)
@@ -77,6 +78,11 @@ Tolerates `.` for `,`, 1–3 digit hours/fractions, missing fraction, any spacin
 | `SRT_END_BEFORE_START`, `SRT_OVERLAP`                             | warn               | report                           |
 | `SRT_EMPTY_CUE`                                                   | info               | report                           |
 | `SRT_TIMING_EXTRAS` (coordinates), `SRT_UNPARSEABLE_BLOCK`        | warn               | report                           |
+| `SRT_AMBIGUOUS_INDEX`                                             | warn               | report                           |
+| `ASS_EOL_MIXED`                                                   | warn               | auto                             |
+| `ASS_TIME_FORMAT`                                                 | info               | report                           |
+| `ASS_END_BEFORE_START`, `ASS_FORMAT_MISSING`                      | warn               | report                           |
+| `ASS_UNPARSEABLE_EVENT`                                           | warn               | report                           |
 | `SEG_MARKER_COLLISION`                                            | n/a                | report (raised through coverage) |
 
 Diagnostics carry `code` + `params` only. The Main process never sends localized text.
@@ -84,6 +90,28 @@ Diagnostics carry `code` + `params` only. The Main process never sends localized
 ### Repaired serializer (`srt/srt-repair.ts`)
 
 Applies only `auto` fixes and returns `{ text, applied }` (one `AppliedFix` per occurrence). Timing is regenerated from `ms` (`HH:MM:SS,mmm`), keeping coordinates with normalized spacing; indexes become the ordinal; items are separated by exactly the existing blank lines or one if missing; EOLs become the dominant one; trailing spaces/tabs are stripped (including "blank" lines made of spaces). `{ unparsed: 'keep' | 'drop' }` (default `keep`): `drop` removes unparsed blocks and records each one. Idempotent, and never changes any `ms`.
+
+## ASS / SSA (`ass/`)
+
+One module for both dialects: `doc.format` is `'ssa'` when `ScriptType: v4.00` (no `+`) or, without `ScriptType`, a `[V4 Styles]` section exists; otherwise `'ass'`. `assFormat` and `ssaFormat` share the implementation; the real dialect always comes from the content.
+
+- **Structure (lossless).** Only `Dialogue:` lines inside `[Events]` become `Cue`s. Everything else (Script Info, styles, `Comment:`, fonts, `;`, blank lines) is raw trivia in `leading`/`trailing`. `mkvextract` output (UTF-8 BOM, CRLF, `Comment:` events moved before all `Dialogue:`) is handled and round-trips exactly.
+- **Columns** come from the `[Events]` `Format:` line (any order, `Text` must be last; SSA `Marked` is read as `Layer`). Missing/unusable `Format:` falls back to the standard columns with `ASS_FORMAT_MISSING`. `Text` is everything after the (N-1)-th comma, so commas in the text are safe.
+- **`AssCueData`**: `prefix` (raw line up to the comma before `Text`, so exact serialization is `prefix + text`), `layer`, `marginL/R/V`, `effect` (trimmed strings). `Style`/`Name` go to `Cue.style`/`Cue.actor`.
+- **Time** `H:MM:SS.cc` → ms; other readable forms (1 or 3 fraction digits, missing fraction, padding spaces) are accepted and reported (`ASS_TIME_FORMAT`), never rewritten. Unreadable time or too few columns → `UnparsedBlock` with reason `bad-event` (verbatim, `ASS_UNPARSEABLE_EVENT`).
+- **Inline lexer** (`ass/inline-lexer.ts`):
+
+| Becomes            | Rule                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| `Tag` (override)   | every `{…}`, including comment blocks without a backslash (libass hides them, unlike SRT's `{laughs}`) |
+| `Tag` (open/close) | a block holding **only** `\i \b \u \s` with `0`/`1` (`{\i1}` opens, `{\i0}` closes) → `<gN>` pair      |
+| `LineBreak`        | `\N` and `\n` (`raw` keeps the two characters)                                                         |
+| `Text`             | everything else; `\h` stays literal; `{` without `}` is text                                           |
+
+- **Never sent to the LLM** (decided by `classify()` from the tags, so `core/` stays format-agnostic): vector drawings (`\p1`…; not `\pos`/`\p0`) → `SKIPPED_DRAWING` (info); karaoke (`\k \kf \ko \K`) → `UNTRANSLATED_KARAOKE` (warn); unreadable events → `UNTRANSLATED_BAD_EVENT`.
+- **Repair** (`ass-repair.ts`) only unifies EOL to the dominant one (`ASS_EOL_MIXED`); `unparsed: 'drop'` removes bad events. Everything else is report-only and there is no trimming (trailing spaces in `Text` may be meaningful).
+- **Translation validation** is stricter than SRT in two ways, in both formats: loose markers `<xN/>` must keep their original relative order (`MARKER_ORDER`: overrides are positional), and a `\N`/`\n` written by the model counts as a raw newline.
+- Tests use synthetic fixtures; real files should only be used locally and never committed.
 
 ## Segmentation for the LLM (`core/segmentation/`)
 
@@ -104,7 +132,7 @@ output:   {\an8}Hello <i>world</i>, how are you?
 
 - Leading/trailing tags are **not sent** when they are standalone or when both ends of a pair sit on the edges (fixpoint, so an edge never separates a pair). `<i>A</i>\n<i>B</i>` therefore stays `<g1>A</g1><br/><g2>B</g2>`.
 - **No escaping.** Text that already looks like a marker (`<g1>`, `</g2>`, `<x3/>`, `<br/>`) makes the cue `UNTRANSLATED_MARKER_COLLISION`: it bypasses the LLM and is reported.
-- `validateTranslation`/`applyTranslation` require: every marker exactly once, pairs open-before-close and nested, same `<br/>` count, no raw `\n`/`\r` (a real newline would split the cue), no tags invented by the model (checked with the format's own `lexInline`, injected so `core/` stays format-agnostic), and non-empty text. Marker and word **positions are free**: languages reorder. Issues: `MISSING_MARKER`, `UNEXPECTED_MARKER`, `DUPLICATE_MARKER`, `BAD_NESTING`, `BR_COUNT_MISMATCH`, `RAW_NEWLINE`, `INVENTED_TAG`, `EMPTY_TRANSLATION`.
+- `validateTranslation`/`applyTranslation` require: every marker exactly once, pairs open-before-close and nested, same `<br/>` count, no raw `\n`/`\r` (a real newline would split the cue), no tags invented by the model (checked with the format's own `lexInline`, injected so `core/` stays format-agnostic), and non-empty text. Marker and word **positions are free**: languages reorder. Issues: `MISSING_MARKER`, `UNEXPECTED_MARKER`, `DUPLICATE_MARKER`, `BAD_NESTING`, `BR_COUNT_MISMATCH`, `RAW_NEWLINE`, `INVENTED_TAG`, `MARKER_ORDER`, `EMPTY_TRANSLATION`.
 - `applyTranslation` does **not** trim; whitespace policy belongs to the caller. A translation equal to the payload reproduces the cue exactly (property test), and editing only the text never changes tags, breaks, timecodes or trivia.
 
 ## Coverage (`core/coverage.ts`)
@@ -115,9 +143,12 @@ output:   {\an8}Hello <i>world</i>, how are you?
 | ------------ | -------------------------------- | ---------------------------------------------------------------- |
 | skipped      | `SKIPPED_NO_LETTERS`             | cue without any Unicode letter (`♪♪`, `...`, numbers, only tags) |
 | skipped      | `SKIPPED_EMPTY_BLOCK`            | lone index number                                                |
+| skipped      | `SKIPPED_DRAWING`                | ASS/SSA vector drawing (`\p1`)                                   |
 | untranslated | `UNTRANSLATED_ORPHAN_TEXT`       | text after a blank line without timing                           |
 | untranslated | `UNTRANSLATED_BAD_TIMING`        | unreadable `-->` line                                            |
 | untranslated | `UNTRANSLATED_MARKER_COLLISION`  | text resembles a marker                                          |
+| untranslated | `UNTRANSLATED_KARAOKE`           | ASS/SSA karaoke tags                                             |
+| untranslated | `UNTRANSLATED_BAD_EVENT`         | unreadable ASS/SSA `Dialogue:`                                   |
 | untranslated | `UNTRANSLATED_VALIDATION_FAILED` | reserved for the LLM layer                                       |
 
 Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤120-char `excerpt` with line breaks/control characters made visible, `outcome` (`kept-original` or `omitted`, following the `unparsed` export option), `params`, `cause` and `actions`. Untranslated entries come first and `maxEntries` (default 500) caps the payload while the totals stay complete. The UI requirements are tracked in [`frontend-requirements.md`](./frontend-requirements.md).
@@ -130,4 +161,5 @@ Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤1
 
 - No line-length/reflow checks on translated text (belongs to the LLM QC layer).
 - `normalized_previous_line` and the context hash live in the Job Memory module; this layer only exposes `cuePlainText()`.
-- ASS/SSA are not implemented. `Cue.format` is generic for them; revisit the type when styles/layers arrive.
+- No style filter in the parser API (`Cue.style` is exposed; filtering belongs to the Job/Profile iteration).
+- ASS `[Fonts]`/`[Graphics]`, `\\t` animations and `\\clip` are kept raw as trivia/tags; nothing is interpreted beyond what is listed above.

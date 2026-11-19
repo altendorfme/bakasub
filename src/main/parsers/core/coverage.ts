@@ -67,7 +67,11 @@ function cueRaw(cue: Cue<unknown>): string {
   return cue.nodes.map(nodeRaw).join('')
 }
 
-function toEntry(item: Item<unknown>, opts: CoverageOptions): CoverageEntry | null {
+function toEntry(
+  item: Item<unknown>,
+  format: SubtitleDocument<unknown>['format'],
+  opts: CoverageOptions
+): CoverageEntry | null {
   const c = classify(item)
   if (c.status === 'translatable') return null
 
@@ -85,7 +89,7 @@ function toEntry(item: Item<unknown>, opts: CoverageOptions): CoverageEntry | nu
       location: { line: item.line, endLine: item.endLine },
       excerpt: excerptOf(item.raw),
       outcome: opts.unparsed === 'drop' ? 'omitted' : 'kept-original',
-      cause: 'SRT_UNPARSEABLE_BLOCK',
+      cause: format === 'srt' ? 'SRT_UNPARSEABLE_BLOCK' : 'ASS_UNPARSEABLE_EVENT',
       actions: c.status === 'skipped' ? ['ignore'] : ['edit-raw', 'ignore']
     }
   }
@@ -122,7 +126,7 @@ export function analyzeCoverage(
   doc.items.forEach((item) => {
     if (item.kind === 'cue') cues++
     else blocks++
-    const entry = toEntry(item, opts)
+    const entry = toEntry(item, doc.format, opts)
     if (!entry) {
       translatable++
       return

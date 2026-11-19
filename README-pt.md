@@ -4,7 +4,7 @@
 
 Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
 
-> Status: **infraestrutura base e parser SRT concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). Job Manager, tradução via LLM e parsers ASS/SSA ainda não foram implementados. Veja o [roadmap](#roadmap).
+> Status: **infraestrutura base e parsers SRT e ASS/SSA concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). Job Manager e tradução via LLM ainda não foram implementados. Veja o [roadmap](#roadmap).
 
 ## Stack
 
@@ -54,7 +54,7 @@ src/
     logging/       electron-log (scopes: app, db, ipc, sidecar, llm)
     services/      shutdown-coordinator, app-info, app-update, consentimento nativo
     sidecars/      módulo de sidecars (sem dependência de `electron`, testável em Node puro)
-    parsers/       parsing de legendas: decoder, AST comum, SRT, segmentação, cobertura (puro, testável)
+    parsers/       parsing de legendas: decoder, AST comum, SRT, ASS/SSA, segmentação, cobertura (puro, testável)
     jobs/ llm/     reservados para a lógica de negócio
     window/        criação da BrowserWindow
   preload/         única superfície exposta ao renderer (window.api), com allowlist
@@ -156,7 +156,7 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] Verificação de versão do app
 - [x] Build e release (Linux + Windows)
 - [x] **Parser SRT**: AST lossless (nós Text / Tag / LineBreak), scanner tolerante com diagnósticos, modo de reparo seguro, segmentação estilo XLIFF para o LLM, relatório de cobertura (veja [`docs/parsing.md`](./docs/parsing.md))
-- [ ] **Parsers ASS/SSA** sobre a mesma AST de `core/`
+- [x] **Parser ASS/SSA**: mesma AST de `core/`; só `Dialogue:` vira cue e o resto é trivia lossless; desenhos e karaokê nunca vão ao LLM (veja [`docs/parsing.md`](./docs/parsing.md))
 - [ ] **Job Manager**: fila com concorrência controlada, cancelamento via `AbortController`, rollback de transações
 - [ ] **Estratégia LLM**: chunking com `<context>`/`<target>`, resposta JSON validada com Zod e retry por chunk, termbase no System Prompt, streaming SSE do OpenRouter
 - [ ] **Job Memory**: upsert no SQLite, _context hash_ (≤ 3 palavras inclui a linha anterior normalizada)

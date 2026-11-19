@@ -80,9 +80,9 @@ describe('scanBlocks: recuperação', () => {
     ])
   })
 
-  it('texto do cue terminado por número: o número vira índice do próximo', () => {
-    // Ambiguidade inerente: sem linha em branco, "42" + timing é lido como índice.
-    expect(view(`1\n${T1}\nTenho\n42\n${T2}\nB\n`)).toEqual(['cue:1 "Tenho"', 'cue:42 "B"'])
+  it('texto terminado por número que não é índice anterior+1: fica no texto do cue', () => {
+    // Ambiguidade resolvida pela regra "anterior + 1"; o parser a relata (SRT_AMBIGUOUS_INDEX).
+    expect(view(`1\n${T1}\nTenho\n42\n${T2}\nB\n`)).toEqual(['cue:1 "Tenho\\n42"', 'cue:- "B"'])
   })
 
   it('texto órfão depois de linha em branco', () => {
@@ -186,5 +186,33 @@ describe('scanBlocks: propriedades', () => {
         checkCoverage(s, scanBlocks(s))
       )
     )
+  })
+})
+
+describe('scanBlocks: índice colado ambíguo', () => {
+  const T = '00:00:01,000 --> 00:00:02,000'
+  const T2 = '00:00:03,000 --> 00:00:04,000'
+
+  it('colado com índice anterior+1: continua sendo índice', () => {
+    const items = scanBlocks(`1\n${T}\nTexto\n2\n${T2}\nFim\n`)
+    expect(items.map((i) => i.kind)).toEqual(['cue', 'cue'])
+    expect(items[1]).toMatchObject({ index: { raw: '2' } })
+    expect((items[1] as { ambiguousIndex?: unknown }).ambiguousIndex).toBeUndefined()
+  })
+
+  it('colado com outro número: é texto do cue anterior e o próximo fica sem índice', () => {
+    const src = `1\n${T}\nEm\n1999\n${T2}\nFim\n`
+    const items = scanBlocks(src)
+    expect(items).toHaveLength(2)
+    expect(src.slice(items[0].start, items[0].end)).toBe(`1\n${T}\nEm\n1999`)
+    expect(items[1]).toMatchObject({
+      index: null,
+      ambiguousIndex: { line: 4, value: '1999' }
+    })
+  })
+
+  it('com linha em branco antes, nada muda (qualquer número é índice)', () => {
+    const items = scanBlocks(`1\n${T}\nTexto\n\n1999\n${T2}\nFim\n`)
+    expect(items[1]).toMatchObject({ index: { raw: '1999' } })
   })
 })

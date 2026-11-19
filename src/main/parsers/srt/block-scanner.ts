@@ -26,6 +26,11 @@ export interface ScannedCue {
   timing: { raw: string; parsed: ParsedTiming }
   /** EOL entre a linha de timing e o texto ('' quando o cue não tem texto). */
   timingEol: string
+  /**
+   * Sem índice e colado a uma linha só de dígitos que ficou como texto do cue anterior
+   * (o número não era `índice anterior + 1`): a ambiguidade é relatada, nunca resolvida em silêncio.
+   */
+  ambiguousIndex?: { line: number; value: string }
   /** Região do texto: input.slice(textStart, end). Vazia quando o cue não tem texto. */
   textStart: number
 }
@@ -71,7 +76,8 @@ function splitLines(input: string): Line[] {
  *
  * Um cue começa numa linha de timing válida (precedida, se existir, por uma linha só com dígitos
  * que vira o índice). O texto vai até: linha em branco, outra linha de timing, ou índice+timing
- * colados. Linhas não-vazias fora de qualquer cue formam blocos `unparsed`.
+ * colados. No caso colado (sem linha em branco), uma linha só de dígitos antes de um timing só é
+ * índice se for o índice do cue anterior + 1; senão é texto do cue anterior. Linhas não-vazias fora de qualquer cue formam blocos `unparsed`.
  *
  * Os offsets garantem o round-trip: o texto entre itens (EOL + linhas em branco) é recuperado
  * por quem consome via `input.slice(prevEnd, item.start)`.
@@ -99,8 +105,22 @@ export function scanBlocks(input: string): ScannedItem[] {
       const timingLine = lines[t]
       const parsed = parseTimingLine(timingLine.text)!
 
+      // Índice esperado para um próximo cue colado; sem índice no cue atual, qualquer um serve.
+      const expected = indexLine ? Number(indexLine.text.trim()) + 1 : null
+      const startsGluedCue = (k: number): boolean =>
+        isTiming(k) ||
+        (k + 1 < lines.length &&
+          INDEX.test(lines[k].text) &&
+          isTiming(k + 1) &&
+          (expected === null || Number(lines[k].text.trim()) === expected))
+
       let j = t + 1
-      while (j < lines.length && !BLANK.test(lines[j].text) && !startsCue(j)) j++
+      while (j < lines.length && !BLANK.test(lines[j].text) && !startsGluedCue(j)) j++
+      const prev = i > 0 ? lines[i - 1] : null
+      const ambiguousIndex =
+        !indexLine && prev && !BLANK.test(prev.text) && INDEX.test(prev.text)
+          ? { line: prev.no, value: prev.text.trim() }
+          : undefined
       const hasText = j > t + 1
       items.push({
         kind: 'cue',
@@ -110,6 +130,7 @@ export function scanBlocks(input: string): ScannedItem[] {
         endLine: hasText ? lines[j - 1].no : timingLine.no,
         index: indexLine ? { raw: indexLine.text, eol: indexLine.eol } : null,
         timing: { raw: timingLine.text, parsed },
+        ...(ambiguousIndex ? { ambiguousIndex } : {}),
         timingEol: hasText ? timingLine.eol : '',
         textStart: hasText ? lines[t + 1].start : timingLine.end
       })
