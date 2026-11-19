@@ -368,6 +368,7 @@ export interface PresetImportResult {
   skipped: { index: number; name?: string; reason: string }[]
 }
 
+/** `code` é um `ErrorCode` (ver `error-codes.ts`); tipado como string porque o Main é a fonte. */
 export type IpcError = { code: string; message: string }
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError }
 

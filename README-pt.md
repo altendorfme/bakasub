@@ -65,7 +65,7 @@ src/
     settings/      registro tipado de configurações e o cofre de segredos cifrado
     window/        criação da BrowserWindow
   preload/         única superfície exposta ao renderer (window.api), com allowlist
-  renderer/        React + Tailwind + TanStack Query
+  renderer/        React + Tailwind + TanStack Query + TanStack Router + i18next (veja docs/renderer.md)
   shared/          contrato IPC tipado e utilitários puros (sem zod/electron)
 drizzle/           migrations versionadas
 scripts/           build cruzado (Docker/wine) e binários nativos
@@ -152,7 +152,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 

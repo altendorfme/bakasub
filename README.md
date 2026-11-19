@@ -65,7 +65,7 @@ src/
     settings/      typed settings registry and the encrypted secret vault
     window/        BrowserWindow factory
   preload/         the only surface exposed to the renderer (window.api), allowlisted
-  renderer/        React + Tailwind + TanStack Query
+  renderer/        React + Tailwind + TanStack Query + TanStack Router + i18next (see docs/renderer.md)
   shared/          typed IPC contract and pure utilities (no zod/electron)
 drizzle/           versioned migrations
 scripts/           cross-build (Docker/wine) and native binaries
@@ -141,7 +141,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Renderer](./docs/renderer.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 

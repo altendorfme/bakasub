@@ -2,14 +2,14 @@ import './styles/main.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { QueryClientProvider } from '@tanstack/react-query'
-import App from './App'
+import { App } from './app/app'
+import { createAppRouter } from './app/router'
 import { queryClient } from './lib/query-client'
+
+const router = createAppRouter({ queryClient })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <App queryClient={queryClient} router={router} />
   </StrictMode>
 )
