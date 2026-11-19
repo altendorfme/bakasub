@@ -87,6 +87,28 @@ export interface PublicSettings {
   'preflight.autoConfirmBelowUsd': number | null
   'tracks.preferredSourceLangs': string[]
   'logs.level': 'info' | 'debug'
+  /** Avançado (Settings → Advanced). Ver docs/rate-limits.md. */
+  'llm.rateLimit.freeRpm': number
+  'llm.rateLimit.paidRpm': number | null
+  'llm.rateLimit.freeTier': FreeTierSetting
+  'llm.retry.maxThrottled': number
+  'llm.retry.maxTransient': number
+  'llm.retry.baseDelayMs': number
+  'llm.retry.maxDelayMs': number
+  'llm.retry.chunkRounds': number
+}
+
+export type FreeTierSetting = 'auto' | 'under-10' | 'over-10'
+
+/** Cota diária de modelos `:free` no OpenRouter (zera 00:00 UTC). */
+export interface FreeQuotaStatus {
+  /** `unknown`: `GET /key` não respondeu (sem key, offline); assume-se 50/dia. */
+  tier: 'under-10' | 'over-10' | 'unknown'
+  /** `override`: fixado em Settings (`llm.rateLimit.freeTier`). */
+  source: 'auto' | 'override'
+  limit: number
+  used: number | null
+  remaining: number | null
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -315,6 +337,11 @@ export interface JobProgress {
     chunk?: { index: number; count: number }
   }
   cost?: number
+  /**
+   * Parado esperando o OpenRouter: `rate-limit` (teto por minuto), `cooldown` (429 recente na
+   * faixa; vale para todos os jobs), `backoff` (retry após erro). Ausente = trabalhando.
+   */
+  waiting?: { reason: 'rate-limit' | 'cooldown' | 'backoff'; untilMs: number }
 }
 
 export interface JobResult {
@@ -482,6 +509,11 @@ export interface PreflightEstimate {
   tokens: { input: Range; output: Range }
   /** USD; `null` quando o preço é dinâmico. */
   cost: Range | null
+  /**
+   * Só para modelos free: requisições previstas (chunks + margem de reparo) contra o que resta da
+   * cota diária. `enough: null` = cota desconhecida. Não bloqueia; força a confirmação.
+   */
+  freeQuota?: FreeQuotaStatus & { requests: number; enough: boolean | null }
   /** Decisão tomada pelo job. */
   decision: 'auto-confirmed' | 'needs-confirmation' | 'confirmed'
 }
@@ -529,6 +561,8 @@ export interface IpcInvokeContract {
   'settings:get': { req: void; res: PublicSettings }
   /** Patch parcial, validado por chave; aplica as regras de favoritos/idiomas (`SETTINGS_CONFLICT`). */
   'settings:update': { req: Partial<PublicSettings>; res: PublicSettings }
+  /** Volta as chaves ao padrão de fábrica ("Restore defaults"), com as mesmas regras do update. */
+  'settings:reset': { req: { keys: (keyof PublicSettings)[] }; res: PublicSettings }
   /** Últimas entradas (mais antigas primeiro), de todos os arquivos rotacionados. */
   'logs:tail': { req: LogTailQuery; res: LogEntry[] }
   /** Liga/desliga o envio de `logs:entry` (só enquanto a tela de logs está aberta). */
@@ -555,6 +589,8 @@ export interface IpcInvokeContract {
     res: PresetImportResult
   }
   'models:list': { req: { force?: boolean }; res: ModelList }
+  /** Cota diária de modelos `:free` (`GET /key`, cache de 30 s; override em Settings). */
+  'models:free-quota': { req: void; res: FreeQuotaStatus }
   /** Faixas de legenda de um MKV (caminho revalidado no Main). */
   'media:probe': { req: { path: string }; res: MediaProbe }
   /** Diálogo nativo; caminhos já validados. `[]` se cancelado. */
@@ -626,6 +662,7 @@ export const INVOKE_CHANNELS = [
   'settings:api-key-status',
   'settings:get',
   'settings:update',
+  'settings:reset',
   'logs:tail',
   'logs:watch',
   'logs:open-folder',
@@ -639,6 +676,7 @@ export const INVOKE_CHANNELS = [
   'presets:export',
   'presets:import',
   'models:list',
+  'models:free-quota',
   'media:probe',
   'dialog:open-files',
   'dialog:choose-output-dir',
@@ -691,6 +729,7 @@ export interface BakaSubApi {
     tmdbKeyStatus(): Promise<IpcResult<TmdbKeyStatus>>
     get(): Promise<IpcResult<PublicSettings>>
     update(patch: Partial<PublicSettings>): Promise<IpcResult<PublicSettings>>
+    reset(keys: (keyof PublicSettings)[]): Promise<IpcResult<PublicSettings>>
   }
   logs: {
     tail(query?: LogTailQuery): Promise<IpcResult<LogEntry[]>>
@@ -710,6 +749,7 @@ export interface BakaSubApi {
   }
   models: {
     list(force?: boolean): Promise<IpcResult<ModelList>>
+    freeQuota(): Promise<IpcResult<FreeQuotaStatus>>
   }
   media: {
     probe(path: string): Promise<IpcResult<MediaProbe>>

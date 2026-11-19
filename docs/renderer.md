@@ -9,6 +9,7 @@ src/renderer/src/
     layout/     AppShell (sidebar + outlet + status bar), Sidebar, StatusBar
     ui/         shadcn/ui-style primitives (Button, Card, Badge, …)
   data/         TanStack Query hooks per domain + query-keys
+  guides/       in-app user guides: <lang>/<id>.md, getGuide/useGuide
   i18n/         i18next instance, locales/en/*, typed keys
   lib/          ipc (unwrap/IpcCallError), query-client, cn()
   pages/        screens (placeholders until built)
@@ -33,6 +34,10 @@ i18next with **English as the default and source language**. Namespaces: `common
 - The Main never sends user-facing text. `errorMessage(err)` (`i18n/error-message.ts`) maps `IpcCallError.code` to `errors:<code>`; unknown codes and non-IPC errors fall back to `errors:unknown` with the code. The raw `message` is never shown (it may carry paths or HTTP details).
 - `src/shared/error-codes.ts` is the single list of codes (`APP_ERROR_CODES` from `AppError`, plus `FORBIDDEN`/`INTERNAL` from `createHandler`). `locales/en/errors.ts` `satisfies Record<ErrorCode, string>`: a new backend code without a message fails to compile, and a test checks every code at runtime.
 - Adding a language: a new `locales/<lang>/` folder with the same shape as `en`.
+
+## In-app guides
+
+User guides (OpenRouter key, limits and retries, TMDB key) live in `src/renderer/src/guides/<lang>/<id>.md`, outside `docs/` (which is for developers), with one file per language (`en`, `pt-BR`). `guides.ts` bundles them with `import.meta.glob('?raw')`; `useGuide(id)` returns the guide in the current i18next language (exact, then base language, then English). It uses `i18n.language`, not `resolvedLanguage`, so a guide can already be shown in a language the UI does not have yet. Links between guides are relative `.md` links (`guideIdFromHref` turns them into in-app navigation). `guides.test.ts` fails when a translation is missing or a cross-link is broken. Details: [`guides/README.md`](../src/renderer/src/guides/README.md).
 
 ## Theme
 

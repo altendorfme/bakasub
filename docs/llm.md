@@ -21,7 +21,9 @@ translateDocument
 | `sse.ts`                | incremental WHATWG SSE decoder (bytes split anywhere, CR/LF/CRLF, comments, BOM)                   |
 | `openrouter-client.ts`  | Chat Completions over SSE, error classification (`LlmError.kind`), idle timeout, key redaction     |
 | `model-catalog.ts`      | `/api/v1/models` normalized to `ModelInfo`, cached in `settings` (24 h, offline fallback)          |
-| `retry-policy.ts`       | transport decision per error kind and attempt (pure)                                               |
+| `retry-policy.ts`       | transport decision per error kind and attempt (pure, configurable)                                 |
+| `rate-limiter.ts`       | process-wide sliding window per lane (free/paid) and lane cooldown after a 429                     |
+| `free-quota.ts`         | free-model daily quota from `GET /api/v1/key`, tier override                                       |
 | `llm-session.ts`        | one job ↔ one model: request + retry + output mode + usage, cost lookup of interrupted generations |
 | `chunker.ts`            | chunk planning and the context window                                                              |
 | `prompt-builder.ts`     | glossary parsing, System Prompt, translate/repair messages, strict JSON Schema                     |
@@ -55,16 +57,20 @@ Always parsed with the same two layers: tolerant extraction (code fences, prose 
 
 ## Retries
 
-| Failure                                                   | Policy                                                                                             |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| line fails validation / missing from the answer           | accept the valid lines (written to the cache), repair only the failing ones; ≤ 3 attempts per line |
-| unparseable JSON                                          | counts as an attempt for every pending line; retried with the translate prompt                     |
-| `finish_reason: length`                                   | split the chunk in half (no content attempt spent)                                                 |
-| moderation (403 / `content_filter`)                       | split until isolated (≤ 3 levels); blocked lines → `UNTRANSLATED_CONTENT_FILTERED`                 |
-| 429 / 503                                                 | `Retry-After` (capped at 60 s) or exponential backoff 1 s…30 s with jitter; ≤ 5 attempts           |
-| 408 / 5xx / error inside the stream / 60 s idle / network | backoff; ≤ 3 attempts                                                                              |
-| 401 / 402 (or 403 budget) / 400                           | fail the job: `LLM_AUTH` / `LLM_CREDITS` / `LLM_BAD_REQUEST`                                       |
-| transport attempts exhausted                              | `LLM_UNAVAILABLE`                                                                                  |
+| Failure                                                   | Policy                                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| line fails validation / missing from the answer           | accept the valid lines (written to the cache), repair only the failing ones; ≤ 3 attempts per line      |
+| unparseable JSON                                          | counts as an attempt for every pending line; retried with the translate prompt                          |
+| `finish_reason: length`                                   | split the chunk in half (no content attempt spent)                                                      |
+| moderation (403 / `content_filter`)                       | split until isolated (≤ 3 levels); blocked lines → `UNTRANSLATED_CONTENT_FILTERED`                      |
+| 429                                                       | the whole lane cools down (`Retry-After`, else `X-RateLimit-Reset`, else backoff; ≤ 60 s); ≤ 5 attempts |
+| 429 free-model daily quota                                | fail the job: `LLM_DAILY_LIMIT` (reset time in the message)                                             |
+| 503                                                       | backoff 1 s…30 s with jitter, this request only; ≤ 5 attempts                                           |
+| 408 / 5xx / error inside the stream / 60 s idle / network | backoff; ≤ 3 attempts                                                                                   |
+| 401 / 402 (or 403 budget) / 400                           | fail the job: `LLM_AUTH` / `LLM_CREDITS` / `LLM_BAD_REQUEST`                                            |
+| transport attempts exhausted                              | extra chunk rounds after 60 s, 120 s (only the missing lines); then `LLM_UNAVAILABLE`                   |
+
+Every request first takes a slot from the shared `RateLimiter`; attempts, delays and rounds come from the `llm.retry.*` settings (read on every request). Details, defaults and the free-model quota: [`rate-limits.md`](./rate-limits.md).
 
 Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay in the original language and the job ends `completed-with-warnings`. If more than **10%** of the translatable lines fail validation the job stops right away with `LLM_TOO_MANY_FAILURES` (moderated lines do not count). Everything accepted so far is already in the cache.
 

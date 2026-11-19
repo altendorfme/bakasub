@@ -15,6 +15,7 @@ import type { Artifacts } from './artifacts'
 import type { JobSpec } from './job-spec'
 import { JobRunner, StepFailure, type RunHooks } from './job-runner'
 import type { StepDeps, SubtitleTranslator } from './step-context'
+import type { PreflightEstimate } from '../../shared/ipc-contract'
 
 const ASS = `[Script Info]\nScriptType: v4.00+\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,Hello there\n`
 const SRT = `1\n00:00:01,000 --> 00:00:02,000\nHello there\n`
@@ -50,6 +51,7 @@ let translator: { translate: Mock }
 
 beforeEach(() => {
   threshold = null
+  freeQuota = undefined
   preflightRuns = 0
   root = mkdtempSync(join(tmpdir(), 'bakasub-runner-'))
   workDir = join(root, 'work')
@@ -98,6 +100,7 @@ const ESTIMATE = {
   cost: { low: 0.01, high: 0.02 }
 }
 let threshold: number | null
+let freeQuota: PreflightEstimate['freeQuota']
 let preflightRuns: number
 const runner = (): JobRunner =>
   new JobRunner({
@@ -106,7 +109,10 @@ const runner = (): JobRunner =>
     preflight: {
       run: async () => {
         preflightRuns++
-        return { estimate: ESTIMATE, coverage: { totals: {} } as never }
+        return {
+          estimate: freeQuota ? { ...ESTIMATE, freeQuota } : ESTIMATE,
+          coverage: { totals: {} } as never
+        }
       },
       autoConfirmBelowUsd: async () => threshold
     }
@@ -394,5 +400,28 @@ describe('JobRunner', () => {
       hooks()
     )
     expect(r.status).toBe('awaiting-confirmation')
+  })
+
+  it('cota free insuficiente: pede confirmação mesmo abaixo do limite de custo, e avisa', async () => {
+    threshold = 0.05
+    freeQuota = {
+      tier: 'under-10',
+      source: 'auto',
+      limit: 50,
+      used: 49,
+      remaining: 1,
+      requests: 2,
+      enough: false
+    }
+    const r = await runner().run(
+      {
+        spec: pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>),
+        artifacts: {},
+        workDir
+      },
+      hooks()
+    )
+    expect(r.status).toBe('awaiting-confirmation')
+    expect(r.result.warnings.join()).toContain('free-model daily quota')
   })
 })

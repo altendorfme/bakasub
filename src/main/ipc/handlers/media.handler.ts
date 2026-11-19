@@ -1,3 +1,4 @@
+import type { FreeQuota } from '../../llm/free-quota'
 import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron'
 import { z } from 'zod'
 import type { ModelList, OpenDialogKind } from '../../../shared/ipc-contract'
@@ -32,6 +33,7 @@ const FILTERS: Readonly<Record<OpenDialogKind, OpenDialogOptions['filters']>> = 
 export function registerMediaHandlers(deps: {
   mkv: Pick<MkvToolnix, 'probe'>
   models: ModelCatalog
+  freeQuota: Pick<FreeQuota, 'status'>
 }): void {
   createHandler('media:probe', {
     input: z.object({ path: z.string().min(1).max(4096) }),
@@ -41,6 +43,8 @@ export function registerMediaHandlers(deps: {
       return { subtitles: [...info.subtitles], attachments: info.attachments }
     }
   })
+
+  createHandler('models:free-quota', { handle: () => deps.freeQuota.status() })
 
   createHandler('models:list', {
     input: z.object({ force: z.boolean().optional() }),

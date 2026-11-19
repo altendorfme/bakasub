@@ -358,7 +358,9 @@ export class JobManager {
       keepWorkDir?: boolean
     }
   ): Promise<void> {
+    // Uma espera (limite/backoff) não sobrevive ao fim do job.
     const finalProgress: JobProgress = { ...progress, step: extra.step ?? null }
+    delete finalProgress.waiting
     // Limpa antes de publicar o estado terminal: quem vê `completed` não vê o workdir.
     if (!extra.keepWorkDir) await rm(this.workDir(id), { recursive: true, force: true })
     await this.deps.repo.update(id, {

@@ -67,6 +67,7 @@ src/
     window/        BrowserWindow factory
   preload/         the only surface exposed to the renderer (window.api), allowlisted
   renderer/        React + Tailwind + TanStack Query + TanStack Router + i18next (see docs/renderer.md)
+    src/guides/    in-app user guides, one folder per language (en, pt-BR)
   shared/          typed IPC contract and pure utilities (no zod/electron)
 drizzle/           versioned migrations
 scripts/           cross-build (Docker/wine) and native binaries
@@ -142,7 +143,7 @@ Use `workflow_dispatch` to test without creating a release. Notes: `linux-unpack
 
 ## Documentation
 
-Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Media context](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
+Detailed flows live in [`docs/`](./docs): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Rate limits](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Media context](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build and release](./docs/release.md) · [Frontend backlog](./docs/frontend-requirements.md). Docs are updated together with the code they describe.
 
 ## Roadmap
 
@@ -161,4 +162,5 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] **Job Memory**: validated cache keyed by _context hash_ + language + model + glossary, per-chunk transactional upsert, prune with incremental vacuum (see [`docs/job-memory.md`](./docs/job-memory.md))
 - [x] **Preflight**: local token estimate (`js-tiktoken`, exact for GPT, ±20% range for other tokenizers) × Job Memory hit rate × `/api/v1/models` pricing, coverage report, confirmation before translating (auto-confirm threshold), batch totals (see [`docs/preflight.md`](./docs/preflight.md))
 - [x] **Media context** (backend): scene-release filename parsing, TMDB search/details/episodes with a conservative auto-match, response cache, local artwork cache served through `bakasub-media://`, details frozen in the job and sent in `<media>` (see [`docs/media-context.md`](./docs/media-context.md))
+- [x] **Rate limits and retries**: process-wide limiter per lane (free/paid), lane cooldown after a 429, free-model daily quota from `GET /key` with preflight warning, extra chunk rounds, all tunable in advanced settings (see [`docs/rate-limits.md`](./docs/rate-limits.md))
 - [ ] **Frontend**: build the screens listed in [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (translation coverage report in the preflight, parser diagnostics, encoding confidence, sidecar onboarding)

@@ -1,7 +1,8 @@
-import type { PreflightEstimate } from '../../shared/ipc-contract'
+import type { FreeQuotaStatus, PreflightEstimate } from '../../shared/ipc-contract'
 import { AppError } from '../errors'
 import type { CatalogSnapshot, ModelInfo } from '../llm/model-catalog'
 import { parseGlossary } from '../llm/prompt-builder'
+import { laneOf } from '../llm/rate-limiter'
 import { JobMemoryService } from '../memory/job-memory.service'
 import {
   analyzeCoverage,
@@ -25,6 +26,9 @@ export interface PreflightInput {
   readonly media?: string
 }
 
+/** Reparos e rodadas extras: requisições além de uma por chunk. */
+const REQUEST_MARGIN = 1.25
+
 export interface PreflightOutput {
   readonly estimate: Omit<PreflightEstimate, 'decision'>
   readonly coverage: CoverageReport
@@ -39,6 +43,8 @@ export class Preflighter {
         get(options?: { signal?: AbortSignal }): Promise<CatalogSnapshot>
       }
       memory: JobMemoryService
+      /** Cota diária de modelos free. Sem ela, o preflight não fala de cota. */
+      freeQuota?: { status(signal?: AbortSignal): Promise<FreeQuotaStatus> }
     }
   ) {}
 
@@ -61,17 +67,32 @@ export class Preflighter {
       sourceLang: input.sourceLang
     })
     const lookup = await this.deps.memory.lookupDocument(input.doc, ctx, { peek: true })
+    const estimate = estimatePreflight({
+      doc: input.doc,
+      preset: { glossary, prompt: input.preset.prompt },
+      targetLang: input.targetLang,
+      sourceLang: input.sourceLang,
+      media: input.media,
+      model,
+      lookup,
+      catalogFetchedAt: snapshot.fetchedAt
+    })
+    const quota =
+      laneOf(model) === 'free' && this.deps.freeQuota
+        ? await this.deps.freeQuota.status(signal)
+        : null
+    const requests = Math.ceil(estimate.lines.chunks * REQUEST_MARGIN)
     return {
-      estimate: estimatePreflight({
-        doc: input.doc,
-        preset: { glossary, prompt: input.preset.prompt },
-        targetLang: input.targetLang,
-        sourceLang: input.sourceLang,
-        media: input.media,
-        model,
-        lookup,
-        catalogFetchedAt: snapshot.fetchedAt
-      }),
+      estimate: quota
+        ? {
+            ...estimate,
+            freeQuota: {
+              ...quota,
+              requests,
+              enough: quota.remaining === null ? null : quota.remaining >= requests
+            }
+          }
+        : estimate,
       coverage: analyzeCoverage(input.doc)
     }
   }

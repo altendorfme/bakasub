@@ -36,7 +36,15 @@ describe('PreferencesService', () => {
       'jobs.concurrency': 2,
       'preflight.autoConfirmBelowUsd': null,
       'tracks.preferredSourceLangs': ['en'],
-      'logs.level': 'info'
+      'logs.level': 'info',
+      'llm.rateLimit.freeRpm': 20,
+      'llm.rateLimit.paidRpm': null,
+      'llm.rateLimit.freeTier': 'auto',
+      'llm.retry.maxThrottled': 5,
+      'llm.retry.maxTransient': 3,
+      'llm.retry.baseDelayMs': 1000,
+      'llm.retry.maxDelayMs': 30_000,
+      'llm.retry.chunkRounds': 2
     })
     expect(s).not.toHaveProperty('models.cache')
   })
@@ -103,5 +111,27 @@ describe('PreferencesService', () => {
     onChanged.mockClear()
     await prefs.update({ 'jobs.concurrency': 3 })
     expect(onChanged).not.toHaveBeenCalled()
+  })
+
+  it('retry: base delay above the maximum is a conflict', async () => {
+    expect(
+      await code(prefs.update({ 'llm.retry.baseDelayMs': 5000, 'llm.retry.maxDelayMs': 2000 }))
+    ).toBe('SETTINGS_CONFLICT')
+    expect(await code(prefs.update({ 'llm.rateLimit.freeRpm': 0 }))).toBe('INVALID_INPUT')
+  })
+
+  it('reset restores factory defaults for the given keys only', async () => {
+    await prefs.update({
+      'llm.rateLimit.freeRpm': 10,
+      'llm.retry.chunkRounds': 0,
+      'jobs.concurrency': 3
+    })
+    onChanged.mockClear()
+    const s = await prefs.reset(['llm.rateLimit.freeRpm', 'llm.retry.chunkRounds'])
+    expect(s['llm.rateLimit.freeRpm']).toBe(20)
+    expect(s['llm.retry.chunkRounds']).toBe(2)
+    expect(s['jobs.concurrency']).toBe(3)
+    expect(onChanged).toHaveBeenCalledWith(['llm.rateLimit.freeRpm', 'llm.retry.chunkRounds'])
+    expect(await code(prefs.reset(['models.cache']))).toBe('INVALID_INPUT')
   })
 })

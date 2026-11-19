@@ -46,7 +46,8 @@ const api: BakaSubApi = {
     clearTmdbKey: () => invoke('settings:clear-tmdb-key'),
     tmdbKeyStatus: () => invoke('settings:tmdb-key-status'),
     get: () => invoke('settings:get'),
-    update: (patch) => invoke('settings:update', patch)
+    update: (patch) => invoke('settings:update', patch),
+    reset: (keys) => invoke('settings:reset', { keys })
   },
   logs: {
     tail: (query) => invoke('logs:tail', query ?? {}),
@@ -65,7 +66,8 @@ const api: BakaSubApi = {
     import: (onConflict) => invoke('presets:import', { onConflict })
   },
   models: {
-    list: (force) => invoke('models:list', { force })
+    list: (force) => invoke('models:list', { force }),
+    freeQuota: () => invoke('models:free-quota')
   },
   media: {
     probe: (path) => invoke('media:probe', { path }),

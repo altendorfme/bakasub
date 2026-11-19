@@ -1,6 +1,6 @@
 # Media context (TMDB)
 
-Recognizes what is being translated from the file name and gives the model the title, genres, synopsis and episode synopsis in the prompt's `<media>` block. Optional: without a TMDB key everything works, just without this context. Code: `src/main/media-context/`. User guide for the key: [`tmdb-api-key.md`](./tmdb-api-key.md).
+Recognizes what is being translated from the file name and gives the model the title, genres, synopsis and episode synopsis in the prompt's `<media>` block. Optional: without a TMDB key everything works, just without this context. Code: `src/main/media-context/`. User guide for the key (in-app, en/pt-BR): [`tmdb-key.md`](../src/renderer/src/guides/en/tmdb-key.md).
 
 ```
 file name ──► parseReleaseName ──► { title, year?, season?, episode?, absoluteEpisode? }

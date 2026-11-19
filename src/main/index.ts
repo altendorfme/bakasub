@@ -110,6 +110,7 @@ if (!app.requestSingleInstanceLock()) {
         mkv: jobModule.mkv,
         models: jobModule.models,
         batches: jobModule.batches,
+        freeQuota: jobModule.freeQuota,
         tmdb: mediaContext.tmdb,
         mediaContext: mediaContext.service
       })

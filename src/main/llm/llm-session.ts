@@ -8,7 +8,8 @@ import {
   type ResponseFormat
 } from './openrouter-client'
 import { responseSchema } from './prompt-builder'
-import { decide } from './retry-policy'
+import type { RateLane, RateLimiter, WaitInfo } from './rate-limiter'
+import { decide, DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 
 export interface LlmTransport {
   chat(req: import('./openrouter-client').ChatRequest, signal?: AbortSignal): Promise<ChatResult>
@@ -78,10 +79,31 @@ export class LlmSession {
   }
   private readonly costLookups: Promise<void>[] = []
 
+  private readonly now: () => number
+
   constructor(
-    private readonly deps: { llm: LlmTransport; sleep: Sleep; random: () => number; log: LlmLog },
-    private readonly params: { model: ModelInfo; temperature: number; signal?: AbortSignal }
-  ) {}
+    private readonly deps: {
+      llm: LlmTransport
+      sleep: Sleep
+      random: () => number
+      log: LlmLog
+      /** Limitador global (compartilhado entre jobs). */
+      limiter: RateLimiter
+      /** Lida a cada requisição: mudanças em Settings valem para jobs em andamento. */
+      retryConfig?: () => Promise<RetryConfig>
+      now?: () => number
+      /** Começo (`WaitInfo`) e fim (`null`) de uma espera, para a UI. */
+      onWait?: (w: WaitInfo | null) => void
+    },
+    private readonly params: {
+      model: ModelInfo
+      lane: RateLane
+      temperature: number
+      signal?: AbortSignal
+    }
+  ) {
+    this.now = deps.now ?? Date.now
+  }
 
   private format(ids: readonly number[]): {
     responseFormat?: ResponseFormat
@@ -102,9 +124,24 @@ export class LlmSession {
     ids: readonly number[],
     maxTokens: number
   ): Promise<SessionResponse> {
-    const { signal } = this.params
+    const { signal, lane } = this.params
+    let waited = false
+    const onWait = (w: WaitInfo): void => {
+      waited = true
+      this.deps.onWait?.(w)
+    }
     for (let attempt = 1; ; attempt++) {
       if (signal?.aborted) throw new CancelRequested()
+      const config = (await this.deps.retryConfig?.()) ?? DEFAULT_RETRY_CONFIG
+      try {
+        await this.deps.limiter.acquire(lane, { signal, onWait })
+      } catch {
+        throw new CancelRequested()
+      }
+      if (waited) {
+        waited = false
+        this.deps.onWait?.(null)
+      }
       try {
         const res = await this.deps.llm.chat(
           {
@@ -126,18 +163,31 @@ export class LlmSession {
         if (!(err instanceof LlmError)) throw err
         if (err.generationId && ['aborted', 'timeout', 'stream-error'].includes(err.kind))
           this.lookupCost(err.generationId)
-        const d = decide(err, attempt, this.deps.random)
+        const d = decide(err, attempt, { config, random: this.deps.random, now: this.now() })
         this.deps.log.warn(
           `chat failed kind=${err.kind} status=${err.status ?? '-'} attempt=${attempt} -> ${d.action}: ${err.message}`
         )
         switch (d.action) {
           case 'cancel':
             throw new CancelRequested()
-          case 'fatal':
-            throw new FatalLlmError(d.code, err.message)
+          case 'fatal': {
+            const reset = err.details.rateLimit?.resetAtMs
+            throw new FatalLlmError(
+              d.code,
+              d.code === 'LLM_DAILY_LIMIT' && reset
+                ? `${err.message} (resets at ${new Date(reset).toISOString()})`
+                : err.message
+            )
+          }
           case 'moderated':
             return { type: 'moderated' }
           case 'retry':
+            if (d.scope === 'lane') {
+              // 429: a faixa inteira espera; o próximo `acquire` (deste e de outros jobs) segura.
+              this.deps.limiter.cooldown(lane, this.now() + d.delayMs)
+              break
+            }
+            onWait({ reason: 'backoff', untilMs: this.now() + d.delayMs })
             try {
               await this.deps.sleep(d.delayMs, signal)
             } catch {

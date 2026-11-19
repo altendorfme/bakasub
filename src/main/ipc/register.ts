@@ -2,6 +2,7 @@ import type { AppInfoService } from '../services/app-info.service'
 import type { AppUpdateService } from '../services/app-update.service'
 import type { BatchService } from '../batch/batch-service'
 import type { JobManager } from '../jobs/job-manager'
+import type { FreeQuota } from '../llm/free-quota'
 import type { ModelCatalog } from '../llm/model-catalog'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import type { MediaContextService } from '../media-context/media-context.service'
@@ -36,6 +37,7 @@ export interface IpcDependencies {
   batches: BatchService
   tmdb: TmdbClient
   mediaContext: MediaContextService
+  freeQuota: FreeQuota
 }
 
 /** Composition root dos handlers IPC. Um arquivo por domínio em ./handlers. */

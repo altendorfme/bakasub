@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { LlmError, OpenRouterClient, parseRetryAfter, redact } from './openrouter-client'
+import {
+  LlmError,
+  OpenRouterClient,
+  parseRateLimitHeaders,
+  parseRetryAfter,
+  redact
+} from './openrouter-client'
 
 const KEY = 'sk-or-v1-SECRETSECRET'
 const sse = (...events: unknown[]): string =>
@@ -131,6 +137,54 @@ describe('OpenRouterClient.chat', () => {
     if (status === 429 || status === 503) expect(err.retryAfterMs).toBe(2000)
   })
 
+  it('429 lê X-RateLimit-* (limite, restante, reset em epoch ms)', async () => {
+    const f = async (): Promise<Response> =>
+      new Response('{"error":{"code":429,"message":"Rate limit exceeded"}}', {
+        status: 429,
+        headers: {
+          'x-ratelimit-limit': '20',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(Date.now() + 30_000)
+        }
+      })
+    const err = (await client(f as unknown as typeof fetch)
+      .chat(req)
+      .catch((e) => e)) as LlmError
+    expect(err.kind).toBe('rate-limit')
+    expect(err.details.rateLimit).toMatchObject({ limit: 20, remaining: 0 })
+  })
+
+  it('429 da cota diária de modelos free => daily-limit (não repete)', async () => {
+    const reset = Date.now() + 6 * 3_600_000
+    const f = async (): Promise<Response> =>
+      new Response('{"error":{"code":429,"message":"free-models-per-day"}}', {
+        status: 429,
+        headers: {
+          'x-ratelimit-limit': '50',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(reset)
+        }
+      })
+    await expect(client(f as unknown as typeof fetch).chat(req)).rejects.toMatchObject({
+      kind: 'daily-limit',
+      details: { rateLimit: { limit: 50, remaining: 0, resetAtMs: reset } }
+    })
+  })
+
+  it('429 dentro do stream => rate-limit', async () => {
+    const f = async (): Promise<Response> =>
+      streamResponse([
+        sse({
+          object: 'chat.completion.chunk',
+          error: { code: 429, message: 'Rate limit exceeded' },
+          choices: [{ delta: { content: '' }, finish_reason: 'error' }]
+        })
+      ])
+    await expect(client(f as unknown as typeof fetch).chat(req)).rejects.toMatchObject({
+      kind: 'rate-limit'
+    })
+  })
+
   it('403 com budget (não moderação) => credits', async () => {
     const f = async (): Promise<Response> =>
       new Response(
@@ -252,12 +306,48 @@ describe('OpenRouterClient.generationCost', () => {
   })
 })
 
+describe('OpenRouterClient.keyInfo', () => {
+  it('lê is_free_tier e free_model_daily_requests de GET /key', async () => {
+    const f = vi.fn(async () =>
+      Response.json({
+        data: {
+          is_free_tier: false,
+          usage: 3,
+          free_model_daily_requests: { used: 12, limit: 1000, remaining: 988 }
+        }
+      })
+    )
+    expect(await client(f as unknown as typeof fetch).keyInfo()).toEqual({
+      isFreeTier: false,
+      freeDaily: { used: 12, limit: 1000, remaining: 988 }
+    })
+    expect((f.mock.calls[0] as unknown as [string])[0]).toBe('https://openrouter.ai/api/v1/key')
+  })
+
+  it('sem o objeto de cota => freeDaily null; 401 => auth', async () => {
+    const a = async (): Promise<Response> => Response.json({ data: { is_free_tier: true } })
+    expect(await client(a as unknown as typeof fetch).keyInfo()).toEqual({
+      isFreeTier: true,
+      freeDaily: null
+    })
+    const b = async (): Promise<Response> => new Response('{}', { status: 401 })
+    await expect(client(b as unknown as typeof fetch).keyInfo()).rejects.toMatchObject({
+      kind: 'auth'
+    })
+  })
+})
+
 describe('utilitários', () => {
   it('parseRetryAfter: segundos, data HTTP, inválido', () => {
     expect(parseRetryAfter('3', 0)).toBe(3000)
     expect(parseRetryAfter(new Date(10_000).toUTCString(), 4_000)).toBe(6000)
     expect(parseRetryAfter('abc', 0)).toBeUndefined()
     expect(parseRetryAfter(null, 0)).toBeUndefined()
+  })
+  it('parseRateLimitHeaders: ignora ausentes e inválidos', () => {
+    const h = new Headers({ 'x-ratelimit-limit': '20', 'x-ratelimit-remaining': 'x' })
+    expect(parseRateLimitHeaders(h)).toEqual({ limit: 20 })
+    expect(parseRateLimitHeaders(new Headers())).toBeUndefined()
   })
   it('redact remove a key e padrões sk-or-*', () => {
     expect(redact(`x ${KEY} y sk-or-v1-abc123 z`, KEY)).toBe('x [REDACTED] y [REDACTED] z')

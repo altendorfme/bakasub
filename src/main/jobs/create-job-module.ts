@@ -6,8 +6,11 @@ import { PresetRepository } from '../database/repositories/preset.repository'
 import { SettingsRepository } from '../database/repositories/settings.repository'
 import type { LlmLog } from '../llm/llm-session'
 import { ModelCatalog } from '../llm/model-catalog'
+import { FreeQuota } from '../llm/free-quota'
+import { realSleep } from '../llm/llm-session'
 import { OpenRouterClient } from '../llm/openrouter-client'
-import { translateDocument } from '../llm/translate-document'
+import { RateLimiter } from '../llm/rate-limiter'
+import { translateDocument, type RetrySettings } from '../llm/translate-document'
 import { MkvToolnix, type CommandRunner, type ToolResolver } from '../media/mkvtoolnix-service'
 import type { JobMemoryService } from '../memory/job-memory.service'
 import { PresetService } from '../presets/preset.service'
@@ -56,6 +59,7 @@ export function createJobModule(o: JobModuleOptions): {
   settings: SettingsService
   preferences: PreferencesService
   batches: BatchService
+  freeQuota: FreeQuota
 } {
   const settings = new SettingsService(new SettingsRepository(o.db), (key, err) =>
     o.log.jobs.warn(`invalid setting ${key}: ${String(err)}`)
@@ -63,7 +67,26 @@ export function createJobModule(o: JobModuleOptions): {
   const client = new OpenRouterClient({ apiKey: () => o.vault.get('openrouter.apiKey') })
   const models = new ModelCatalog(client, settings)
   const mkv = new MkvToolnix(o.runner, o.tools)
-  const preflighter = new Preflighter({ models, memory: o.memory })
+  // Um limitador para o processo inteiro: os limites do OpenRouter são por conta, não por job.
+  const limiter = new RateLimiter({
+    config: async () => ({
+      freeRpm: await settings.get('llm.rateLimit.freeRpm'),
+      paidRpm: await settings.get('llm.rateLimit.paidRpm')
+    }),
+    sleep: realSleep
+  })
+  const retrySettings = async (): Promise<RetrySettings> => ({
+    maxThrottled: await settings.get('llm.retry.maxThrottled'),
+    maxTransient: await settings.get('llm.retry.maxTransient'),
+    baseDelayMs: await settings.get('llm.retry.baseDelayMs'),
+    maxDelayMs: await settings.get('llm.retry.maxDelayMs'),
+    chunkRounds: await settings.get('llm.retry.chunkRounds')
+  })
+  const freeQuota = new FreeQuota({
+    keyInfo: (signal) => client.keyInfo(signal),
+    tierSetting: () => settings.get('llm.rateLimit.freeTier')
+  })
+  const preflighter = new Preflighter({ models, memory: o.memory, freeQuota })
 
   const translator: SubtitleTranslator = {
     translate: (input, opts) =>
@@ -81,7 +104,7 @@ export function createJobModule(o: JobModuleOptions): {
           targetLang: input.targetLang,
           sourceLang: input.sourceLang
         },
-        { llm: client, memory: o.memory, models, log: o.log.llm },
+        { llm: client, memory: o.memory, models, log: o.log.llm, limiter, retrySettings },
         opts
       )
   }
@@ -142,8 +165,9 @@ export function createJobModule(o: JobModuleOptions): {
     // Mais slots => a fila anda na hora; menos slots valem conforme os jobs terminam.
     onChanged: (keys) => {
       if (keys.includes('jobs.concurrency')) jobs.kick()
+      if (keys.includes('llm.rateLimit.freeTier')) freeQuota.invalidate()
       o.onSettingsChanged?.(keys)
     }
   })
-  return { jobs, presets, mkv, models, settings, preferences, batches }
+  return { jobs, presets, mkv, models, settings, preferences, batches, freeQuota }
 }

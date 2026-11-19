@@ -6,7 +6,14 @@ import { analyzeCoverage, type SubtitleDocument } from '../parsers'
 import { srtFormat } from '../parsers/srt'
 import type { ModelInfo } from './model-catalog'
 import { LlmError, type ChatRequest, type ChatResult } from './openrouter-client'
-import { TranslationCancelled, translateDocument, type TranslateDeps } from './translate-document'
+import { RateLimiter } from './rate-limiter'
+import {
+  DEFAULT_RETRY_SETTINGS,
+  TranslationCancelled,
+  translateDocument,
+  type TranslateDeps,
+  type TranslateProgress
+} from './translate-document'
 
 const MODEL: ModelInfo = {
   id: 'a/b',
@@ -63,10 +70,15 @@ function deps(
   over: Partial<TranslateDeps> = {}
 ): TranslateDeps & { calls: ChatRequest[]; sleep: ReturnType<typeof vi.fn> } {
   const calls: ChatRequest[] = []
-  const sleep = vi.fn(async () => undefined)
+  // Relógio virtual: `sleep` avança o tempo (o limitador depende disso para sair do cooldown).
+  let t = 1_000_000
+  const sleep = vi.fn(async (ms: number) => {
+    t += ms
+  })
   return {
     calls,
     sleep,
+    now: () => t,
     llm: {
       chat: async (req: ChatRequest) => {
         calls.push(req)
@@ -242,13 +254,108 @@ describe('translateDocument', () => {
     })
   })
 
-  it('transitório esgotado => LLM_UNAVAILABLE; custo das gerações interrompidas é consultado', async () => {
+  it('transitório esgotado => 2 rodadas extras do chunk (60 s, 120 s), depois LLM_UNAVAILABLE', async () => {
     const d = deps(() => {
       throw new LlmError('stream-error', 'died', { generationId: 'gen-1' })
     })
     const err = await translateDocument(input(srt('Hello there friend.')), d).catch((e) => e)
     expect(err).toMatchObject({ code: 'LLM_UNAVAILABLE' })
+    expect(d.calls).toHaveLength(9) // 3 tentativas × (1 + 2 rodadas)
+    expect(d.sleep).toHaveBeenCalledWith(60_000, undefined)
+    expect(d.sleep).toHaveBeenCalledWith(120_000, undefined)
+  })
+
+  it('rodada extra reenvia só as linhas que faltam', async () => {
+    const lines = ['Hello there friend.', 'How are you doing today?', 'Fine, thanks a lot.']
+    let failing = false
+    const d = deps((req, call) => {
+      if (call === 1) {
+        // Só a 1ª linha volta válida; o reparo das outras esbarra na rede.
+        const first = [...targetLines(req)][0]
+        failing = true
+        return ok(JSON.stringify({ [first[0]]: tr(first[1]) }))
+      }
+      if (failing && call <= 4) throw new LlmError('network', 'down')
+      return echo(req)
+    })
+    const r = await translateDocument(input(srt(...lines)), d, {})
+    expect(r.failed).toEqual([])
+    const last = d.calls.at(-1)!
+    expect([...targetLines(last).keys()]).toHaveLength(2)
+  })
+
+  it('chunkRounds = 0: falha sem rodada extra', async () => {
+    const d = deps(
+      () => {
+        throw new LlmError('network', 'down')
+      },
+      { retrySettings: async () => ({ ...DEFAULT_RETRY_SETTINGS, chunkRounds: 0 }) }
+    )
+    await expect(translateDocument(input(srt('Hello there friend.')), d)).rejects.toMatchObject({
+      code: 'LLM_UNAVAILABLE'
+    })
     expect(d.calls).toHaveLength(3)
+  })
+
+  it('cota diária de modelos free: LLM_DAILY_LIMIT na hora, com o horário do reset', async () => {
+    const d = deps(() => {
+      throw new LlmError('daily-limit', 'free-models-per-day', {
+        status: 429,
+        rateLimit: { limit: 50, remaining: 0, resetAtMs: Date.UTC(2026, 0, 2) }
+      })
+    })
+    const err = await translateDocument(input(srt('Hello there friend.')), d).catch((e) => e)
+    expect(err).toMatchObject({ code: 'LLM_DAILY_LIMIT' })
+    expect(err.message).toContain('2026-01-02T00:00:00.000Z')
+    expect(d.calls).toHaveLength(1)
+  })
+
+  it('429 põe a faixa em cooldown no limitador compartilhado: outro job também espera', async () => {
+    let t = 0
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms
+    })
+    const limiter = new RateLimiter({
+      config: async () => ({ freeRpm: 100, paidRpm: null }),
+      sleep,
+      now: () => t
+    })
+    const a = deps(
+      (req, call) => {
+        if (call === 1) throw new LlmError('rate-limit', 'slow', { retryAfterMs: 5000 })
+        return echo(req)
+      },
+      { limiter, sleep, now: () => t }
+    )
+    await translateDocument(input(srt('Hello there friend.')), a)
+    expect(limiter.cooldownUntil('free')).toBeNull()
+    expect(sleep).toHaveBeenCalledWith(5000, undefined)
+    // Cooldown ativo => o próximo job espera antes da 1ª requisição.
+    limiter.cooldown('free', t + 7000)
+    const b = deps(echo, { limiter, sleep, now: () => t })
+    const events: TranslateProgress[] = []
+    await translateDocument(input(srt('Other line here.')), b, {
+      onProgress: (p) => events.push(p)
+    })
+    expect(sleep).toHaveBeenLastCalledWith(7000, undefined)
+    expect(events).toContainEqual(
+      expect.objectContaining({ waiting: { reason: 'cooldown', untilMs: 7000 + 5000 } })
+    )
+    expect(events.at(-1)!.waiting).toBeUndefined()
+  })
+
+  it('backoff aparece no progresso como waiting e some quando a requisição sai', async () => {
+    const d = deps((req, call) => {
+      if (call === 1) throw new LlmError('server', 'oops', { status: 500 })
+      return echo(req)
+    })
+    const events: TranslateProgress[] = []
+    await translateDocument(input(srt('Hello there friend.')), d, {
+      onProgress: (p) => events.push(p)
+    })
+    const w = events.findIndex((e) => e.waiting?.reason === 'backoff')
+    expect(w).toBeGreaterThan(-1)
+    expect(events[w + 1].waiting).toBeUndefined()
   })
 
   it('cancelamento: TranslationCancelled com o custo do /generation e o que já foi gravado', async () => {

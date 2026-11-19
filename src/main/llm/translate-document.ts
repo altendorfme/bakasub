@@ -23,9 +23,20 @@ import {
 } from './llm-session'
 import type { ModelInfo } from './model-catalog'
 import { buildSystemPrompt, parseGlossary } from './prompt-builder'
+import { laneOf, RateLimiter, type WaitInfo } from './rate-limiter'
+import { DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 
 /** Acima desta fração de linhas esgotadas (validação), o job falha. Moderação não conta. */
 export const MAX_FAILED_RATIO = 0.1
+/** Espera antes da rodada extra N de um chunk (60 s, 120 s…). */
+export const CHUNK_ROUND_DELAY_MS = 60_000
+
+export interface RetrySettings extends RetryConfig {
+  /** Rodadas extras de um chunk depois de esgotar o retry de transporte. */
+  readonly chunkRounds: number
+}
+
+export const DEFAULT_RETRY_SETTINGS: RetrySettings = { ...DEFAULT_RETRY_CONFIG, chunkRounds: 2 }
 
 export interface TranslateInput<F> {
   readonly doc: SubtitleDocument<F>
@@ -52,6 +63,11 @@ export interface TranslateDeps {
   readonly log?: LlmLog
   readonly sleep?: Sleep
   readonly random?: () => number
+  readonly now?: () => number
+  /** Limitador global do processo. Sem ele, só o cooldown local de 429 (sem teto por minuto). */
+  readonly limiter?: RateLimiter
+  /** Lido a cada requisição/rodada (Settings → Avançado). */
+  readonly retrySettings?: () => Promise<RetrySettings>
 }
 
 export interface TranslateProgress {
@@ -63,6 +79,8 @@ export interface TranslateProgress {
   readonly cached: number
   readonly chunk?: { readonly index: number; readonly count: number }
   readonly cost: number
+  /** Parado esperando (limite, cooldown de 429 ou backoff). Ausente = trabalhando. */
+  readonly waiting?: WaitInfo
 }
 
 export interface TranslateOptions {
@@ -121,15 +139,50 @@ export async function translateDocument<F>(
   const total = timeline.length
   const maxFailed = Math.floor(total * MAX_FAILED_RATIO)
 
+  const sleep = deps.sleep ?? realSleep
+  const now = deps.now ?? Date.now
+  const settings = deps.retrySettings ?? (async () => DEFAULT_RETRY_SETTINGS)
+  const limiter =
+    deps.limiter ??
+    new RateLimiter({ config: async () => ({ freeRpm: Infinity, paidRpm: null }), sleep, now })
+
+  type Phase = Omit<TranslateProgress, 'total' | 'cached' | 'cost' | 'waiting'>
+  let last: Phase = { phase: 'lookup', done: 0 }
+  let waiting: WaitInfo | undefined
+  const emit = (): void =>
+    onProgress?.({
+      ...last,
+      total,
+      cached: lookup.hits.size,
+      cost: session.usage.cost,
+      ...(waiting ? { waiting } : {})
+    })
+  const progress = (p: Phase): void => {
+    last = p
+    emit()
+  }
+  const onWait = (w: WaitInfo | null): void => {
+    waiting = w ?? undefined
+    emit()
+  }
+
   const session = new LlmSession(
-    { llm: deps.llm, sleep: deps.sleep ?? realSleep, random: deps.random ?? Math.random, log },
-    { model, temperature: input.preset.temperature, signal }
+    {
+      llm: deps.llm,
+      sleep,
+      random: deps.random ?? Math.random,
+      log,
+      limiter,
+      retryConfig: settings,
+      now,
+      onWait
+    },
+    { model, lane: laneOf(model), temperature: input.preset.temperature, signal }
   )
   const failed: LineFailure[] = []
+  const failedIds = new Set<number>()
   let validationFailed = 0
   let done = 0
-  const progress = (p: Omit<TranslateProgress, 'total' | 'cached' | 'cost'>): void =>
-    onProgress?.({ ...p, total, cached: lookup.hits.size, cost: session.usage.cost })
 
   progress({ phase: 'lookup', done: 0 })
 
@@ -162,6 +215,7 @@ export async function translateDocument<F>(
       },
       fail: (f) => {
         failed.push(f)
+        failedIds.add(f.cueId)
         done++
         if (f.reason === 'UNTRANSLATED_VALIDATION_FAILED') validationFailed++
       }
@@ -171,7 +225,31 @@ export async function translateDocument<F>(
   const chunks = planChunks(lookup.misses, { ...DEFAULT_CHUNK_LIMITS, ...input.limits })
   try {
     for (const [i, chunk] of chunks.entries()) {
-      await translator.run(chunk)
+      for (let round = 0; ; round++) {
+        // Numa rodada extra, só o que a anterior não resolveu (aceitas já estão no Job Memory).
+        const rest = chunk.filter((u) => !known.has(u.cueId) && !failedIds.has(u.cueId))
+        if (rest.length === 0) break
+        try {
+          await translator.run(rest)
+          break
+        } catch (err) {
+          const rounds = (await settings()).chunkRounds
+          if (!(err instanceof FatalLlmError && err.code === 'LLM_UNAVAILABLE') || round >= rounds)
+            throw err
+          const delay = CHUNK_ROUND_DELAY_MS * (round + 1)
+          log.warn(
+            `chunk ${i + 1}/${chunks.length}: retries exhausted (${err.message}); ` +
+              `extra round ${round + 1}/${rounds} in ${delay / 1000}s`
+          )
+          onWait({ reason: 'backoff', untilMs: now() + delay })
+          try {
+            await sleep(delay, signal)
+          } catch {
+            throw new CancelRequested()
+          }
+          onWait(null)
+        }
+      }
       if (validationFailed > maxFailed)
         throw new AppError(
           'LLM_TOO_MANY_FAILURES',

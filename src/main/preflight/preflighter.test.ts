@@ -57,4 +57,54 @@ describe('Preflighter', () => {
       })
     ).rejects.toMatchObject({ code: 'LLM_UNKNOWN_MODEL' })
   })
+
+  it('modelo free: compara as requisições previstas com a cota diária', async () => {
+    const free = { ...MODEL, id: 'a/b:free' }
+    const run = (remaining: number | null): ReturnType<Preflighter['run']> =>
+      new Preflighter({
+        models: {
+          find: async () => free,
+          get: async () => ({ models: [free], fetchedAt: 5, offline: false })
+        },
+        memory,
+        freeQuota: {
+          status: async () => ({
+            tier: 'under-10',
+            source: 'auto',
+            limit: 50,
+            used: remaining === null ? null : 50 - remaining,
+            remaining
+          })
+        }
+      }).run({
+        doc,
+        format: srtFormat,
+        preset: { model: 'a/b:free', glossary: [], temperature: 0.3, prompt: '' },
+        targetLang: 'pt-BR'
+      })
+    expect((await run(10)).estimate.freeQuota).toMatchObject({ requests: 2, enough: true })
+    expect((await run(1)).estimate.freeQuota).toMatchObject({ requests: 2, enough: false })
+    expect((await run(null)).estimate.freeQuota).toMatchObject({ enough: null })
+  })
+
+  it('modelo pago: nada de cota', async () => {
+    const r = await new Preflighter({
+      models: {
+        find: async () => MODEL,
+        get: async () => ({ models: [MODEL], fetchedAt: 5, offline: false })
+      },
+      memory,
+      freeQuota: {
+        status: async () => {
+          throw new Error('não deveria consultar')
+        }
+      }
+    }).run({
+      doc,
+      format: srtFormat,
+      preset: { model: 'a/b', glossary: [], temperature: 0.3, prompt: '' },
+      targetLang: 'pt-BR'
+    })
+    expect(r.estimate.freeQuota).toBeUndefined()
+  })
 })

@@ -26,10 +26,18 @@ export const preflightStep: Step = async (ctx) => {
   const cheap = threshold !== null && estimate.cost !== null && estimate.cost.high < threshold
   // Nada a traduzir (tudo em cache) não tem custo: não faz sentido pedir confirmação.
   const nothing = estimate.lines.toTranslate === 0
+  // Cota free insuficiente: custo zero não pode confirmar sozinho (o usuário precisa ver o aviso).
+  const shortQuota = estimate.freeQuota?.enough === false
+  if (shortQuota)
+    ctx.warn(
+      `free-model daily quota: ~${estimate.freeQuota!.requests} requests needed, ` +
+        `${estimate.freeQuota!.remaining} left today`
+    )
   ctx.artifacts.preflight = {
     estimate: {
       ...estimate,
-      decision: !confirm || cheap || nothing ? 'auto-confirmed' : 'needs-confirmation'
+      decision:
+        !confirm || ((cheap || nothing) && !shortQuota) ? 'auto-confirmed' : 'needs-confirmation'
     },
     coverage
   }

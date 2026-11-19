@@ -16,6 +16,8 @@ OpenRouter may rename buttons or pages over time; credits and keys are always in
 
 After the key, BakaSub asks you to star at least one model in **Models** and pick a default. Models marked **Moderated** may refuse some lines (they stay in the original language); **Exact cost** means the estimate uses the model's own tokenizer.
 
+Free models (ending in `:free`) cost nothing but have per-minute and daily limits: see [Limits, waits and retries](./openrouter-limits.md).
+
 ## Privacy
 
 - The key is stored encrypted on your computer (in your system's keychain when available) and is never shown again, not even to BakaSub's own screens.

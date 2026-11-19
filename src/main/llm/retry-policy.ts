@@ -1,21 +1,51 @@
 import type { AppErrorCode } from '../errors'
 import type { LlmError } from './openrouter-client'
 
+/** Valores ajustáveis em Settings → Avançado (`llm.retry.*`). */
+export interface RetryConfig {
+  /** Tentativas com 429/502/503. */
+  readonly maxThrottled: number
+  /** Tentativas com 5xx, timeout, erro no stream e rede. */
+  readonly maxTransient: number
+  readonly baseDelayMs: number
+  readonly maxDelayMs: number
+}
+
+export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxThrottled: 5,
+  maxTransient: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30_000
+}
+
+/** `Retry-After`/`X-RateLimit-Reset` maiores que isto são limitados (servidor exagerando). */
+export const RETRY_AFTER_CAP_MS = 60_000
+
 export type RetryDecision =
-  | { action: 'retry'; delayMs: number }
+  /**
+   * `lane`: 429; a faixa inteira entra em cooldown (todos os jobs esperam).
+   * `request`: só esta requisição espera.
+   */
+  | { action: 'retry'; delayMs: number; scope: 'lane' | 'request' }
   | { action: 'fatal'; code: AppErrorCode }
   | { action: 'moderated' }
   | { action: 'cancel' }
 
-const MAX_THROTTLED = 5
-const MAX_TRANSIENT = 3
-const BACKOFF_CAP_MS = 30_000
-const RETRY_AFTER_CAP_MS = 60_000
-
-/** Exponencial (1 s, 2 s, 4 s…) com jitter em [50%, 100%] e teto de 30 s. */
-export function backoffDelay(attempt: number, random: () => number = Math.random): number {
-  const base = Math.min(BACKOFF_CAP_MS, 1000 * 2 ** (attempt - 1))
+/** Exponencial (base, 2×base, 4×base…) com jitter em [50%, 100%] e teto `maxDelayMs`. */
+export function backoffDelay(
+  attempt: number,
+  config: Pick<RetryConfig, 'baseDelayMs' | 'maxDelayMs'> = DEFAULT_RETRY_CONFIG,
+  random: () => number = Math.random
+): number {
+  const base = Math.min(config.maxDelayMs, config.baseDelayMs * 2 ** (attempt - 1))
   return Math.round(base * (0.5 + random() / 2))
+}
+
+/** Espera pedida pelo servidor (`Retry-After`, senão `X-RateLimit-Reset`), limitada. */
+function serverHint(err: LlmError, now: number): number | undefined {
+  const reset = err.details.rateLimit?.resetAtMs
+  const hint = err.retryAfterMs ?? (reset !== undefined ? Math.max(0, reset - now) : undefined)
+  return hint === undefined ? undefined : Math.min(hint, RETRY_AFTER_CAP_MS)
 }
 
 /**
@@ -25,8 +55,11 @@ export function backoffDelay(attempt: number, random: () => number = Math.random
 export function decide(
   err: LlmError,
   attempt: number,
-  random: () => number = Math.random
+  o: { config?: RetryConfig; random?: () => number; now?: number } = {}
 ): RetryDecision {
+  const config = o.config ?? DEFAULT_RETRY_CONFIG
+  const random = o.random ?? Math.random
+  const now = o.now ?? Date.now()
   switch (err.kind) {
     case 'auth':
       return { action: 'fatal', code: 'LLM_AUTH' }
@@ -34,25 +67,26 @@ export function decide(
       return { action: 'fatal', code: 'LLM_CREDITS' }
     case 'bad-request':
       return { action: 'fatal', code: 'LLM_BAD_REQUEST' }
+    case 'daily-limit':
+      return { action: 'fatal', code: 'LLM_DAILY_LIMIT' }
     case 'moderation':
       return { action: 'moderated' }
     case 'aborted':
       return { action: 'cancel' }
     case 'rate-limit':
     case 'unavailable':
-      if (attempt >= MAX_THROTTLED) return { action: 'fatal', code: 'LLM_UNAVAILABLE' }
+      if (attempt >= config.maxThrottled) return { action: 'fatal', code: 'LLM_UNAVAILABLE' }
       return {
         action: 'retry',
-        delayMs:
-          err.retryAfterMs !== undefined
-            ? Math.min(err.retryAfterMs, RETRY_AFTER_CAP_MS)
-            : backoffDelay(attempt, random)
+        delayMs: serverHint(err, now) ?? backoffDelay(attempt, config, random),
+        // 503 costuma ser do modelo/provedor, não da conta: não trava a faixa.
+        scope: err.kind === 'rate-limit' ? 'lane' : 'request'
       }
     case 'server':
     case 'timeout':
     case 'stream-error':
     case 'network':
-      if (attempt >= MAX_TRANSIENT) return { action: 'fatal', code: 'LLM_UNAVAILABLE' }
-      return { action: 'retry', delayMs: backoffDelay(attempt, random) }
+      if (attempt >= config.maxTransient) return { action: 'fatal', code: 'LLM_UNAVAILABLE' }
+      return { action: 'retry', delayMs: backoffDelay(attempt, config, random), scope: 'request' }
   }
 }

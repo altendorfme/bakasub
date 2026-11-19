@@ -15,7 +15,15 @@ export const PUBLIC_SETTING_KEYS = [
   'jobs.concurrency',
   'preflight.autoConfirmBelowUsd',
   'tracks.preferredSourceLangs',
-  'logs.level'
+  'logs.level',
+  'llm.rateLimit.freeRpm',
+  'llm.rateLimit.paidRpm',
+  'llm.rateLimit.freeTier',
+  'llm.retry.maxThrottled',
+  'llm.retry.maxTransient',
+  'llm.retry.baseDelayMs',
+  'llm.retry.maxDelayMs',
+  'llm.retry.chunkRounds'
 ] as const satisfies readonly (keyof PublicSettings & SettingKey)[]
 
 type PublicKey = (typeof PUBLIC_SETTING_KEYS)[number]
@@ -90,6 +98,9 @@ export class PreferencesService {
       'The default target language cannot be removed'
     )
 
+    if (next['llm.retry.baseDelayMs'] > next['llm.retry.maxDelayMs'])
+      throw new AppError('SETTINGS_CONFLICT', 'The base retry delay exceeds the maximum delay')
+
     if (
       'translation.defaultPresetId' in patch &&
       !(await this.d.presetExists(next['translation.defaultPresetId']))
@@ -103,6 +114,17 @@ export class PreferencesService {
     for (const k of changed) await this.d.settings.set(k, next[k] as never)
     if (changed.length > 0) this.d.onChanged?.(changed)
     return next
+  }
+
+  /** Volta as chaves ao padrão de fábrica (Settings → "Restore defaults"), com as mesmas regras. */
+  async reset(keys: readonly string[]): Promise<PublicSettings> {
+    const unknown = keys.filter((k) => !(PUBLIC_SETTING_KEYS as readonly string[]).includes(k))
+    if (unknown.length)
+      throw new AppError('INVALID_INPUT', `Unknown settings: ${unknown.join(', ')}`)
+    const patch = Object.fromEntries(
+      (keys as PublicKey[]).map((k) => [k, SETTINGS_SCHEMA[k].default])
+    ) as Partial<PublicSettings>
+    return this.update(patch)
   }
 
   /**

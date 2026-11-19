@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { ApiKeyStatus } from '../../../shared/ipc-contract'
-import type { PreferencesService } from '../../settings/preferences.service'
+import type { FreeQuota } from '../../llm/free-quota'
+import { PUBLIC_SETTING_KEYS, type PreferencesService } from '../../settings/preferences.service'
 import type { SecretVault } from '../../settings/secret-vault'
 import { redactor } from '../../logging/logger'
 import { createHandler } from '../create-handler'
@@ -18,6 +19,8 @@ const apiKeyInput = z.object({
 export function registerSettingsHandlers(deps: {
   vault: SecretVault
   preferences: PreferencesService
+  /** A cota free é da conta da key: trocar a key invalida o cache de `GET /key`. */
+  freeQuota: Pick<FreeQuota, 'invalidate'>
 }): void {
   const status = async (): Promise<ApiKeyStatus> => ({
     present: await deps.vault.has('openrouter.apiKey'),
@@ -28,12 +31,14 @@ export function registerSettingsHandlers(deps: {
     handle: async ({ apiKey }) => {
       await deps.vault.set('openrouter.apiKey', apiKey)
       redactor.add(apiKey)
+      deps.freeQuota.invalidate()
       return status()
     }
   })
   createHandler('settings:clear-api-key', {
     handle: async () => {
       await deps.vault.delete('openrouter.apiKey')
+      deps.freeQuota.invalidate()
       return status()
     }
   })
@@ -43,5 +48,9 @@ export function registerSettingsHandlers(deps: {
     // Forma livre aqui: a validação por chave (e a recusa de chaves internas) é do PreferencesService.
     input: z.record(z.string(), z.unknown()),
     handle: (patch) => deps.preferences.update(patch)
+  })
+  createHandler('settings:reset', {
+    input: z.object({ keys: z.array(z.enum(PUBLIC_SETTING_KEYS)).min(1).max(50) }),
+    handle: ({ keys }) => deps.preferences.reset(keys)
   })
 }

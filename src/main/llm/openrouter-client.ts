@@ -11,8 +11,10 @@ export type LlmErrorKind =
   | 'bad-request'
   /** 403 de moderação ou `finish_reason: content_filter`. Não repete. */
   | 'moderation'
-  /** 429. Repete respeitando `Retry-After`. */
+  /** 429. Repete respeitando `Retry-After` / `X-RateLimit-Reset`. */
   | 'rate-limit'
+  /** 429 da cota diária de modelos free (50 ou 1000/dia). Fatal até o reset (00:00 UTC). */
+  | 'daily-limit'
   /** 502/503: modelo/provedor indisponível. Repete. */
   | 'unavailable'
   /** Outros 5xx (e 404/413/422 inesperados). Repete. */
@@ -34,6 +36,8 @@ export class LlmError extends Error {
     readonly details: {
       status?: number
       retryAfterMs?: number
+      /** Cabeçalhos `X-RateLimit-*` (429 gerados pelo próprio OpenRouter). */
+      rateLimit?: RateLimitHeaders
       /** Para contabilizar custo de gerações interrompidas (`/generation`). */
       generationId?: string | null
     } = {}
@@ -50,6 +54,21 @@ export class LlmError extends Error {
   get generationId(): string | null | undefined {
     return this.details.generationId
   }
+}
+
+export interface RateLimitHeaders {
+  readonly limit?: number
+  readonly remaining?: number
+  /** Epoch ms. */
+  readonly resetAtMs?: number
+}
+
+/** O que `GET /key` diz sobre a conta (o resto da resposta não nos interessa). */
+export interface KeyInfo {
+  /** "Nunca comprou créditos". */
+  readonly isFreeTier: boolean
+  /** Cota diária de modelos free (UTC). `null` se o OpenRouter não informar. */
+  readonly freeDaily: { used: number; limit: number; remaining: number } | null
 }
 
 export interface ChatMessage {
@@ -117,6 +136,35 @@ export function parseRetryAfter(value: string | null, now = Date.now()): number 
   if (/^\d+(\.\d+)?$/.test(value.trim())) return Math.round(Number(value) * 1000)
   const at = Date.parse(value)
   return Number.isNaN(at) ? undefined : Math.max(0, at - now)
+}
+
+const intHeader = (h: Headers, name: string): number | undefined => {
+  const v = h.get(name)
+  if (v === null || !/^\d+$/.test(v.trim())) return undefined
+  return Number(v)
+}
+
+export function parseRateLimitHeaders(h: Headers): RateLimitHeaders | undefined {
+  const limit = intHeader(h, 'x-ratelimit-limit')
+  const remaining = intHeader(h, 'x-ratelimit-remaining')
+  const resetAtMs = intHeader(h, 'x-ratelimit-reset')
+  if (limit === undefined && remaining === undefined && resetAtMs === undefined) return undefined
+  return {
+    ...(limit !== undefined ? { limit } : {}),
+    ...(remaining !== undefined ? { remaining } : {}),
+    ...(resetAtMs !== undefined ? { resetAtMs } : {})
+  }
+}
+
+/** Acima disto, o limite do 429 é a cota diária (50/1000), não a de 20 req/min. */
+const DAILY_LIMIT_MIN = 50
+/** Reset tão distante só pode ser o da cota diária. */
+const DAILY_RESET_MIN_MS = 10 * 60_000
+
+function isDailyLimit(rl: RateLimitHeaders | undefined, now = Date.now()): boolean {
+  if (!rl || rl.remaining !== 0) return false
+  if (rl.limit !== undefined) return rl.limit >= DAILY_LIMIT_MIN
+  return rl.resetAtMs !== undefined && rl.resetAtMs - now > DAILY_RESET_MIN_MS
 }
 
 interface ErrorBody {
@@ -228,11 +276,18 @@ export class OpenRouterClient {
         }
         const message =
           typeof parsed?.error?.message === 'string' ? parsed.error.message : `HTTP ${res.status}`
-        throw new LlmError(kindForStatus(res.status, parsed), redact(message, key), {
-          status: res.status,
-          retryAfterMs: parseRetryAfter(res.headers.get('retry-after')),
-          generationId
-        })
+        const rateLimit = parseRateLimitHeaders(res.headers)
+        const kind = kindForStatus(res.status, parsed)
+        throw new LlmError(
+          kind === 'rate-limit' && isDailyLimit(rateLimit) ? 'daily-limit' : kind,
+          redact(message, key),
+          {
+            status: res.status,
+            retryAfterMs: parseRetryAfter(res.headers.get('retry-after')),
+            ...(rateLimit ? { rateLimit } : {}),
+            generationId
+          }
+        )
       }
       if (!res.body) throw new LlmError('stream-error', 'Empty response body', { generationId })
 
@@ -254,7 +309,9 @@ export class OpenRouterClient {
         }
         if (c.error) {
           const msg = typeof c.error.message === 'string' ? c.error.message : 'stream error'
-          throw new LlmError('stream-error', redact(msg, key), { generationId })
+          // Limite atingido no meio do stream chega como evento, não como HTTP 429.
+          const kind = c.error.code === 429 ? 'rate-limit' : 'stream-error'
+          throw new LlmError(kind, redact(msg, key), { generationId })
         }
         const choice = c.choices?.[0]
         if (typeof choice?.delta?.content === 'string') content += choice.delta.content
@@ -304,6 +361,36 @@ export class OpenRouterClient {
       }
     } catch {
       return null
+    }
+  }
+
+  /** `GET /key`: patamar da conta e cota diária de modelos free. */
+  async keyInfo(signal?: AbortSignal): Promise<KeyInfo> {
+    const key = await this.options.apiKey()
+    if (!key) throw new LlmError('auth', 'OpenRouter API key is not set')
+    let res: Response
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}/key`, { headers: this.headers(key), signal })
+    } catch (err) {
+      throw this.toError(err, key, signal, null)
+    }
+    if (!res.ok)
+      throw new LlmError(kindForStatus(res.status, null), `HTTP ${res.status}`, {
+        status: res.status
+      })
+    const json = (await res.json().catch(() => null)) as {
+      data?: { is_free_tier?: unknown; free_model_daily_requests?: Record<string, unknown> }
+    } | null
+    const d = json?.data
+    const q = d?.free_model_daily_requests
+    const isInt = (v: unknown): v is number =>
+      typeof v === 'number' && Number.isInteger(v) && v >= 0
+    return {
+      isFreeTier: d?.is_free_tier === true,
+      freeDaily:
+        q && isInt(q.used) && isInt(q.limit) && isInt(q.remaining)
+          ? { used: q.used, limit: q.limit, remaining: q.remaining }
+          : null
     }
   }
 

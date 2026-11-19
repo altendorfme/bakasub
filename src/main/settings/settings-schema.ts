@@ -44,6 +44,27 @@ export const SETTINGS_SCHEMA = {
     schema: z.number().min(0).max(1000).nullable(),
     default: null
   },
+  /**
+   * Avançado: limites e retry das chamadas ao OpenRouter (ver docs/rate-limits.md). Lidos a cada
+   * requisição, então valem para jobs em andamento. `freeRpm` 20 = limite do OpenRouter.
+   */
+  'llm.rateLimit.freeRpm': { schema: z.number().int().min(1).max(60), default: 20 },
+  /** `null` = sem teto (o OpenRouter não limita modelos pagos; o provedor pode devolver 429). */
+  'llm.rateLimit.paidRpm': {
+    schema: z.number().int().min(1).max(1000).nullable(),
+    default: null as number | null
+  },
+  /** Patamar da cota diária free: `auto` lê `GET /key`; `under-10` = 50/dia, `over-10` = 1000/dia. */
+  'llm.rateLimit.freeTier': {
+    schema: z.enum(['auto', 'under-10', 'over-10']),
+    default: 'auto' as 'auto' | 'under-10' | 'over-10'
+  },
+  'llm.retry.maxThrottled': { schema: z.number().int().min(1).max(10), default: 5 },
+  'llm.retry.maxTransient': { schema: z.number().int().min(1).max(10), default: 3 },
+  'llm.retry.baseDelayMs': { schema: z.number().int().min(250).max(10_000), default: 1000 },
+  'llm.retry.maxDelayMs': { schema: z.number().int().min(1000).max(120_000), default: 30_000 },
+  /** Rodadas extras de um chunk (60 s, 120 s…) depois de esgotar o retry de transporte. */
+  'llm.retry.chunkRounds': { schema: z.number().int().min(0).max(5), default: 2 },
   /** Idiomas de origem preferidos (ordem) na seleção automática de faixas do batch. */
   'tracks.preferredSourceLangs': {
     schema: z.array(z.string().min(1).max(35)).max(10),

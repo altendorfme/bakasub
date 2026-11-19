@@ -67,6 +67,7 @@ src/
     window/        criação da BrowserWindow
   preload/         única superfície exposta ao renderer (window.api), com allowlist
   renderer/        React + Tailwind + TanStack Query + TanStack Router + i18next (veja docs/renderer.md)
+    src/guides/    guias do usuário exibidos no app, uma pasta por idioma (en, pt-BR)
   shared/          contrato IPC tipado e utilitários puros (sem zod/electron)
 drizzle/           migrations versionadas
 scripts/           build cruzado (Docker/wine) e binários nativos
@@ -153,7 +154,7 @@ Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`ch
 
 ## Documentação detalhada
 
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
+Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
 
 ## Roadmap
 
@@ -172,4 +173,5 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
 - [x] **Preflight**: estimativa local de tokens (`js-tiktoken`, exata para GPT, faixa de ±20% para outros tokenizers) × taxa de acerto do Job Memory × preços de `/api/v1/models`, relatório de cobertura, confirmação antes de traduzir (limite de auto-confirmação), totais do batch (veja [`docs/preflight.md`](./docs/preflight.md))
 - [x] **Contexto de mídia** (backend): parse do nome do release, busca/detalhes/episódios no TMDB com identificação conservadora, cache das respostas, cache local de arte servido por `bakasub-media://`, detalhes congelados no job e enviados no `<media>` (veja [`docs/media-context.md`](./docs/media-context.md))
+- [x] **Limites e retries**: limitador único no processo por faixa (free/pago), cooldown da faixa após 429, cota diária de modelos free via `GET /key` com aviso no preflight, rodadas extras por chunk, tudo ajustável nas configurações avançadas (ver [`docs/rate-limits.md`](./docs/rate-limits.md))
 - [ ] **Frontend**: construir as telas listadas em [`docs/frontend-requirements.md`](./docs/frontend-requirements.md) (relatório de cobertura da tradução no preflight, diagnósticos do parser, confiança de encoding, onboarding de sidecars)

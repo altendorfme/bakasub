@@ -18,6 +18,8 @@ const codes = {
   LLM_CREDITS: 'Your OpenRouter credits ran out. Add credits and retry the job.',
   LLM_BAD_REQUEST: 'The model rejected the request. Try another model.',
   LLM_UNAVAILABLE: 'The model is unavailable right now. Retry later or pick another model.',
+  LLM_DAILY_LIMIT:
+    'Daily limit for free models reached. It resets at 00:00 UTC; what was already translated is kept, so retrying later continues from there.',
   LLM_UNKNOWN_MODEL: 'This model is no longer available on OpenRouter. Pick another one.',
   LLM_TOO_MANY_FAILURES: 'Too many lines failed to translate. Try another model or preset.',
   INVALID_PATH: 'This file or folder cannot be used. Choose it again.',
