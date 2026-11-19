@@ -50,7 +50,8 @@ const IDENTIFY = {
       type: 'subtitles',
       codec: 'SSA',
       properties: { codec_id: 'S_TEXT/SSA', language: 'xyz' }
-    }
+    },
+    { id: 7, type: 'subtitles', codec: 'USF', properties: { codec_id: 'S_TEXT/USF' } }
   ],
   attachments: [{ id: 1, file_name: 'font.ttf' }]
 }
@@ -70,7 +71,7 @@ describe('toBcp47', () => {
 describe('parseIdentify', () => {
   const info = parseIdentify(IDENTIFY)
   it('só faixas de legenda, com formato, idioma, flags e eventos', () => {
-    expect(info.subtitles.map((t) => t.id)).toEqual([2, 3, 4, 5, 6])
+    expect(info.subtitles.map((t) => t.id)).toEqual([2, 3, 4, 5, 6, 7])
     expect(info.subtitles[0]).toEqual({
       id: 2,
       codecId: 'S_TEXT/ASS',
@@ -83,10 +84,12 @@ describe('parseIdentify', () => {
     })
     expect(info.subtitles[1]).toMatchObject({ format: 'srt', language: 'pt-BR', forced: true })
   })
-  it('PGS e WebVTT ficam desabilitadas com motivo', () => {
+  it('WebVTT é suportado; PGS e texto sem parser ficam desabilitados com motivo', () => {
     expect(info.subtitles[2]).toMatchObject({ format: null, unsupported: 'image-based' })
-    expect(info.subtitles[3]).toMatchObject({ format: null, unsupported: 'no-parser' })
+    expect(info.subtitles[3]).toMatchObject({ format: 'vtt', codecId: 'S_TEXT/WEBVTT' })
+    expect(info.subtitles[3]).not.toHaveProperty('unsupported')
     expect(info.subtitles[4]).toMatchObject({ format: 'ssa', language: undefined })
+    expect(info.subtitles[5]).toMatchObject({ format: null, unsupported: 'no-parser' })
   })
   it('anexos contados (fontes do ASS)', () => {
     expect(info.attachments).toBe(1)

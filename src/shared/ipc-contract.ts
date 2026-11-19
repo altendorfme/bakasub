@@ -115,6 +115,9 @@ export type PresetInput = Pick<
   'name' | 'mediaType' | 'temperature' | 'prompt' | 'glossary' | 'model' | 'targetLang'
 >
 
+/** Formatos de legenda em texto que o app lê, traduz e grava (a extensão do arquivo é o id). */
+export type SubtitleTextFormat = 'srt' | 'ass' | 'ssa' | 'vtt'
+
 export type JobKind = 'extract' | 'translate' | 'mux' | 'pipeline'
 export type JobStatus =
   | 'queued'
@@ -234,7 +237,7 @@ export interface SubtitleTrackInfo {
   id: number
   codecId: string
   /** `null` = não traduzível/extraível nesta versão (ver `unsupported`). */
-  format: 'srt' | 'ass' | 'ssa' | null
+  format: SubtitleTextFormat | null
   unsupported?: 'image-based' | 'no-parser'
   language?: string
   name?: string

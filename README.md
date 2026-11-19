@@ -4,7 +4,7 @@
 
 Desktop application for extracting, AI-translating and re-muxing subtitles from `.mkv` videos.
 
-> Status: **base infrastructure, the SRT and ASS/SSA parsers, the Job Memory cache, the LLM translation layer, the Job Manager (with batch mode) and the cost preflight are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI is not implemented yet. See the [roadmap](#roadmap).
+> Status: **base infrastructure, the SRT, ASS/SSA and WebVTT parsers, the Job Memory cache, the LLM translation layer, the Job Manager (with batch mode) and the cost preflight are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI is not implemented yet. See the [roadmap](#roadmap).
 
 ## Stack
 
@@ -54,7 +54,7 @@ src/
     logging/       electron-log (scopes: app, db, ipc, sidecar, llm)
     services/      shutdown-coordinator, app-info, app-update, native consent dialog
     sidecars/      sidecar module (no `electron` dependency, testable in plain Node)
-    parsers/       subtitle parsing: decoder, common AST, SRT, ASS/SSA, segmentation, coverage (pure, testable)
+    parsers/       subtitle parsing: decoder, common AST, SRT, ASS/SSA, WebVTT, segmentation, coverage (pure, testable)
     llm/           OpenRouter client (SSE), model catalog, chunking, prompts, retries, translateDocument
     memory/        Job Memory: context hash and cache service
     media/         mkvtoolnix facade (probe/extract/mux), languages, output naming, path guard
@@ -155,7 +155,7 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] **ASS/SSA parser**: same `core/` AST; only `Dialogue:` becomes a cue, everything else is lossless trivia; drawings and karaoke are never sent to the LLM (see [`docs/parsing.md`](./docs/parsing.md))
 - [x] **Job Manager**: persisted jobs (`extract`, `translate`, `mux`, `pipeline`), FIFO queue with bounded concurrency, per-job `AbortController`, retry from the failed step, atomic outputs, graceful shutdown, presets (4 immutable built-ins + custom, JSON export/import), validated paths (see [`docs/jobs.md`](./docs/jobs.md))
 - [x] **Batch mode**: folders (optionally recursive) or multiple files, plan with automatic track selection, atomic batch creation, mirrored output folders, batch cancel (see [`docs/jobs.md`](./docs/jobs.md))
-- [ ] **Subtitle formats**: WebVTT parser; OCR for PGS/VobSub
+- [x] **WebVTT parser**: same `core/` AST; header/NOTE/STYLE/REGION as lossless trivia, decoded entities with escaping on output, `<v>` speaker, safe repair (see [`docs/parsing.md`](./docs/parsing.md)). Image-based subtitles (PGS/VobSub) are out of scope
 - [x] **LLM layer**: sequential `<context>`/`<target>` chunks over cache misses, structured JSON (`json_schema` → `json_object` → prompt) validated with Zod + marker validation, per-line repair, transport retry policy, termbase in the System Prompt, OpenRouter SSE with cancellation and cost accounting, encrypted API key (see [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: validated cache keyed by _context hash_ + language + model + glossary, per-chunk transactional upsert, prune with incremental vacuum (see [`docs/job-memory.md`](./docs/job-memory.md))
 - [x] **Preflight**: local token estimate (`js-tiktoken`, exact for GPT, ±20% range for other tokenizers) × Job Memory hit rate × `/api/v1/models` pricing, coverage report, confirmation before translating (auto-confirm threshold), batch totals (see [`docs/preflight.md`](./docs/preflight.md))

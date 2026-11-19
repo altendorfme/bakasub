@@ -2,6 +2,7 @@
 export { decodeSubtitle, metaFromText, type DecodedSubtitle } from './decode/subtitle-decoder'
 export { srtFormat, type SrtCueData } from './srt'
 export { assFormat, ssaFormat, type AssCueData } from './ass'
+export { vttFormat, type VttCueData } from './vtt'
 export { SubtitleParseError } from './core/format'
 export type { InlineLexer, RepairOptions, RepairResult, SubtitleFormat } from './core/format'
 export { cuePlainText, normalizeForHash } from './core/plain-text'

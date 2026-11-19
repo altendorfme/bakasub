@@ -12,7 +12,7 @@
 
 import type { Diagnostic } from './diagnostics'
 
-export type FormatId = 'srt' | 'ssa' | 'ass'
+export type FormatId = 'srt' | 'ssa' | 'ass' | 'vtt'
 
 export interface Timecode {
   /** Valor normalizado em milissegundos. */
@@ -23,7 +23,14 @@ export interface Timecode {
 
 export interface TextNode {
   readonly type: 'text'
+  /** Texto lógico (entidades já decodificadas no VTT). É o que vai para o LLM e para o hash. */
   readonly value: string
+  /**
+   * Texto exatamente como escrito (ex.: `&amp;` no VTT). Só formatos que escapam texto o
+   * preenchem, e sempre, em todo nó original. Nós criados pela tradução não têm `raw`:
+   * o serializer do formato escapa `value`.
+   */
+  readonly raw?: string
 }
 
 export type TagKind = 'open' | 'close' | 'override'

@@ -27,7 +27,8 @@ export function selectTranslationTrack(
   }
   const key = (t: SubtitleTrack): number[] => [
     langRank(t),
-    t.format === 'srt' ? 1 : 0,
+    // ASS/SSA carrega mais estilo; SRT e VTT empatam.
+    t.format === 'ass' || t.format === 'ssa' ? 0 : 1,
     t.forced ? 1 : 0,
     t.name && SIGNS.test(t.name) ? 1 : 0,
     -(t.eventCount ?? 0),

@@ -18,6 +18,7 @@ import type { StepDeps, SubtitleTranslator } from './step-context'
 
 const ASS = `[Script Info]\nScriptType: v4.00+\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,Hello there\n`
 const SRT = `1\n00:00:01,000 --> 00:00:02,000\nHello there\n`
+const VTT = `WEBVTT\n\n00:01.000 --> 00:02.000 align:start\n<v Bob>Tom &amp; Jerry\n`
 const INFO: MkvInfo = {
   attachments: 0,
   subtitles: [
@@ -57,6 +58,7 @@ beforeEach(() => {
   mkdirSync(outDir)
   writeFileSync(join(root, 'ep01.mkv'), 'MKV-SOURCE')
   writeFileSync(join(root, 'ep01.en.srt'), SRT)
+  writeFileSync(join(root, 'ep02.en.vtt'), VTT)
   writeFileSync(join(root, 'sub.pt-BR.ass'), ASS)
   writeFileSync(join(root, 'broken.ass'), '   ')
   mkv = {
@@ -227,6 +229,22 @@ describe('JobRunner', () => {
     const r = await runner().run({ spec, artifacts: {}, workDir }, hooks())
     expect(r.result.outputs).toEqual([join(outDir, 'ep01.pt-BR (2).srt')])
     expect(readFileSync(r.result.outputs[0], 'utf8')).toBe(SRT)
+  })
+
+  it('translate de .vtt solto: grava .vtt, cabeçalho e entidades preservados', async () => {
+    const spec = {
+      kind: 'translate',
+      source: join(root, 'ep02.en.vtt'),
+      sourceSize: 1,
+      outputDir: outDir,
+      preset,
+      targetLang: 'pt-BR',
+      sourceLang: 'en',
+      confirmBeforeTranslate: false
+    } as JobSpec
+    const r = await runner().run({ spec, artifacts: {}, workDir }, hooks())
+    expect(r.result.outputs).toEqual([join(outDir, 'ep02.pt-BR.vtt')])
+    expect(readFileSync(r.result.outputs[0], 'utf8')).toBe(VTT)
   })
 
   it('mux: legenda ilegível falha no validate, antes de tocar no MKV', async () => {

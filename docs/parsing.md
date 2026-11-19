@@ -1,12 +1,12 @@
 # Subtitle parsing
 
-Everything lives in `src/main/parsers/` and is **pure** (no `electron` import), so it runs in plain Node and under vitest. Public API: `src/main/parsers/index.ts`. Formats: **SRT** and **ASS/SSA** (`srt/` and `ass/` reuse `core/` and add only a scanner, an inline lexer, a parser and a serializer).
+Everything lives in `src/main/parsers/` and is **pure** (no `electron` import), so it runs in plain Node and under vitest. Public API: `src/main/parsers/index.ts`. Formats: **SRT**, **ASS/SSA** and **WebVTT** (`srt/`, `ass/` and `vtt/` reuse `core/` and add only a scanner, an inline lexer, a parser and a serializer). Image-based subtitles (PGS, VobSub, DVB) are **out of scope**: they would need OCR.
 
 Parsers only take text apart and put it back together. They know nothing about LLMs, the database or IPC.
 
 ```
 bytes ──► decodeSubtitle ──► text + DocumentMeta
-text  ──► srtFormat.parse | assFormat.parse ──► SubtitleDocument (cues + unparsed blocks + diagnostics)
+text  ──► srtFormat.parse | assFormat.parse | vttFormat.parse ──► SubtitleDocument (cues + unparsed blocks + diagnostics)
 cue   ──► toTranslationUnit ──► payload (text + markers) + skeleton
 LLM   ──► applyTranslation(cue, unit, translated, lexInline) ──► new Cue | Issue[]
 doc   ──► srtFormat.serialize (exact)  |  srtFormat.serializeRepaired (safe fixes)
@@ -32,6 +32,7 @@ Order: BOM (UTF-8, UTF-16 LE/BE) → strict UTF-8 → `chardet` restricted to an
 ## AST (`core/types.ts`)
 
 - `Node` = `TextNode | TagNode | LineBreakNode`. `TagNode.raw` keeps the exact source; `kind` is `open | close | override`.
+- `TextNode.value` is the logical text (what the LLM and the hash see). Formats that escape text (WebVTT) also set `TextNode.raw` on **every** original node; nodes created by a translation have no `raw`, and the format's serializer escapes their `value` (`nodesRaw(nodes, escapeText)`). SRT and ASS never set `raw`.
 - `Cue<F>`: `id` (document ordinal, **not** the file index), `start`/`end` (`{ ms, raw }`), `nodes`, `leading`, `line`/`endLine`, and `format: F` (lossless, format-specific data; for SRT: index line, timing line, EOLs, extras).
 - `Cue.style?` / `Cue.actor?`: ASS/SSA `Style` and `Name` columns (`undefined` in SRT or when empty).
 - `UnparsedBlock`: raw text the scanner could not classify (`orphan-text | bad-timing | empty-block | bad-event`).
@@ -83,6 +84,10 @@ Tolerates `.` for `,`, 1–3 digit hours/fractions, missing fraction, any spacin
 | `ASS_TIME_FORMAT`                                                 | info               | report                           |
 | `ASS_END_BEFORE_START`, `ASS_FORMAT_MISSING`                      | warn               | report                           |
 | `ASS_UNPARSEABLE_EVENT`                                           | warn               | report                           |
+| `VTT_HEADER_MISSING`, `VTT_TIME_FORMAT`, `VTT_MISSING_BLANK_LINE` | info               | auto                             |
+| `VTT_ARROW_IN_TEXT`, `VTT_EOL_MIXED`                              | warn               | auto                             |
+| `VTT_END_BEFORE_START`, `VTT_UNPARSEABLE_BLOCK`                   | warn               | report                           |
+| `VTT_EMPTY_CUE`                                                   | info               | report                           |
 | `SEG_MARKER_COLLISION`                                            | n/a                | report (raised through coverage) |
 
 Diagnostics carry `code` + `params` only. The Main process never sends localized text.
@@ -112,6 +117,26 @@ One module for both dialects: `doc.format` is `'ssa'` when `ScriptType: v4.00` (
 - **Repair** (`ass-repair.ts`) only unifies EOL to the dominant one (`ASS_EOL_MIXED`); `unparsed: 'drop'` removes bad events. Everything else is report-only and there is no trimming (trailing spaces in `Text` may be meaningful).
 - **Translation validation** is stricter than SRT in two ways, in both formats: loose markers `<xN/>` must keep their original relative order (`MARKER_ORDER`: overrides are positional), and a `\N`/`\n` written by the model counts as a raw newline.
 - Tests use synthetic fixtures; real files should only be used locally and never committed.
+
+## WebVTT (`vtt/`)
+
+- **Structure (lossless).** The file is split into blocks by blank lines. The `WEBVTT` header block and `NOTE`/`STYLE`/`REGION` blocks are raw trivia in the next item's `leading` (or `trailing`); they never become items. A block with a timing line is a cue: the line right before the timing is the identifier, and lines before the identifier become an `orphan-text` block. A block without a valid timing is `bad-timing` (contains `-->`) or `orphan-text`.
+- **Glued cues** follow the spec parser: inside a block, lines before a later timing line belong to the **previous** cue's text, and the new cue has no identifier (`VTT_MISSING_BLANK_LINE`). Whitespace-only lines are treated as separators but reported, because the spec does not consider them blank.
+- **`VttCueData`**: `identifier` (`{ raw, eol }` or `null`), `timingRaw`, `timingEol`, `settings` (cue settings such as ` align:start line:0`, kept raw with the leading space).
+- **Timing** (`vtt/timing-line.ts`): `mm:ss.ttt` or `hh:mm:ss.ttt`. Tolerates a comma (SRT style), 1–3 digit fractions (integer ms, as in SRT), missing fraction and odd spacing around `-->`; all of these raise `VTT_TIME_FORMAT`. Settings must be separated by whitespace.
+- **Inline lexer** (`vtt/inline-lexer.ts`):
+
+| Becomes            | Rule                                                                                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Tag` (open/close) | whitelist `c i b u v lang ruby rt` (classes like `<c.yellow>` and annotations kept in `raw`)                                                                           |
+| `Tag` (override)   | inner timestamps `<00:01.500>` (name `timestamp`; sent as `<xN/>`, never paired)                                                                                       |
+| `LineBreak`        | each EOL                                                                                                                                                               |
+| `Text`             | everything else; entities `&amp; &lt; &gt; &nbsp; &lrm; &rlm; &quot; &apos;` and `&#N;`/`&#xH;` are **decoded** into `value` (raw kept); unknown entities stay literal |
+
+- **Speaker**: the annotation of the first `<v Name>` (with or without classes) goes to `Cue.actor`; the tag itself is a marker, so the name never reaches the LLM as text.
+- **Escaping**: text produced by a translation is escaped on output (`&` `<` `>` and the decoded NBSP/LRM/RLM become entities), so a model that writes `-->` or `<3` can never break the file. A source and an SRT file with the same sentence share Job Memory entries, because the payload carries decoded text.
+- **Repair** (`vtt-repair.ts`): inserts the missing `WEBVTT` header; regenerates non-canonical timestamps (keeping hours if they were written, and the settings); separates glued cues with a blank line and empties whitespace-only lines, except for a cue glued to orphan lines of the same block (separating it would turn its identifier into trivia, e.g. `NOTE x`); rewrites a raw `-->` in cue text as `--&gt;` (same rendering, valid cue); unifies EOLs. `unparsed: 'drop'` removes unparsed blocks and keeps the trivia before them. Idempotent, and the result reparses without `auto` diagnostics (property test).
+- **Pipeline**: `S_TEXT/WEBVTT` tracks are extractable and translatable (`mkvextract` writes `.vtt`), `.vtt` files are accepted by `translate` and `mux`, and the output keeps the source format (`mkvmerge` muxes WebVTT natively).
 
 ## Segmentation for the LLM (`core/segmentation/`)
 
@@ -164,3 +189,5 @@ Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤1
 - The context hash lives in the Job Memory module ([`job-memory.md`](./job-memory.md)); this layer only exposes `cuePlainText()` (tags removed, breaks and ASS `\\h` as spaces) and `normalizeForHash()` (NFC, `\\h` → space, collapsed whitespace, trim, case preserved).
 - No style filter in the parser API (`Cue.style` is exposed; filtering belongs to a later jobs/presets iteration).
 - ASS `[Fonts]`/`[Graphics]`, `\\t` animations and `\\clip` are kept raw as trivia/tags; nothing is interpreted beyond what is listed above.
+- WebVTT `STYLE`/`REGION` contents and cue settings are kept raw; they are not validated or interpreted.
+- Image-based subtitles (PGS, VobSub, DVB) are out of scope: OCR was evaluated and dropped for its size and complexity. Their tracks stay visible as `image-based` and cannot be selected.

@@ -1,14 +1,15 @@
 import { z } from 'zod'
+import type { SubtitleTextFormat } from '../../shared/ipc-contract'
 import { canonicalTag, toBcp47 } from './languages'
 
-export type SubtitleFormatId = 'srt' | 'ass' | 'ssa'
+export type SubtitleFormatId = SubtitleTextFormat
 
 export interface SubtitleTrack {
   readonly id: number
   readonly codecId: string
   /** `null` quando a faixa não pode ser traduzida (ver `unsupported`). */
   readonly format: SubtitleFormatId | null
-  /** `image-based`: PGS/VobSub (exigiria OCR). `no-parser`: texto sem parser (WebVTT…). */
+  /** `image-based`: PGS/VobSub/DVB (exigiria OCR, fora do escopo). `no-parser`: texto sem parser. */
   readonly unsupported?: 'image-based' | 'no-parser'
   readonly language?: string
   readonly name?: string
@@ -26,7 +27,8 @@ const CODECS: Readonly<Record<string, SubtitleFormatId>> = {
   'S_TEXT/UTF8': 'srt',
   'S_TEXT/ASCII': 'srt',
   'S_TEXT/ASS': 'ass',
-  'S_TEXT/SSA': 'ssa'
+  'S_TEXT/SSA': 'ssa',
+  'S_TEXT/WEBVTT': 'vtt'
 }
 const IMAGE_CODECS = new Set(['S_HDMV/PGS', 'S_VOBSUB', 'S_DVBSUB', 'S_IMAGE/BMP'])
 

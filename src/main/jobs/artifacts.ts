@@ -1,3 +1,4 @@
+import type { SubtitleTextFormat } from '../../shared/ipc-contract'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { copyFile, rename, stat, unlink } from 'node:fs/promises'
@@ -15,10 +16,10 @@ export interface FileArtifact {
 export interface Artifacts {
   probe?: { tracks: SubtitleTrack[] }
   extract?: {
-    files: (FileArtifact & { trackId: number; format: 'srt' | 'ass' | 'ssa'; language?: string })[]
+    files: (FileArtifact & { trackId: number; format: SubtitleTextFormat; language?: string })[]
   }
   translate?: {
-    file: FileArtifact & { format: 'srt' | 'ass' | 'ssa' }
+    file: FileArtifact & { format: SubtitleTextFormat }
     failedLines: { cueId: number; reason: string }[]
     usage: NonNullable<import('../../shared/ipc-contract').JobResult['usage']>
     cache: { hits: number; misses: number }

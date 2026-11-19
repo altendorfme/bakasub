@@ -1,24 +1,34 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
+import type { SubtitleTextFormat } from '../../../shared/ipc-contract'
 import { AppError } from '../../errors'
 import {
   assFormat,
   decodeSubtitle,
   srtFormat,
+  vttFormat,
   SubtitleParseError,
   type SubtitleDocument,
   type SubtitleFormat
 } from '../../parsers'
 
-export type TextFormatId = 'srt' | 'ass' | 'ssa'
+export type TextFormatId = SubtitleTextFormat
+
+const FORMATS: Readonly<Record<TextFormatId, SubtitleFormat<unknown>>> = {
+  srt: srtFormat as SubtitleFormat<unknown>,
+  // O dialeto ASS/SSA real vem do conteúdo; o mesmo objeto serve aos dois.
+  ass: assFormat as SubtitleFormat<unknown>,
+  ssa: assFormat as SubtitleFormat<unknown>,
+  vtt: vttFormat as SubtitleFormat<unknown>
+}
 
 export function formatFor(id: TextFormatId): SubtitleFormat<unknown> {
-  return (id === 'srt' ? srtFormat : assFormat) as SubtitleFormat<unknown>
+  return FORMATS[id]
 }
 
 export function formatFromPath(path: string): TextFormatId {
   const ext = extname(path).slice(1).toLowerCase()
-  if (ext === 'srt' || ext === 'ass' || ext === 'ssa') return ext
+  if (Object.hasOwn(FORMATS, ext)) return ext as TextFormatId
   throw new AppError('INVALID_SUBTITLE', `Unsupported subtitle extension: ${basename(path)}`)
 }
 

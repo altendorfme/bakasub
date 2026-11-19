@@ -4,7 +4,7 @@
 
 Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
 
-> Status: **infraestrutura base, parsers SRT e ASS/SSA, cache Job Memory, camada de tradução LLM, Job Manager (com modo batch) e preflight de custo concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI ainda não foi implementada. Veja o [roadmap](#roadmap).
+> Status: **infraestrutura base, parsers SRT, ASS/SSA e WebVTT, cache Job Memory, camada de tradução LLM, Job Manager (com modo batch) e preflight de custo concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI ainda não foi implementada. Veja o [roadmap](#roadmap).
 
 ## Stack
 
@@ -54,7 +54,7 @@ src/
     logging/       electron-log (scopes: app, db, ipc, sidecar, llm)
     services/      shutdown-coordinator, app-info, app-update, consentimento nativo
     sidecars/      módulo de sidecars (sem dependência de `electron`, testável em Node puro)
-    parsers/       parsing de legendas: decoder, AST comum, SRT, ASS/SSA, segmentação, cobertura (puro, testável)
+    parsers/       parsing de legendas: decoder, AST comum, SRT, ASS/SSA, WebVTT, segmentação, cobertura (puro, testável)
     llm/           cliente OpenRouter (SSE), catálogo de modelos, chunking, prompts, retries, translateDocument
     memory/        Job Memory: context hash e serviço de cache
     media/         fachada do mkvtoolnix (probe/extract/mux), idiomas, nomes de saída, validação de caminhos
@@ -166,7 +166,7 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] **Parser ASS/SSA**: mesma AST de `core/`; só `Dialogue:` vira cue e o resto é trivia lossless; desenhos e karaokê nunca vão ao LLM (veja [`docs/parsing.md`](./docs/parsing.md))
 - [x] **Job Manager**: jobs persistidos (`extract`, `translate`, `mux`, `pipeline`), fila FIFO com concorrência limitada, `AbortController` por job, retry a partir da etapa que falhou, saídas atômicas, shutdown gracioso, presets (4 embutidos imutáveis + personalizados, export/import em JSON), caminhos validados (veja [`docs/jobs.md`](./docs/jobs.md))
 - [x] **Modo batch**: pastas (com recursão opcional) ou vários arquivos, plano com seleção automática de faixas, criação atômica, espelhamento de pastas, cancelamento do lote (veja [`docs/jobs.md`](./docs/jobs.md))
-- [ ] **Formatos de legenda**: parser de WebVTT; OCR para PGS/VobSub
+- [x] **Parser WebVTT**: mesma AST de `core/`; cabeçalho/NOTE/STYLE/REGION como trivia lossless, entidades decodificadas com escape na saída, falante do `<v>`, reparo seguro (veja [`docs/parsing.md`](./docs/parsing.md)). Legendas em imagem (PGS/VobSub) estão fora do escopo
 - [x] **Camada LLM**: chunks sequenciais `<context>`/`<target>` sobre os misses do cache, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))
 - [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
 - [x] **Preflight**: estimativa local de tokens (`js-tiktoken`, exata para GPT, faixa de ±20% para outros tokenizers) × taxa de acerto do Job Memory × preços de `/api/v1/models`, relatório de cobertura, confirmação antes de traduzir (limite de auto-confirmação), totais do batch (veja [`docs/preflight.md`](./docs/preflight.md))

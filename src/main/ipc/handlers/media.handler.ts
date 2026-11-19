@@ -20,8 +20,13 @@ const EXTENSIONS: Readonly<Record<OpenDialogKind, readonly string[]>> = {
 
 const FILTERS: Readonly<Record<OpenDialogKind, OpenDialogOptions['filters']>> = {
   media: [{ name: 'Matroska', extensions: ['mkv'] }],
-  subtitle: [{ name: 'Subtitles', extensions: ['srt', 'ass', 'ssa'] }],
-  any: [{ name: 'Video and subtitles', extensions: ['mkv', 'srt', 'ass', 'ssa'] }]
+  subtitle: [{ name: 'Subtitles', extensions: SUBTITLE_EXTENSIONS.map((e) => e.slice(1)) }],
+  any: [
+    {
+      name: 'Video and subtitles',
+      extensions: [...MEDIA_EXTENSIONS, ...SUBTITLE_EXTENSIONS].map((e) => e.slice(1))
+    }
+  ]
 }
 
 export function registerMediaHandlers(deps: {

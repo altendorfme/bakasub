@@ -23,7 +23,7 @@ jobs:progress (throttled 250 ms; state transitions immediately)
 
 Steps (`steps/*.step.ts`) are shared by every kind (`plan.ts`):
 
-- **probe**: `mkvmerge -J` → subtitle tracks (`media/mkv-probe.ts`). Supported: `S_TEXT/UTF8`, `S_TEXT/ASS`, `S_TEXT/SSA`. PGS/VobSub (`image-based`, would need OCR) and WebVTT (`no-parser`) are listed but rejected. Track language: `language_ietf`, else ISO 639-2 → BCP-47 table (`media/languages.ts`); `und` = unknown.
+- **probe**: `mkvmerge -J` → subtitle tracks (`media/mkv-probe.ts`). Supported: `S_TEXT/UTF8`, `S_TEXT/ASCII`, `S_TEXT/ASS`, `S_TEXT/SSA`, `S_TEXT/WEBVTT`. PGS/VobSub/DVB (`image-based`, would need OCR, out of scope) and other text codecs without a parser (`no-parser`, e.g. USF) are listed but rejected. Track language: `language_ietf`, else ISO 639-2 → BCP-47 table (`media/languages.ts`); `und` = unknown.
 - **extract**: one `mkvextract` pass for all requested tracks into the work dir.
 - **preflight**: token/cost estimate and coverage; may stop the job in `awaiting-confirmation` (see [`preflight.md`](./preflight.md)).
 - **translate**: decode → parse → `translateDocument` (see [`llm.md`](./llm.md)) → `serializeRepaired` → UTF-8 (BOM if the source had one). `sourceLang`: job option, else filename suffix (`ep01.en.srt`), else the track language.
@@ -99,4 +99,4 @@ dialog:open-folder | dialog:open-files (multiple) | drag & drop
 
 ## Pending
 
-- WebVTT parser; OCR for PGS/VobSub.
+- Image-based subtitles (PGS/VobSub/DVB) are out of scope (OCR dropped).

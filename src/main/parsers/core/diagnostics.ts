@@ -30,6 +30,16 @@ export type DiagnosticCode =
   | 'ASS_END_BEFORE_START'
   | 'ASS_FORMAT_MISSING'
   | 'ASS_UNPARSEABLE_EVENT'
+  // WebVTT: corrigíveis
+  | 'VTT_HEADER_MISSING'
+  | 'VTT_TIME_FORMAT'
+  | 'VTT_MISSING_BLANK_LINE'
+  | 'VTT_ARROW_IN_TEXT'
+  | 'VTT_EOL_MIXED'
+  // WebVTT: somente relato
+  | 'VTT_END_BEFORE_START'
+  | 'VTT_EMPTY_CUE'
+  | 'VTT_UNPARSEABLE_BLOCK'
   // Segmentação
   | 'SEG_MARKER_COLLISION'
 
@@ -55,6 +65,14 @@ export const FIX_POLICY: Readonly<Record<DiagnosticCode, FixPolicy>> = {
   ASS_END_BEFORE_START: 'report',
   ASS_FORMAT_MISSING: 'report',
   ASS_UNPARSEABLE_EVENT: 'report',
+  VTT_HEADER_MISSING: 'auto',
+  VTT_TIME_FORMAT: 'auto',
+  VTT_MISSING_BLANK_LINE: 'auto',
+  VTT_ARROW_IN_TEXT: 'auto',
+  VTT_EOL_MIXED: 'auto',
+  VTT_END_BEFORE_START: 'report',
+  VTT_EMPTY_CUE: 'report',
+  VTT_UNPARSEABLE_BLOCK: 'report',
   SEG_MARKER_COLLISION: 'report'
 }
 
