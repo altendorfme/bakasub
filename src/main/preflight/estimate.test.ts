@@ -23,7 +23,11 @@ const doc = srtFormat.parse(
       `${i + 1}\n00:00:${String(i).padStart(2, '0')},000 --> 00:00:${String(i).padStart(2, '0')},500\nSentence number ${i} is <i>here</i>.\n`
   ).join('\n')
 )
-const allMisses = (): DocumentLookup => ({ hits: new Map(), misses: computeContextHashes(doc) })
+const allMisses = (): DocumentLookup => ({
+  hits: new Map(),
+  misses: computeContextHashes(doc),
+  copies: new Map()
+})
 const base = {
   doc,
   preset: { glossary: [] as unknown[], prompt: '' },
@@ -34,7 +38,7 @@ const base = {
 describe('estimatePreflight', () => {
   it('tudo miss: linhas, chunks, tokens e custo exatos para GPT (faixa só dos retries)', () => {
     const e = estimatePreflight({ ...base, model: GPT, lookup: allMisses() })
-    expect(e.lines).toEqual({ total: 50, cached: 0, toTranslate: 50, chunks: 2 })
+    expect(e.lines).toEqual({ total: 50, cached: 0, toTranslate: 50, copies: 0, chunks: 2 })
     expect(e.approximate).toBe(false)
     expect(e.tokens.input.low).toBeGreaterThan(500)
     expect(e.tokens.input.high).toBe(Math.ceil(e.tokens.input.low * 1.15))
@@ -55,10 +59,31 @@ describe('estimatePreflight', () => {
     const hits = new Map(
       all.slice(0, 45).map((u) => [u.cueId, { translated: `PT ${u.unit.payload}`, unit: u }])
     )
-    const e = estimatePreflight({ ...base, model: GPT, lookup: { hits, misses: all.slice(45) } })
+    const e = estimatePreflight({
+      ...base,
+      model: GPT,
+      lookup: { hits, misses: all.slice(45), copies: new Map() }
+    })
     const full = estimatePreflight({ ...base, model: GPT, lookup: allMisses() })
-    expect(e.lines).toEqual({ total: 50, cached: 45, toTranslate: 5, chunks: 1 })
+    expect(e.lines).toEqual({ total: 50, cached: 45, toTranslate: 5, copies: 0, chunks: 1 })
     expect(e.tokens.input.low).toBeLessThan(full.tokens.input.low)
+  })
+
+  it('cópias contam no total mas não viram requisição nem token', () => {
+    const all = computeContextHashes(doc)
+    const copies = new Map([[all[0].cueId, all.slice(40)]])
+    const e = estimatePreflight({
+      ...base,
+      model: GPT,
+      lookup: { hits: new Map(), misses: all.slice(0, 40), copies }
+    })
+    const only40 = estimatePreflight({
+      ...base,
+      model: GPT,
+      lookup: { hits: new Map(), misses: all.slice(0, 40), copies: new Map() }
+    })
+    expect(e.lines).toEqual({ total: 50, cached: 0, toTranslate: 40, copies: 10, chunks: 1 })
+    expect(e.tokens).toEqual(only40.tokens)
   })
 
   it('tokenizer de outra família: aproximado, faixa ±20% além dos retries', () => {
@@ -96,7 +121,11 @@ describe('estimatePreflight', () => {
   it('nada a traduzir: zero', () => {
     const all = computeContextHashes(doc)
     const hits = new Map(all.map((u) => [u.cueId, { translated: u.unit.payload, unit: u }]))
-    const e = estimatePreflight({ ...base, model: GPT, lookup: { hits, misses: [] } })
+    const e = estimatePreflight({
+      ...base,
+      model: GPT,
+      lookup: { hits, misses: [], copies: new Map() }
+    })
     expect(e.lines.chunks).toBe(0)
     expect(e.tokens).toEqual({ input: { low: 0, high: 0 }, output: { low: 0, high: 0 } })
     expect(e.cost).toEqual({ low: 0, high: 0 })

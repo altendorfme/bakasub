@@ -12,7 +12,7 @@ probe → extract → preflight ──► decision
 
 ## How the estimate is computed (`estimate.ts`)
 
-It simulates the real requests with the **same production code**: Job Memory lookup in `peek` mode (does not touch `last_used_at`, so a cancelled preflight never keeps stale entries alive), `planLanes` over the misses with the same `llm.concurrency.perJob` (each lane simulated with only the cache and its own translations, as in the parallel run), `buildContext`, the real System Prompt (glossary included) and translate messages, and the strict JSON Schema when the model uses structured outputs. Translations not known yet are filled in the context with the source text (similar length). Deterministic.
+It simulates the real requests with the **same production code**: Job Memory lookup in `peek` mode (does not touch `last_used_at`, so a cancelled preflight never keeps stale entries alive), `planLanes` over the misses (representatives only: `lines.copies` counts the lines filled from another one with the same context hash, which cost no request or token) with the same `llm.concurrency.perJob` (each lane simulated with only the cache and its own translations, as in the parallel run), `buildContext`, the real System Prompt (glossary included) and translate messages, and the strict JSON Schema when the model uses structured outputs. Translations not known yet are filled in the context with the source text (similar length). Deterministic.
 
 - **Input tokens**: per chunk, `countMessageTokens([system, user])` (+4 per message, +3 reply priming) + the JSON Schema.
 - **Output tokens**: target payload tokens × 1.2 + 8 per line (JSON keys/quotes).

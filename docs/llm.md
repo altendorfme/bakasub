@@ -35,7 +35,7 @@ translateDocument
 
 ## Chunks and context
 
-- Only Job Memory **misses** are sent, in timeline order (`HashedUnit.timeIndex`: `start.ms`, file order on ties). Inside a lane chunks run **sequentially**, so each chunk sees the previous translations; lanes run in parallel (next section).
+- Only Job Memory **misses** are sent, one per context hash (copies are filled from their representative and stay out of `<context>`, see [`job-memory.md`](./job-memory.md)), in timeline order (`HashedUnit.timeIndex`: `start.ms`, file order on ties). Inside a lane chunks run **sequentially**, so each chunk sees the previous translations; lanes run in parallel (next section).
 - A chunk holds up to **40 lines or ~2,000 estimated tokens** of `<target>` (`token-estimate.ts`: ~4 chars/token, ~1 per CJK character; for limits only, the preflight uses a real tokenizer, see [`preflight.md`](./preflight.md)). A line larger than the budget goes alone.
 - `<context>`: the 5 translatable cues before the chunk (source **and** translation when known, from the cache or an earlier chunk) and 2 after (source only), as plain text without markers.
 - `max_tokens` ≈ 2.5 × the target estimate + JSON overhead, at least 256, capped by `top_provider.max_completion_tokens`.
@@ -89,7 +89,7 @@ Always parsed with the same two layers: tolerant extraction (code fences, prose 
 
 Every request first takes a slot from the shared `RateLimiter`; attempts, delays and rounds come from the `llm.retry.*` settings (read on every request). Details, defaults and the free-model quota: [`rate-limits.md`](./rate-limits.md).
 
-Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay in the original language and the job ends `completed-with-warnings`. If more than **10%** of the translatable lines fail validation the job stops right away with `LLM_TOO_MANY_FAILURES` (moderated lines do not count). Everything accepted so far is already in the cache.
+Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay in the original language and the job ends `completed-with-warnings`. If more than **10%** of the distinct translatable lines (distinct context hashes) fail validation the job stops right away with `LLM_TOO_MANY_FAILURES` (moderated lines do not count; a failed representative fails its copies too but counts once). Everything accepted so far is already in the cache.
 
 ## Streaming, cancellation and cost
 

@@ -66,6 +66,22 @@ describe('JobMemoryService', () => {
     expect(second.hits.get(1)?.translated).toBe('Hello <g1>world</g1> beautiful today')
   })
 
+  it('misses com o mesmo context hash: um representante e as cópias agrupadas', async () => {
+    const sign = 'The village chief is watching us.'
+    const d = srtFormat.parse(
+      [sign, 'Fine, then.', sign, sign]
+        .map((t, i) => `${i + 1}\n00:00:0${i},000 --> 00:00:0${i},500\n${t}\n`)
+        .join('\n')
+    )
+    const r = await svc.lookupDocument(d, ctx())
+    const ids = (us: readonly { cueId: number }[]): number[] => us.map((u) => u.cueId)
+    expect(r.misses).toHaveLength(2)
+    const [rep] = r.misses
+    expect(rep.unit.payload).toBe(sign)
+    expect(ids(r.copies.get(rep.cueId)!)).toHaveLength(2)
+    expect(r.copies.size).toBe(1)
+  })
+
   it('escritas simultâneas (lanes, jobs) vão em fila: sem SQLITE_BUSY', async () => {
     // Transações do libsql pegam conexões distintas do pool; sem a fila, a 2ª dá database locked.
     const c = ctx()

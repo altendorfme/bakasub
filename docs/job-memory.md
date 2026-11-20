@@ -4,7 +4,7 @@ Continuous translation cache in SQLite. Reprocessing a file (or another release 
 
 ```
 doc ──► computeContextHashes ──► HashedUnit[] (cueId, hash, unit = payload + skeleton)
-     ──► JobMemoryService.lookupDocument ──► hits (validated) + misses (→ LLM)
+     ──► JobMemoryService.lookupDocument ──► hits (validated) + misses (→ LLM) + copies
 LLM chunk validated ──► JobMemoryService.commitChunk ──► one transaction (upsertMany)
 settings ──► memory:stats / memory:prune
 ```
@@ -12,6 +12,8 @@ settings ──► memory:stats / memory:prune
 ## What is stored
 
 Payloads, not plain text: `source_text` is the source payload and `translated_text` the translated payload, both with the segmentation markers (`<gN>…</gN>`, `<xN/>`, `<br/>`, see [`parsing.md`](./parsing.md)). Reinjection needs the markers. Only marker ids/order are in the payload, never the tags' `raw`, so `{\an8}` vs `{\an2}` (or a different edge tag) share the same entry.
+
+**Copies.** Misses that share a `context_hash` would hit the same cache row, so `lookupDocument` keeps only the first one (document order) in `misses` and groups the rest under `copies` (keyed by the representative's `cueId`). Only representatives go to the LLM; the accepted translation is validated against each copy's own skeleton and reapplied there, and only the representative is written (same row). Typical case: motion-tracked signs typeset frame by frame (a single "Episode 1" title card can be 100+ events with different `\pos`/`\fscx` and identical payload). Short lines (≤ 3 words) only group when the previous line also matches, so contextual short lines ("What?" in different scenes) stay separate.
 
 **Every hit is validated** with `validateTranslation` against the current cue's skeleton (and `source_text` must equal the current payload). A corrupt or incompatible entry is a miss: the cue goes to the LLM and the upsert overwrites the entry.
 

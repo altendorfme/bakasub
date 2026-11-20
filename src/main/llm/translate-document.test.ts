@@ -401,6 +401,41 @@ describe('translateDocument', () => {
     expect(d.calls).toHaveLength(3) // o primeiro chunk já estoura o limite
   })
 
+  it('cópias (mesmo context hash): uma só vai ao LLM e a tradução vale para todas', async () => {
+    const sign = 'The village <i>chief</i> is watching us.'
+    const doc = srt(sign, sign, 'Fine, then.', sign, sign)
+    const d = deps(echo)
+    const r = await translateDocument(input(doc), d)
+    expect(r.status).toBe('completed')
+    expect(d.calls).toHaveLength(1)
+    expect([...targetLines(d.calls[0]).values()]).toEqual([
+      'The village <g1>chief</g1> is watching us.',
+      'Fine, then.'
+    ])
+    const out = srtFormat.serialize(r.doc as never)
+    expect(out.match(/PT The village <i>chief<\/i> is watching us\./g)).toHaveLength(4)
+    expect(r.copies).toBe(3)
+    expect(r.cache).toEqual({ hits: 0, misses: 5 })
+    // As cópias não entram no <context> (repetiriam a mesma fala).
+    expect(d.calls[0].messages[1].content.match(/watching us/g)).toHaveLength(1)
+  })
+
+  it('cópias de uma fala que falhou contam uma vez no limite de 10%', async () => {
+    const bad = 'This sign line never validates at all.'
+    const lines = [
+      ...Array.from({ length: 30 }, () => bad),
+      ...Array.from({ length: 30 }, (_, i) => `Sentence number ${i} goes here.`)
+    ]
+    const d = deps((req) => {
+      const ids = [...targetLines(req)].filter(([, p]) => p !== bad)
+      return ok(JSON.stringify(Object.fromEntries(ids.map(([id, p]) => [id, tr(p)]))))
+    })
+    const r = await translateDocument(input(srt(...lines)), d)
+    expect(r.status).toBe('completed-with-warnings')
+    expect(r.failed).toHaveLength(30)
+    expect(new Set(r.failed.map((f) => f.cueId)).size).toBe(30)
+  })
+
   it('sequencial: o 2º chunk recebe no contexto as traduções do 1º; hits do cache também', async () => {
     const lines = Array.from({ length: 45 }, (_, i) => `Sentence number ${i} goes here.`)
     const d = deps(echo)
