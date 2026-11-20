@@ -299,7 +299,24 @@ export const common: LocaleShape<typeof en> = {
       tracks: 'Faixas',
       works: 'Obras',
       preset: 'Preset e contexto',
-      output: 'Saída'
+      output: 'Saída',
+      review: 'Revisar custo',
+      run: 'Tradução'
+    },
+    review: {
+      heading: 'Revise o custo antes de traduzir',
+      body: 'Nada vai para a IA antes da sua confirmação.',
+      lines_one: '{{n}} fala a traduzir',
+      lines_other: '{{n}} falas a traduzir',
+      noEstimate: 'Estimativa indisponível',
+      nothing: 'Tudo em cache',
+      dynamic: 'Preço dinâmico',
+      approx: 'aproximado (tokenizer estimado)',
+      quota: 'A cota diária do modelo grátis pode não bastar para todos os arquivos.',
+      pending_one:
+        '{{count}} arquivo ainda está sendo preparado; ele aparece aqui quando a estimativa ficar pronta.',
+      pending_other:
+        '{{count}} arquivos ainda estão sendo preparados; eles aparecem aqui quando as estimativas ficarem prontas.'
     },
     files: {
       heading: 'Escolha os arquivos',
@@ -343,7 +360,8 @@ export const common: LocaleShape<typeof en> = {
       include: 'Incluir',
       out_one: '{{count}} fica de fora',
       out_other: '{{count}} ficam de fora',
-      byYou: 'Deixado de fora por você'
+      byYou: 'Deixado de fora por você',
+      previousOutput: 'Parece uma tradução anterior (o original está no lote)'
     },
     tracks: {
       heading: 'Confira as faixas de legenda',
@@ -375,9 +393,18 @@ export const common: LocaleShape<typeof en> = {
     },
     preset: {
       heading: 'Como traduzir cada obra',
-      body: 'O padrão do lote vale para todas as obras. Personalize uma obra quando ela pedir outro preset, modelo, idioma ou notas.',
-      defaults: 'Padrão do lote',
-      defaultsHint: 'Usado pelas obras não personalizadas',
+      body: 'Cada obra tem o próprio preset, sugerido pelo TMDB. Modelo, idioma e notas seguem o padrão do lote, a menos que você personalize a obra.',
+      defaults: 'Modelo, idioma e notas do lote',
+      defaultsHint: 'Usados pelas obras não personalizadas',
+      modelLang: 'Modelo, idioma e notas',
+      suggested: {
+        anime: 'Sugerido: animação japonesa no TMDB',
+        movie: 'Sugerido: filme no TMDB',
+        series: 'Sugerido: série no TMDB',
+        documentary: 'Sugerido: documentário no TMDB'
+      },
+      useSuggestion: 'Voltar à sugestão ({{preset}})',
+      noSuggestion: 'Sem obra do TMDB: vale o preset padrão das configurações.',
       useDefaults: 'Usar o padrão do lote',
       customize: 'Personalizar esta obra',
       customized: 'Personalizada',
@@ -427,7 +454,23 @@ export const common: LocaleShape<typeof en> = {
       cancelAll: 'Cancelar todos',
       openQueue: 'Abrir na fila',
       another: 'Traduzir outros arquivos',
-      files: 'Arquivos'
+      files: 'Arquivos',
+      phase: {
+        review: 'Preparando os arquivos e estimando o custo…',
+        awaiting: 'Aguardando você confirmar o custo.',
+        run: 'Traduzindo…',
+        done: 'Lote concluído.'
+      },
+      count: {
+        estimating_one: '{{count}} em preparação',
+        estimating_other: '{{count}} em preparação',
+        awaiting_one: '{{count}} aguardando você',
+        awaiting_other: '{{count}} aguardando você',
+        translating_one: '{{count}} traduzindo',
+        translating_other: '{{count}} traduzindo',
+        failed_one: '{{count}} com falha ou cancelado',
+        failed_other: '{{count}} com falha ou cancelados'
+      }
     }
   },
   jobs: {
@@ -475,6 +518,7 @@ export const common: LocaleShape<typeof en> = {
     costIncomplete: 'Não foi possível determinar todo o custo das requisições interrompidas.',
     untranslated_one: '{{count}} fala ficou no idioma original',
     untranslated_other: '{{count}} falas ficaram no idioma original',
+    noExcerpt: 'Fala nº {{id}} (texto não registrado neste job)',
     warnings: 'Avisos',
     remove: 'Remover',
     kind: {

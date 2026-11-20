@@ -3,7 +3,7 @@ import type { BatchPlan, SubtitleTrackInfo } from '@shared/ipc-contract'
 import { languageName } from '@renderer/lib/languages'
 import type { BatchRow, RowEdit, RowProblem } from './batch-rows'
 import type { BatchFlavor, BatchOptions } from './batch-state'
-import type { Grouping } from './works'
+import type { Grouping, PresetSuggestions } from './works'
 
 /** What every step of the batch wizard reads and changes. */
 export interface BatchCtx {
@@ -14,6 +14,8 @@ export interface BatchCtx {
   /** The user changed the automatic grouping. */
   regrouped: boolean
   problems: (RowProblem | null)[]
+  /** Preset suggested by each work's TMDB details (see `suggestPreset`). */
+  suggestions: PresetSuggestions
   options: BatchOptions
   edit: (edits: Record<string, RowEdit>) => void
   setGrouping: (g: Grouping | null) => void

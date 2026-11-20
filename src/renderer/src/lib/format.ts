@@ -11,3 +11,10 @@ export const formatInt = (n: number, lang: string): string =>
 
 export const formatDate = (iso: string, lang: string): string =>
   new Intl.DateTimeFormat(lang, { dateStyle: 'medium' }).format(new Date(iso))
+
+/** `hh:mm:ss` position in the video (subtitle timestamps). */
+export function formatTimecode(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`
+}

@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@renderer/components/ui/button'
 import { useBatchPlans, useCreateBatch, useIdentifyAll } from '@renderer/data/batches'
+import { useMediaDetailsMany } from '@renderer/data/media'
+import { usePresets } from '@renderer/data/presets'
+import { suggestPreset } from '@renderer/lib/preset-suggestion'
 import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { StepBar } from '../step-bar'
 import { BatchBackdrop } from './batch-backdrop'
-import { BatchDetail } from './batch-detail'
+import { BatchRun } from './batch-detail'
 import { BatchOutputStep } from './batch-output-step'
 import type { BatchCtx } from './batch-ctx'
 import { applyEdits, seedRows } from './batch-rows'
@@ -28,7 +31,7 @@ import { FilesStep } from './files-step'
 import { SettingsStep } from './settings-step'
 import { TracksStep } from './tracks-step'
 import { WorksStep } from './works-step'
-import { rowsOf } from './works'
+import { rowsOf, type PresetSuggestions } from './works'
 
 const FLAVORS: readonly BatchFlavor[] = ['pipeline', 'translate']
 
@@ -59,11 +62,13 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
   // Rows only once every file is identified: the automatic grouping depends on it.
   const ids = identify.settled ? identify.data : null
   const idsKey = ids?.map((x) => x?.match?.id ?? x?.release.title ?? '').join('|')
+  const targetLangs = settings?.['translation.targetLangs']
+  const langsKey = targetLangs?.join(',')
   const seeded = useMemo(
-    () => (plan && ids ? seedRows(plan, ids) : null),
+    () => (plan && ids ? seedRows(plan, ids, targetLangs ?? []) : null),
     // `ids` is a new array every render; its content is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, idsKey]
+    [plan, idsKey, langsKey]
   )
   const rows = useMemo(
     () => (seeded ? applyEdits(seeded, state.edits) : null),
@@ -71,6 +76,14 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
   )
   const grouping = groupingOf(state, rows ?? [])
   const problems = rows ? rowProblems(grouping, rows) : []
+  const presets = usePresets().data ?? []
+  const details = useMediaDetailsMany(grouping.works.map((w) => w.ref))
+  const suggestions: PresetSuggestions = Object.fromEntries(
+    grouping.works.map((w, i) => {
+      const d = details[i]
+      return [w.id, d && w.ref && d.id === w.ref.id ? suggestPreset(d, presets) : null]
+    })
+  )
 
   const ctx: BatchCtx | null =
     plan && flavor && rows
@@ -81,6 +94,7 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
           grouping,
           regrouped: state.grouping !== null,
           problems,
+          suggestions,
           options: state.options,
           edit: (edits) => dispatch({ type: 'edit', edits }),
           setGrouping: (g) => dispatch({ type: 'grouping', grouping: g }),
@@ -113,7 +127,7 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
 
   const start = (): void => {
     if (!ctx) return
-    create.mutate(buildBatchRequest(ctx.plan, ctx.rows, grouping, state.options), {
+    create.mutate(buildBatchRequest(ctx.plan, ctx.rows, grouping, state.options, suggestions), {
       onSuccess: (b) => setBatchId(b.id),
       onError: (err) => toast.error(errorMessage(err))
     })
@@ -123,19 +137,18 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
   return (
     <div className="relative min-h-full">
       {!batchId ? <BatchBackdrop refs={backdropRefs} draw={state.draw} /> : null}
-      <div className="relative mx-auto grid max-w-6xl gap-5 px-6 py-7">
+      <div className="relative mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-5 px-6 py-7">
         <h1 className="text-xl font-semibold tracking-tight">{t('batch.title')}</h1>
 
         {batchId ? (
-          <section className="mx-auto w-full max-w-3xl rounded-xl border bg-card/92 p-5">
-            <BatchDetail
-              id={batchId}
-              onAnother={() => {
-                setBatchId(null)
-                dispatch({ type: 'reset' })
-              }}
-            />
-          </section>
+          <BatchRun
+            id={batchId}
+            steps={steps}
+            onAnother={() => {
+              setBatchId(null)
+              dispatch({ type: 'reset' })
+            }}
+          />
         ) : (
           <>
             <StepBar
@@ -146,9 +159,9 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
               reachable={reachable}
               onGo={go}
             />
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+            <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
               <section
-                className="grid min-w-0 gap-4 rounded-xl border bg-card/92 p-5"
+                className="grid grid-cols-[minmax(0,1fr)] min-w-0 gap-4 rounded-xl border bg-card/92 p-5"
                 aria-labelledby="batch-step"
               >
                 <h2 id="batch-step" className="text-base font-semibold">

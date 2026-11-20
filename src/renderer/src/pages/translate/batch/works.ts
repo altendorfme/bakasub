@@ -1,12 +1,13 @@
 import type { MediaRef } from '@shared/ipc-contract'
+import type { PresetSuggestion } from '@renderer/lib/preset-suggestion'
 import type { BatchRow } from './batch-rows'
 
 /**
- * A "work" (obra): the unit of context of a batch. Its files share the TMDB media and, when
- * customized, the preset, model, language and notes. Settings are never per file.
+ * A "work" (obra): the unit of context of a batch. Its files share the TMDB media and the
+ * preset (always per work: suggested from TMDB) and, when customized, the model, language and
+ * notes. Settings are never per file.
  */
 export interface WorkSettings {
-  presetId: string | null
   model: string | null
   targetLang: string | null
   notes: string
@@ -19,6 +20,8 @@ export interface Work {
   ref: MediaRef | null
   /** Send title, genres and synopses to the AI. */
   includeMedia: boolean
+  /** The user's pick; `null` = the suggestion (TMDB), else the default from Settings. */
+  presetId: string | null
   /** `null` = the batch defaults. */
   custom: WorkSettings | null
   /** Created by the user ("New work"), not by the automatic grouping. */
@@ -52,6 +55,7 @@ export function autoGroup(rows: readonly BatchRow[]): Grouping {
         name: r.title,
         ref: r.match,
         includeMedia: true,
+        presetId: null,
         custom: null,
         manual: false
       })
@@ -75,6 +79,7 @@ export function moveFile(g: Grouping, row: BatchRow, to: string | 'new'): Groupi
     name: row.title,
     ref: null,
     includeMedia: true,
+    presetId: null,
     custom: null,
     manual: true
   }
@@ -102,3 +107,10 @@ export const workOf = (g: Grouping, r: BatchRow): Work | undefined =>
 /** The settings a work runs with. */
 export const effectiveSettings = (w: Work, defaults: WorkSettings): WorkSettings =>
   w.custom ?? defaults
+
+/** Suggested preset per work id (`null`: no TMDB match or no details yet). */
+export type PresetSuggestions = Readonly<Record<string, PresetSuggestion | null | undefined>>
+
+/** The preset a work runs with; `null` = the default from Settings (resolved by the Main). */
+export const workPreset = (w: Work, suggestions: PresetSuggestions): string | null =>
+  w.presetId ?? suggestions[w.id]?.presetId ?? null

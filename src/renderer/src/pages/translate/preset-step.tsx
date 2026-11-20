@@ -26,66 +26,37 @@ export interface PresetChoice {
 
 /**
  * Preset (with its details), model (favorites only) and language, prefilled from the defaults.
- * Used by the single-file wizard and, per work, by the batch wizard.
+ * Used by the single-file wizard and by the batch wizard (whose preset is per work, so it
+ * passes `withPreset={false}` and shows a `PresetPicker` of its own).
  */
 export function PresetStep({
   value: state,
   onChange,
-  notesLabel
+  notesLabel,
+  withPreset = true
 }: {
-  value: PresetChoice
+  value: Omit<PresetChoice, 'presetId'> & { presetId?: string | null }
   onChange: (patch: Partial<PresetChoice>) => void
   notesLabel?: string
+  withPreset?: boolean
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const settings = useSettings().data
-  const presets = usePresets().data ?? []
   const catalog = useModels().data?.models ?? []
 
-  const presetId = state.presetId ?? settings?.['translation.defaultPresetId'] ?? ''
   const model = state.model ?? settings?.['translation.defaultModel'] ?? ''
   const lang = state.targetLang ?? settings?.['translation.defaultTargetLang'] ?? ''
-  const preset = presets.find((p) => p.id === presetId)
   const favorites = settings?.['models.favorites'] ?? []
   const nameOf = (id: string): string => catalog.find((m) => m.id === id)?.name ?? id
 
   return (
     <div className="grid gap-4">
-      <div className="grid gap-2">
-        <Field label={t('translate.preset.preset')} help={t('help.preset')}>
-          <Select value={presetId} onValueChange={(v) => onChange({ presetId: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {presets.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {presetLabel(p, t)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        {preset ? (
-          <dl className="grid gap-x-6 gap-y-1 rounded-md border bg-background/40 p-3 text-xs sm:grid-cols-[auto_1fr]">
-            <dt className="text-muted-foreground">{t('translate.preset.mediaType')}</dt>
-            <dd className="flex gap-2">
-              {mediaTypeLabel(preset.mediaType, t)}
-              {preset.builtin ? <Badge>{t('translate.preset.builtin')}</Badge> : null}
-            </dd>
-            <dt className="text-muted-foreground">{t('translate.preset.temperature')}</dt>
-            <dd>{preset.temperature}</dd>
-            <dt className="text-muted-foreground">{t('translate.preset.style')}</dt>
-            <dd className="line-clamp-3 whitespace-pre-line">{preset.prompt || '—'}</dd>
-            <dt className="sr-only">{t('translate.preset.noGlossary')}</dt>
-            <dd className="text-muted-foreground sm:col-span-2">
-              {preset.glossary.length
-                ? t('translate.preset.glossary', { count: preset.glossary.length })
-                : t('translate.preset.noGlossary')}
-            </dd>
-          </dl>
-        ) : null}
-      </div>
+      {withPreset ? (
+        <PresetPicker
+          value={state.presetId ?? null}
+          onChange={(presetId) => onChange({ presetId })}
+        />
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
@@ -143,6 +114,62 @@ export function PresetStep({
           onChange={(e) => onChange({ notes: e.target.value })}
         />
       </Field>
+    </div>
+  )
+}
+
+/** Preset select (names only) and the chosen preset's details. `null` = default from Settings. */
+export function PresetPicker({
+  value,
+  onChange,
+  hint,
+  label
+}: {
+  value: string | null
+  onChange: (presetId: string) => void
+  hint?: React.ReactNode
+  label?: string
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const settings = useSettings().data
+  const presets = usePresets().data ?? []
+  const presetId = value ?? settings?.['translation.defaultPresetId'] ?? ''
+  const preset = presets.find((p) => p.id === presetId)
+  return (
+    <div className="grid gap-2">
+      <Field label={label ?? t('translate.preset.preset')} help={t('help.preset')} hint={hint}>
+        <Select value={presetId} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {presets.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {presetLabel(p, t)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      {preset ? (
+        <dl className="grid gap-x-6 gap-y-1 rounded-md border bg-background/40 p-3 text-xs sm:grid-cols-[auto_1fr]">
+          <dt className="text-muted-foreground">{t('translate.preset.mediaType')}</dt>
+          <dd className="flex gap-2">
+            {mediaTypeLabel(preset.mediaType, t)}
+            {preset.builtin ? <Badge>{t('translate.preset.builtin')}</Badge> : null}
+          </dd>
+          <dt className="text-muted-foreground">{t('translate.preset.temperature')}</dt>
+          <dd>{preset.temperature}</dd>
+          <dt className="text-muted-foreground">{t('translate.preset.style')}</dt>
+          <dd className="line-clamp-3 whitespace-pre-line">{preset.prompt || '—'}</dd>
+          <dt className="sr-only">{t('translate.preset.noGlossary')}</dt>
+          <dd className="text-muted-foreground sm:col-span-2">
+            {preset.glossary.length
+              ? t('translate.preset.glossary', { count: preset.glossary.length })
+              : t('translate.preset.noGlossary')}
+          </dd>
+        </dl>
+      ) : null}
     </div>
   )
 }

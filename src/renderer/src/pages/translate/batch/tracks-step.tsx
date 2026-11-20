@@ -59,7 +59,7 @@ export function TracksStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
                 </SelectContent>
               </Select>
             </label>
-            <ul className="grid gap-1.5">
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
               {idx.map((i) => (
                 <li key={i} className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="min-w-0 flex-1 truncate" title={ctx.rows[i].item.relPath}>

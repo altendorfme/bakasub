@@ -48,7 +48,10 @@ function WorkCard({ ctx, work: w }: { ctx: BatchCtx; work: Work }): React.JSX.El
   const details = useMediaLookup(w.ref, null).data?.details
   const others = g.works.filter((x) => x.id !== w.id)
   return (
-    <article aria-label={w.name} className="grid gap-3 rounded-lg border bg-background/30 p-4">
+    <article
+      aria-label={w.name}
+      className="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border bg-background/30 p-4"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Input
           aria-label={t('batch.works.name')}
@@ -80,7 +83,7 @@ function WorkCard({ ctx, work: w }: { ctx: BatchCtx; work: Work }): React.JSX.El
         ) : null}
       </div>
 
-      <div className="grid gap-1.5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
         <span className="text-xs text-muted-foreground">{t('batch.works.tmdb')}</span>
         <TitleSearch
           value={details?.title ?? w.name}
@@ -103,7 +106,7 @@ function WorkCard({ ctx, work: w }: { ctx: BatchCtx; work: Work }): React.JSX.El
         ) : null}
       </div>
 
-      <ul className="grid gap-1.5 border-t pt-3">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5 border-t pt-3">
         {idx.map((i) => {
           const r = ctx.rows[i]
           return (

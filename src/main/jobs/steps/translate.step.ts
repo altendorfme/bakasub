@@ -1,5 +1,8 @@
 import { join } from 'node:path'
+import type { FailedLine } from '../../../shared/ipc-contract'
+import type { LineFailure } from '../../llm/chunk-translator'
 import { TranslationCancelled } from '../../llm/translate-document'
+import { analyzeCoverage, type SubtitleDocument } from '../../parsers'
 import { fileArtifact } from '../artifacts'
 import type { Step } from '../step-context'
 import { writeSubtitle } from './subtitle-io'
@@ -48,8 +51,29 @@ export const translateStep: Step = async (ctx) => {
   if (fixes.length) ctx.warn(`auto-fixed: ${[...new Set(fixes)].join(', ')}`)
   ctx.artifacts.translate = {
     file: { ...(await fileArtifact(out)), format: id },
-    failedLines: result.failed.map((f) => ({ cueId: f.cueId, reason: f.reason })),
+    failedLines: describeFailures(doc, result.failed),
     usage: result.usage,
     cache: result.cache
   }
+}
+
+/** Falhas com o trecho e o tempo da fala de origem, para a UI mostrar o que ficou sem tradução. */
+export function describeFailures(
+  doc: SubtitleDocument<unknown>,
+  failed: readonly LineFailure[]
+): FailedLine[] {
+  if (!failed.length) return []
+  const entries = new Map(
+    analyzeCoverage(doc, { failures: failed, maxEntries: doc.items.length }).entries.flatMap((e) =>
+      e.ref.kind === 'cue' ? [[e.ref.cueId, e] as const] : []
+    )
+  )
+  return failed.map((f) => {
+    const e = entries.get(f.cueId)
+    return {
+      cueId: f.cueId,
+      reason: f.reason,
+      ...(e ? { excerpt: e.excerpt, location: { ...e.location } } : {})
+    }
+  })
 }

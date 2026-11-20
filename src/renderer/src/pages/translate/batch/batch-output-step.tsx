@@ -5,7 +5,7 @@ import { OutputStep } from '../output-step'
 import type { BatchCtx } from './batch-ctx'
 import { Issues, KindBadge } from './batch-parts'
 import { defaultSettings } from './batch-state'
-import { effectiveSettings, rowsOf } from './works'
+import { effectiveSettings, rowsOf, workPreset } from './works'
 import { useSettingsLabels } from './use-settings-labels'
 
 /** Output folder and mux options (shared by the batch), the cost confirmation, then a review. */
@@ -29,7 +29,7 @@ export function BatchOutputStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
           ) : null
         }
       />
-      <div className="grid gap-1">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
         <label className="flex items-center gap-2.5 text-sm">
           <Checkbox
             checked={o.confirmBeforeTranslate}
@@ -42,12 +42,15 @@ export function BatchOutputStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
         ) : null}
       </div>
 
-      <section aria-labelledby="batch-review" className="grid gap-2 border-t pt-4">
+      <section
+        aria-labelledby="batch-review"
+        className="grid grid-cols-[minmax(0,1fr)] gap-2 border-t pt-4"
+      >
         <h3 id="batch-review" className="text-sm font-semibold">
           {t('batch.output.review')}
         </h3>
         <Issues ctx={ctx} />
-        <ul className="grid gap-1.5">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           {ctx.grouping.works.map((w) => {
             const idx = rowsOf(ctx.grouping, ctx.rows, w.id).filter((i) => ctx.rows[i].include)
             if (!idx.length) return null
@@ -61,7 +64,7 @@ export function BatchOutputStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
             return (
               <li
                 key={w.id}
-                className="grid gap-0.5 rounded-md border bg-background/30 px-3 py-2 text-sm"
+                className="grid grid-cols-[minmax(0,1fr)] gap-0.5 rounded-md border bg-background/30 px-3 py-2 text-sm"
               >
                 <span className="flex flex-wrap items-center gap-2 font-medium">
                   {w.name}
@@ -71,7 +74,7 @@ export function BatchOutputStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
                   {[
                     t('batch.works.files', { count: idx.length }),
                     eps.length ? `${eps[0]}–${eps[eps.length - 1]}` : null,
-                    label.preset(s.presetId),
+                    label.preset(workPreset(w, ctx.suggestions)),
                     label.model(s.model),
                     label.lang(s.targetLang)
                   ]

@@ -330,7 +330,14 @@ describe('JobRunner', () => {
     })
     const r = await runner().run({ spec: pipeline(), artifacts: {}, workDir }, hooks())
     expect(r.status).toBe('completed-with-warnings')
-    expect(r.result.failedLines).toEqual([{ cueId: 1, reason: 'UNTRANSLATED_VALIDATION_FAILED' }])
+    expect(r.result.failedLines).toEqual([
+      {
+        cueId: 1,
+        reason: 'UNTRANSLATED_VALIDATION_FAILED',
+        excerpt: 'Hello there',
+        location: { line: 6, endLine: 6, startMs: 1000, endMs: 2000 }
+      }
+    ])
   })
 
   it('cancelamento na tradução: StepFailure com o uso já gasto', async () => {

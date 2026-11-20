@@ -102,8 +102,10 @@ export function useJobEvents(qc: QueryClient): void {
         const known = applyJobProgress(qc, e)
         if (before && before.status !== e.status) notifyJob(before, e.status)
         const terminal = !['queued', 'running', 'awaiting-confirmation'].includes(e.status)
+        // Awaiting confirmation: `result.preflight` (the estimate) is new and not in the event.
+        const estimated = e.status === 'awaiting-confirmation' && before?.status !== e.status
         if (!known) void qc.invalidateQueries({ queryKey: qk.jobs.list() })
-        else if (terminal) void qc.invalidateQueries({ queryKey: qk.jobs.all })
+        else if (terminal || estimated) void qc.invalidateQueries({ queryKey: qk.jobs.all })
       }),
     [qc]
   )

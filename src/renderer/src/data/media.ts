@@ -1,6 +1,7 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type {
   MediaContextLookup,
+  MediaDetails,
   MediaIdentification,
   MediaProbe,
   MediaRef,
@@ -65,3 +66,18 @@ export const useMediaLookup = (
     // Keep the details on screen while another episode loads.
     placeholderData: (prev) => (prev && ref && prev.details.id === ref.id ? prev : undefined)
   })
+
+/** Details of several titles at once (same cache as `useMediaLookup` without an episode). */
+export function useMediaDetailsMany(
+  refs: readonly (MediaRef | null)[]
+): (MediaDetails | undefined)[] {
+  return useQueries({
+    queries: refs.map((ref) => ({
+      queryKey: qk.media.lookup(ref?.kind ?? '', ref?.id ?? 0, 0, 0),
+      queryFn: () => unwrap(window.api.media.lookup(ref!, undefined)),
+      enabled: ref !== null,
+      staleTime: Infinity
+    })),
+    combine: (res) => res.map((r) => (r.data as MediaContextLookup | undefined)?.details)
+  })
+}

@@ -3,6 +3,7 @@ import type { BatchPlan, MediaIdentification, SubtitleTrackInfo } from '@shared/
 import {
   applyEdits,
   majorityTrack,
+  previousOutputs,
   seedRows,
   trackChoices,
   trackEdits,
@@ -174,18 +175,25 @@ describe('batch wizard state', () => {
     expect(batchCanGo(s, batchSteps('pipeline'), 'works', () => true)).toBe(false)
   })
 
-  it('request: works become groups; customized ones carry their settings; series episodes', () => {
+  it('request: works become groups with their preset; customized ones carry their settings; series episodes', () => {
     const rows = applyEdits(seedRows(plan, ids), { '/a/s02.mkv': { trackId: 4 } })
     let g = autoGroup(rows)
     g = patchWork(g, 'tmdb:9', {
-      custom: { presetId: 'p2', model: 'x/y', targetLang: 'es', notes: ' movie notes ' }
+      presetId: 'p2',
+      custom: { model: 'x/y', targetLang: 'es', notes: ' movie notes ' }
     })
     g = patchWork(g, 'tmdb:7', { includeMedia: true })
-    const req = buildBatchRequest(plan, rows, g, {
-      ...initialBatchWizard.options,
-      presetId: 'p1',
-      notes: 'batch'
-    })
+    // The series follows its TMDB suggestion; the movie's own pick wins over its suggestion.
+    const req = buildBatchRequest(
+      plan,
+      rows,
+      g,
+      { ...initialBatchWizard.options, notes: 'batch' },
+      {
+        'tmdb:7': { presetId: 'builtin:anime', flavor: 'anime' },
+        'tmdb:9': { presetId: 'builtin:movie', flavor: 'movie' }
+      }
+    )
     expect(req).toEqual({
       kind: 'pipeline',
       root: '/a',
@@ -195,7 +203,11 @@ describe('batch wizard state', () => {
         { path: '/a/movie.mkv', trackIds: [2], group: 1 }
       ],
       groups: [
-        { name: 'TMDB Show', media: { provider: 'tmdb', id: 7, kind: 'series' } },
+        {
+          name: 'TMDB Show',
+          media: { provider: 'tmdb', id: 7, kind: 'series' },
+          presetId: 'builtin:anime'
+        },
         {
           name: 'TMDB Movie',
           media: { provider: 'tmdb', id: 9, kind: 'movie' },
@@ -205,7 +217,6 @@ describe('batch wizard state', () => {
           notes: 'movie notes'
         }
       ],
-      presetId: 'p1',
       notes: 'batch',
       options: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
       confirmBeforeTranslate: true
@@ -220,5 +231,42 @@ describe('batch wizard state', () => {
     expect(off.groups?.[0]).toEqual({ name: 'TMDB Show' })
     expect(off.items[0]).toEqual({ path: '/a/s01.mkv', trackIds: [2], group: 0 })
     expect(groupingOf({ ...initialBatchWizard, grouping: g }, rows)).toBe(g)
+  })
+})
+
+describe('outputs of an earlier translation', () => {
+  it('a target-language suffix next to its source', () => {
+    const paths = [
+      '/d/[hchcsen] Gurren Lagann S01E01 v2 [BD Remux].mkv',
+      '/d/[hchcsen] Gurren Lagann S01E01 v2 [BD Remux].pt-BR.mkv',
+      '/d/Avatar (2026) [Remux-2160p]-FraMeSToR.pt-BR.mkv',
+      '/d/ep01.en.ass',
+      '/d/ep01.pt-BR.ass',
+      '/d/Movie.2016.mkv',
+      '/d/other/Movie.2016.pt-BR.mkv'
+    ]
+    expect([...previousOutputs(paths, ['pt-BR', 'es'])]).toEqual([
+      '/d/[hchcsen] Gurren Lagann S01E01 v2 [BD Remux].pt-BR.mkv',
+      // A subtitle source keeps its own suffix (`ep01.en` → `ep01.pt-BR`).
+      '/d/ep01.pt-BR.ass'
+    ])
+    // Not a target language: a source subtitle, not an output.
+    expect(previousOutputs(paths, ['es']).size).toBe(0)
+  })
+
+  it('start excluded, and can be included back', () => {
+    const p: BatchPlan = {
+      ...plan,
+      items: [
+        plan.items[0],
+        { ...plan.items[0], path: '/a/s01.pt-BR.mkv', relPath: 's01.pt-BR.mkv' }
+      ]
+    }
+    const rows = seedRows(p, [ids[0], ids[0]], ['pt-BR'])
+    expect(rows.map((r) => [r.include, r.previousOutput])).toEqual([
+      [true, false],
+      [false, true]
+    ])
+    expect(applyEdits(rows, { '/a/s01.pt-BR.mkv': { include: true } })[1].include).toBe(true)
   })
 })

@@ -95,6 +95,17 @@ export class TmdbClient {
     const genres = Array.isArray(b.genres)
       ? (b.genres as Json[]).map((g) => str(g.name)).filter((g): g is string => !!g)
       : []
+    const genreIds = Array.isArray(b.genres)
+      ? (b.genres as Json[]).map((g) => g.id).filter((n): n is number => typeof n === 'number')
+      : []
+    const originalLanguage = str(b.original_language)
+    const countries = (
+      Array.isArray(b.origin_country)
+        ? (b.origin_country as unknown[])
+        : Array.isArray(b.production_countries)
+          ? (b.production_countries as Json[]).map((c) => c.iso_3166_1)
+          : []
+    ).filter((c): c is string => typeof c === 'string' && c.length > 0)
     const poster = artworkUrl('w342', b.poster_path as string | null)
     const backdrop = artworkUrl('w1280', b.backdrop_path as string | null)
     return {
@@ -105,6 +116,9 @@ export class TmdbClient {
       ...(original && original !== title ? { originalTitle: original } : {}),
       ...(year ? { year } : {}),
       genres,
+      genreIds,
+      ...(originalLanguage ? { originalLanguage } : {}),
+      ...(countries.length ? { originCountries: countries } : {}),
       ...(runtime ? { runtime } : {}),
       synopsis: str(b.overview) ?? '',
       ...(poster ? { posterUrl: poster } : {}),

@@ -144,9 +144,9 @@ export function FilesStep({
         <p className="text-sm text-warning">{t('batch.files.truncated')}</p>
       ) : null}
       {plan?.rejected.length ? (
-        <div className="grid gap-1 text-sm text-warning">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1 text-sm text-warning">
           <p>{t('batch.files.rejected', { count: plan.rejected.length })}</p>
-          <ul className="grid gap-0.5 text-xs">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5 text-xs">
             {plan.rejected.map((r) => (
               <li key={r.path} className="break-all">
                 {r.path} ({r.reason})

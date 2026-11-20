@@ -19,7 +19,7 @@ Deterministic, no library: `Title.S01E05`, `Title.1x05`, `Title.2024`, `Title (2
 
 - Credential: a 32-hex **API Key** goes in `api_key=`; anything else is treated as the **API Read Access Token** (`Authorization: Bearer`). Validated with `GET /3/configuration` before it is saved (`settings:set-tmdb-key`); stored in the vault as `tmdb.credential` and registered in the log redactor.
 - Requests: `language=en-US` always (the prompt is English), 10 s timeout. `401` → `TMDB_AUTH`, `404` → `null`, no key → `TMDB_KEY_MISSING`, anything else → `NETWORK`.
-- `search` (`/search/multi`, movies and TV only, `include_adult=false`), `details` (`/movie/{id}` or `/tv/{id}`: genres, runtime or typical episode runtime, overview), `episode` (`/tv/{id}/season/{s}/episode/{e}`).
+- `search` (`/search/multi`, movies and TV only, `include_adult=false`), `details` (`/movie/{id}` or `/tv/{id}`: genres (names and ids), original language, origin countries (`origin_country` for TV, `production_countries` for movies), runtime or typical episode runtime, overview; the renderer uses genre id + language/country to suggest a preset per batch work), `episode` (`/tv/{id}/season/{s}/episode/{e}`).
 
 ## Cache (`cached-provider.ts`, table `media_cache`)
 

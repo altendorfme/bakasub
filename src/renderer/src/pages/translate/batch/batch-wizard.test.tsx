@@ -112,7 +112,21 @@ const batchJob = (id: string, source: string, status: Job['status']): Job => ({
   step: 'preflight',
   source,
   progress: { step: 'preflight' },
-  result: null,
+  result:
+    status === 'awaiting-confirmation'
+      ? {
+          outputs: [],
+          warnings: [],
+          preflight: {
+            model: { id: 'm', pricing: { prompt: 1e-6, completion: 1e-6 }, catalogFetchedAt: null },
+            approximate: false,
+            lines: { total: 300, cached: 0, toTranslate: 300, chunks: 3 },
+            tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
+            cost: { low: 0.03, high: 0.04 },
+            decision: 'needs-confirmation'
+          }
+        }
+      : null,
   error: null,
   attempt: 1,
   createdAt: '2026-11-20T10:00:00.000Z',
@@ -160,6 +174,9 @@ function setup(): {
             kind: ref.kind,
             title: ref.id === 7 ? 'The Show' : 'The Movie',
             genres: ['Animation'],
+            genreIds: [16],
+            // The show is Japanese animation (→ Anime preset); the movie is not (→ Movie).
+            originalLanguage: ref.id === 7 ? 'ja' : 'en',
             synopsis: 'Synopsis.'
           },
           episode: null
@@ -181,7 +198,14 @@ function setup(): {
       apiKeyStatus: () => ok({ present: true, protection: 'os' as const }),
       get: () => ok(onboardedSettings)
     },
-    presets: { list: () => ok([preset]) },
+    presets: {
+      list: () =>
+        ok([
+          preset,
+          { ...preset, id: 'builtin:anime', name: 'Anime', mediaType: 'anime' },
+          { ...preset, id: 'builtin:movie', name: 'Movie', mediaType: 'movie' }
+        ])
+    },
     models: {
       list: () =>
         ok({
@@ -251,9 +275,16 @@ describe('Translate several files', () => {
     await next()
 
     expect(await screen.findByRole('heading', { name: 'How to translate each work' })).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: /^The Movie/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'Customize this work' }))
-    await userEvent.type(screen.getByLabelText('Notes for this work (optional)'), 'Body swap')
+    // One preset per work, suggested from TMDB; there is no batch-wide preset.
+    const showCard = screen.getByRole('button', { name: /^The Show/ }).closest('article')!
+    const movieCard = screen.getByRole('button', { name: /^The Movie/ }).closest('article')!
+    expect(await within(showCard).findByText('Suggested: Japanese animation on TMDB')).toBeTruthy()
+    expect(within(movieCard).getByText('Suggested: a movie on TMDB')).toBeTruthy()
+    await userEvent.click(within(movieCard).getByRole('button', { name: 'Customize this work' }))
+    await userEvent.type(
+      within(movieCard).getByLabelText('Notes for this work (optional)'),
+      'Body swap'
+    )
     await next()
 
     expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
@@ -267,14 +298,30 @@ describe('Translate several files', () => {
         { path: '/anime/Movie.2016.mkv', trackIds: [3], group: 1 }
       ],
       groups: [
-        { name: 'The Show', media: { provider: 'tmdb', id: 7, kind: 'series' } },
-        { name: 'The Movie', media: { provider: 'tmdb', id: 9, kind: 'movie' }, notes: 'Body swap' }
+        {
+          name: 'The Show',
+          media: { provider: 'tmdb', id: 7, kind: 'series' },
+          presetId: 'builtin:anime'
+        },
+        {
+          name: 'The Movie',
+          media: { provider: 'tmdb', id: 9, kind: 'movie' },
+          presetId: 'builtin:movie',
+          notes: 'Body swap'
+        }
       ],
       options: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
       confirmBeforeTranslate: true
     })
 
-    expect(await screen.findByText('3 files are waiting for your confirmation.')).toBeTruthy()
+    expect(await screen.findByText(/^3 files are waiting for your confirmation\./)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Review the cost before translating' })).toBeTruthy()
+    // Each file's estimate, then the total.
+    expect(screen.getAllByText('US$ 0.030 – 0.040')).toHaveLength(3)
+    expect(screen.getAllByText(/^300 lines to translate/)).toHaveLength(3)
+    expect(screen.getByRole('button', { name: /Review cost/ }).getAttribute('aria-current')).toBe(
+      'step'
+    )
     expect(screen.getByText('Estimated total: US$ 0.100 – 0.120')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Confirm all' }))
     expect(confirm).toHaveBeenCalledWith('b1')

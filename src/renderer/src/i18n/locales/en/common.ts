@@ -293,7 +293,24 @@ export const common = {
       tracks: 'Tracks',
       works: 'Works',
       preset: 'Preset & context',
-      output: 'Output'
+      output: 'Output',
+      review: 'Review cost',
+      run: 'Translation'
+    },
+    review: {
+      heading: 'Review the cost before translating',
+      body: 'Nothing goes to the AI until you confirm.',
+      lines_one: '{{n}} line to translate',
+      lines_other: '{{n}} lines to translate',
+      noEstimate: 'Estimate not available',
+      nothing: 'All cached',
+      dynamic: 'Dynamic price',
+      approx: 'approximate (estimated tokenizer)',
+      quota: "The free model's daily quota may not be enough for every file.",
+      pending_one:
+        '{{count}} file is still being prepared; it shows up here when its estimate is ready.',
+      pending_other:
+        '{{count}} files are still being prepared; they show up here when their estimates are ready.'
     },
     files: {
       heading: 'Choose the files',
@@ -337,7 +354,8 @@ export const common = {
       include: 'Include',
       out_one: '{{count}} left out',
       out_other: '{{count}} left out',
-      byYou: 'Left out by you'
+      byYou: 'Left out by you',
+      previousOutput: 'Looks like an earlier translation (the source is in the batch)'
     },
     tracks: {
       heading: 'Check the subtitle tracks',
@@ -369,9 +387,18 @@ export const common = {
     },
     preset: {
       heading: 'How to translate each work',
-      body: 'The batch defaults apply to every work. Customize a work when it needs another preset, model, language or notes.',
-      defaults: 'Batch defaults',
+      body: 'Each work has its own preset, suggested from TMDB. Model, language and notes follow the batch defaults unless you customize the work.',
+      defaults: 'Batch model, language and notes',
       defaultsHint: 'Used by the works that are not customized',
+      modelLang: 'Model, language and notes',
+      suggested: {
+        anime: 'Suggested: Japanese animation on TMDB',
+        movie: 'Suggested: a movie on TMDB',
+        series: 'Suggested: a series on TMDB',
+        documentary: 'Suggested: a documentary on TMDB'
+      },
+      useSuggestion: 'Back to the suggestion ({{preset}})',
+      noSuggestion: 'No TMDB work: the default preset from Settings applies.',
       useDefaults: 'Use the batch defaults',
       customize: 'Customize this work',
       customized: 'Customized',
@@ -421,7 +448,23 @@ export const common = {
       cancelAll: 'Cancel all',
       openQueue: 'Open in the queue',
       another: 'Translate other files',
-      files: 'Files'
+      files: 'Files',
+      phase: {
+        review: 'Preparing the files and estimating the cost…',
+        awaiting: 'Waiting for you to confirm the cost.',
+        run: 'Translating…',
+        done: 'Batch finished.'
+      },
+      count: {
+        estimating_one: '{{count}} being prepared',
+        estimating_other: '{{count}} being prepared',
+        awaiting_one: '{{count}} waiting for you',
+        awaiting_other: '{{count}} waiting for you',
+        translating_one: '{{count}} translating',
+        translating_other: '{{count}} translating',
+        failed_one: '{{count}} failed or cancelled',
+        failed_other: '{{count}} failed or cancelled'
+      }
     }
   },
   jobs: {
@@ -469,6 +512,7 @@ export const common = {
     costIncomplete: 'Cost of interrupted requests could not be fully determined.',
     untranslated_one: '{{count}} line stayed in the original language',
     untranslated_other: '{{count}} lines stayed in the original language',
+    noExcerpt: 'Line #{{id}} (text not recorded for this job)',
     warnings: 'Warnings',
     remove: 'Remove',
     kind: {

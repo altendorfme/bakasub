@@ -3,12 +3,7 @@ import { AlertTriangle, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CoverageReport } from '@shared/ipc-contract'
 import { Button } from '@renderer/components/ui/button'
-
-const time = (ms: number): string => {
-  const s = Math.floor(ms / 1000)
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`
-}
+import { formatTimecode as time } from '@renderer/lib/format'
 
 /**
  * What will not go to the AI: `untranslated` lines are listed (the user should look at them);

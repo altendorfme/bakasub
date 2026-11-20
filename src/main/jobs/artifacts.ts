@@ -20,7 +20,7 @@ export interface Artifacts {
   }
   translate?: {
     file: FileArtifact & { format: SubtitleTextFormat }
-    failedLines: { cueId: number; reason: string }[]
+    failedLines: import('../../shared/ipc-contract').FailedLine[]
     usage: NonNullable<import('../../shared/ipc-contract').JobResult['usage']>
     cache: { hits: number; misses: number }
   }

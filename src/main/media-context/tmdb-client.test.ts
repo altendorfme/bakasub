@@ -107,7 +107,12 @@ describe('details', () => {
           original_title: 'Dune: Part Two',
           release_date: '2024-02-27',
           runtime: 167,
-          genres: [{ name: 'Science Fiction' }, { name: 'Adventure' }],
+          genres: [
+            { id: 878, name: 'Science Fiction' },
+            { id: 12, name: 'Adventure' }
+          ],
+          original_language: 'en',
+          production_countries: [{ iso_3166_1: 'US', name: 'United States of America' }],
           overview: 'Paul Atreides unites with Chani.',
           poster_path: '/a.jpg',
           backdrop_path: '/b.jpg'
@@ -121,6 +126,9 @@ describe('details', () => {
       title: 'Dune: Part Two',
       year: 2024,
       genres: ['Science Fiction', 'Adventure'],
+      genreIds: [878, 12],
+      originalLanguage: 'en',
+      originCountries: ['US'],
       runtime: 167,
       synopsis: 'Paul Atreides unites with Chani.',
       posterUrl: 'bakasub-media://tmdb/w342/a.jpg',
@@ -137,7 +145,9 @@ describe('details', () => {
           original_name: 'Sousou no Frieren',
           first_air_date: '2023-09-29',
           episode_run_time: [24],
-          genres: [{ name: 'Animation' }],
+          genres: [{ id: 16, name: 'Animation' }],
+          original_language: 'ja',
+          origin_country: ['JP'],
           overview: 'An elf mage.'
         }
       }
@@ -147,7 +157,10 @@ describe('details', () => {
       title: 'Frieren',
       originalTitle: 'Sousou no Frieren',
       year: 2023,
-      runtime: 24
+      runtime: 24,
+      genreIds: [16],
+      originalLanguage: 'ja',
+      originCountries: ['JP']
     })
     expect(await tmdb.details({ provider: 'tmdb', id: 1, kind: 'series' })).toBeNull()
   })

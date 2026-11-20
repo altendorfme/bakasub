@@ -144,18 +144,21 @@ export function Issues({
   return (
     <section
       aria-labelledby="batch-issues"
-      className="grid gap-3 rounded-lg border border-warning/40 bg-warning/5 p-3"
+      className="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border border-warning/40 bg-warning/5 p-3"
     >
       <h3 id="batch-issues" className="flex items-center gap-2 text-sm font-semibold text-warning">
         <AlertTriangle className="size-4" />
         {t('batch.issues.title', { count: list.length })}
       </h3>
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
         {list.map((i) => {
           const r = ctx.rows[i]
           const series = workOf(ctx.grouping, r)?.ref?.kind === 'series'
           return (
-            <li key={r.item.path} className="grid gap-2 rounded-md border bg-background/40 p-3">
+            <li
+              key={r.item.path}
+              className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border bg-background/40 p-3"
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="min-w-0 flex-1 text-sm break-all">{r.item.relPath}</span>
                 <Badge tone="warning">{t(`batch.problem.${ctx.problems[i]!}`)}</Badge>
@@ -196,14 +199,18 @@ export function LeftOut({ ctx }: { ctx: BatchCtx }): React.JSX.Element | null {
       <summary className="cursor-pointer text-muted-foreground">
         {t('batch.issues.out', { count: list.length })}
       </summary>
-      <ul className="mt-2 grid gap-1.5">
+      <ul className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-1.5">
         {list.map((i) => {
           const r = ctx.rows[i]
           return (
             <li key={r.item.path} className="flex flex-wrap items-center gap-2 text-xs">
               <span className="min-w-0 flex-1 break-all">{r.item.relPath}</span>
               <span className="text-muted-foreground" title={r.item.error}>
-                {r.item.skipped ? t(`batch.problem.${r.item.skipped}`) : t('batch.issues.byYou')}
+                {r.item.skipped
+                  ? t(`batch.problem.${r.item.skipped}`)
+                  : r.previousOutput
+                    ? t('batch.issues.previousOutput')
+                    : t('batch.issues.byYou')}
               </span>
               {!r.item.skipped ? (
                 <Button
@@ -245,7 +252,7 @@ export function Collapsible({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-3 p-3 text-left"
       >
-        <span className="grid min-w-0 flex-1 gap-0.5">
+        <span className="grid grid-cols-[minmax(0,1fr)] min-w-0 flex-1 gap-0.5">
           <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
             {title}
             {badge}
@@ -256,7 +263,9 @@ export function Collapsible({
         </span>
         <ChevronDown className={cn('size-4 shrink-0 transition-transform', open && 'rotate-180')} />
       </button>
-      {open ? <div className="grid gap-3 border-t p-3">{children}</div> : null}
+      {open ? (
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 border-t p-3">{children}</div>
+      ) : null}
     </article>
   )
 }

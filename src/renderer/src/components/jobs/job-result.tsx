@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, FileCheck2, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Job } from '@shared/ipc-contract'
-import { formatUsd } from '@renderer/lib/format'
+import type { FailedLine, Job } from '@shared/ipc-contract'
+import { formatTimecode, formatUsd } from '@renderer/lib/format'
 import { JobError } from './job-error'
 
 /** Terminal state: outputs, cost, untranslated lines and warnings, or the error. */
@@ -45,11 +45,7 @@ export function JobResult({ job }: { job: Job }): React.JSX.Element {
           {r.usage.costIncomplete ? ` · ${t('jobs.costIncomplete')}` : ''}
         </p>
       ) : null}
-      {r?.failedLines?.length ? (
-        <p className="text-sm text-warning">
-          {t('jobs.untranslated', { count: r.failedLines.length })}
-        </p>
-      ) : null}
+      {r?.failedLines?.length ? <FailedLines lines={r.failedLines} /> : null}
       {r?.warnings.length ? (
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer">{t('jobs.warnings')}</summary>
@@ -61,5 +57,41 @@ export function JobResult({ job }: { job: Job }): React.JSX.Element {
         </details>
       ) : null}
     </div>
+  )
+}
+
+/** Lines left in the original language: where they are, why, and the original text. */
+export function FailedLines({ lines }: { lines: readonly FailedLine[] }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <section className="grid gap-2" aria-label={t('jobs.untranslated', { count: lines.length })}>
+      <p className="flex items-center gap-1.5 text-sm text-warning">
+        <AlertTriangle className="size-4 shrink-0" />
+        {t('jobs.untranslated', { count: lines.length })}
+      </p>
+      <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-md border bg-background/40 p-1.5">
+        {lines.map((l) => (
+          <li
+            key={l.cueId}
+            className="grid min-w-0 gap-0.5 rounded px-2 py-1.5 text-xs odd:bg-muted/40"
+          >
+            <span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
+              {l.location ? <span>{t('coverage.line', { line: l.location.line })}</span> : null}
+              {l.location?.startMs !== undefined ? (
+                <span>{formatTimecode(l.location.startMs)}</span>
+              ) : null}
+              <span className="text-warning">{t(`coverage.reason.${l.reason}`)}</span>
+            </span>
+            {l.excerpt ? (
+              <code className="font-mono break-words whitespace-pre-wrap text-foreground/90">
+                {l.excerpt}
+              </code>
+            ) : (
+              <span className="text-muted-foreground">{t('jobs.noExcerpt', { id: l.cueId })}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

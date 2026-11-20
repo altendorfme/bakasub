@@ -5,6 +5,7 @@ import { cn } from '@renderer/lib/utils'
 import type { BatchCtx } from './batch-ctx'
 import type { BatchStep } from './batch-state'
 import { useSettingsLabels } from './use-settings-labels'
+import { rowsOf, workPreset } from './works'
 
 /** Same look as the single-file summary: one row per choice, linking to its step. */
 export function BatchSummary({
@@ -30,6 +31,16 @@ export function BatchSummary({
   const out = (ctx?.rows.length ?? 0) - included
   const attention = ctx?.rows.filter((r, i) => r.include && ctx.problems[i]).length ?? 0
   const customized = ctx?.grouping.works.filter((w) => w.custom).length ?? 0
+  // One preset per work: the distinct ones, in work order.
+  const presets = ctx
+    ? [
+        ...new Set(
+          ctx.grouping.works
+            .filter((w) => rowsOf(ctx.grouping, ctx.rows, w.id).some((i) => ctx.rows[i].include))
+            .map((w) => label.preset(workPreset(w, ctx.suggestions)))
+        )
+      ].join(', ')
+    : ''
 
   const rows: { step: BatchStep; label: string; value: string; warn?: string }[] = [
     {
@@ -65,14 +76,18 @@ export function BatchSummary({
     {
       step: 'preset',
       label: t('batch.summary.preset'),
+      value: presets || none
+    },
+    {
+      step: 'preset',
+      label: t('batch.summary.model'),
       value: customized
         ? t('batch.summary.customized', {
-            preset: label.preset(o?.presetId ?? null),
+            preset: label.model(o?.model ?? null),
             count: customized
           })
-        : label.preset(o?.presetId ?? null)
+        : label.model(o?.model ?? null)
     },
-    { step: 'preset', label: t('batch.summary.model'), value: label.model(o?.model ?? null) },
     {
       step: 'preset',
       label: t('batch.summary.language'),
@@ -88,12 +103,12 @@ export function BatchSummary({
   return (
     <aside
       aria-labelledby="batch-summary"
-      className="grid content-start gap-3 rounded-xl border bg-card/92 p-4 lg:sticky lg:top-6"
+      className="grid grid-cols-[minmax(0,1fr)] content-start gap-3 rounded-xl border bg-card/92 p-4 lg:sticky lg:top-6"
     >
       <h2 id="batch-summary" className="text-sm font-semibold">
         {t('batch.summary.title')}
       </h2>
-      <ul className="grid gap-1">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
         {rows
           .filter((r) => steps.includes(r.step))
           .map((r) => {

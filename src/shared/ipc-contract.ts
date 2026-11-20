@@ -183,6 +183,12 @@ export interface MediaSearchResult extends MediaRef {
 
 export interface MediaDetails extends MediaSearchResult {
   genres: string[]
+  /** Ids de gênero do TMDB (16 = Animation, 99 = Documentary): estáveis, ao contrário dos nomes. */
+  genreIds?: number[]
+  /** ISO 639-1 do TMDB (`ja`). */
+  originalLanguage?: string
+  /** ISO 3166-1 (`JP`); séries trazem `origin_country`, filmes `production_countries`. */
+  originCountries?: string[]
   /** Minutos (filme) ou duração típica do episódio (série). */
   runtime?: number
   synopsis: string
@@ -384,6 +390,18 @@ export interface JobProgress {
   waiting?: { reason: 'rate-limit' | 'cooldown' | 'backoff'; untilMs: number }
 }
 
+/**
+ * Fala que ficou no idioma original. `excerpt`/`location` vêm do documento de origem (mesmo
+ * formato de `CoverageEntry`); ausentes em jobs gravados antes de existirem.
+ */
+export interface FailedLine {
+  cueId: number
+  reason: 'UNTRANSLATED_VALIDATION_FAILED' | 'UNTRANSLATED_CONTENT_FILTERED'
+  /** ≤ 120 caracteres, controles visíveis. */
+  excerpt?: string
+  location?: { line: number; endLine: number; startMs?: number; endMs?: number }
+}
+
 export interface JobResult {
   outputs: string[]
   warnings: string[]
@@ -396,7 +414,7 @@ export interface JobResult {
     costIncomplete: boolean
   }
   cache?: { hits: number; misses: number }
-  failedLines?: { cueId: number; reason: string }[]
+  failedLines?: FailedLine[]
   /** Estimativa do preflight (a cobertura completa vem de `jobs:preflight`). */
   preflight?: PreflightEstimate
 }

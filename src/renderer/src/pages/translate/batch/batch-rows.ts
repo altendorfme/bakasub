@@ -19,16 +19,66 @@ export interface BatchRow {
   title: string
   season: number | null
   episode: number | null
+  /** Output of an earlier translation (`X.pt-BR.mkv` next to `X.mkv`): starts excluded. */
+  previousOutput: boolean
 }
 
 /** User changes, kept apart from the seed so a new identification never overwrites them. */
 export type RowEdit = Partial<Pick<BatchRow, 'include' | 'trackId' | 'season' | 'episode'>>
 
-/** Rows from the plan and the identifications (same order); skipped files start excluded. */
+/** Lower-case BCP-47 tag, or `null` when it is not one. */
+function canonical(tag: string): string | null {
+  try {
+    return Intl.getCanonicalLocales(tag)[0]?.toLowerCase() ?? null
+  } catch {
+    return null
+  }
+}
+
+/** `dir/name` without the extension, and the language suffix BakaSub writes (`.pt-BR`). */
+function split(path: string): { stem: string; lang: string | null; bare: string } {
+  const stem = path.replace(/\.[^./\\]+$/, '')
+  // Same rule as the Main's `langFromFilename`: a lower-case primary subtag after the last dot.
+  const m = /\.([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)$/.exec(stem)
+  return m
+    ? { stem, lang: canonical(m[1]), bare: stem.slice(0, -m[0].length) }
+    : { stem, lang: null, bare: stem }
+}
+
+/**
+ * Files that look like the output of an earlier translation: a suffix in one of the target
+ * languages, and the source (`X.mkv`, or `X.en.srt` for subtitles) in the same set of files.
+ */
+export function previousOutputs(
+  paths: readonly string[],
+  targetLangs: readonly string[]
+): Set<string> {
+  const targets = new Set(targetLangs.map(canonical).filter((x): x is string => x !== null))
+  const parts = paths.map(split)
+  const out = new Set<string>()
+  parts.forEach((p, i) => {
+    if (!p.lang || !targets.has(p.lang)) return
+    const source = parts.some(
+      (q, j) => j !== i && (q.stem === p.bare || q.bare === p.bare) && q.lang !== p.lang
+    )
+    if (source) out.add(paths[i])
+  })
+  return out
+}
+
+/**
+ * Rows from the plan and the identifications (same order); skipped files and outputs of an
+ * earlier translation start excluded.
+ */
 export function seedRows(
   plan: BatchPlan,
-  ids: readonly (MediaIdentification | undefined)[]
+  ids: readonly (MediaIdentification | undefined)[],
+  targetLangs: readonly string[] = []
 ): BatchRow[] {
+  const previous = previousOutputs(
+    plan.items.map((it) => it.path),
+    targetLangs
+  )
   return plan.items.map((item, i) => {
     const id = ids[i]
     const rel = id?.release
@@ -36,7 +86,8 @@ export function seedRows(
     const episode = rel?.episode ?? rel?.absoluteEpisode ?? null
     return {
       item,
-      include: !item.skipped,
+      include: !item.skipped && !previous.has(item.path),
+      previousOutput: previous.has(item.path),
       trackId: item.selected[0] ?? null,
       match: id?.match ? { provider: 'tmdb', id: id.match.id, kind: id.match.kind } : null,
       title: id?.match?.title ?? (rel?.title || baseName(item.path)),

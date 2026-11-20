@@ -19,7 +19,9 @@ import {
   effectiveSettings,
   rowsOf,
   workOf,
+  workPreset,
   type Grouping,
+  type PresetSuggestions,
   type WorkSettings
 } from './works'
 
@@ -62,7 +64,6 @@ export const initialBatchWizard: BatchWizardState = {
   edits: {},
   grouping: null,
   options: {
-    presetId: null,
     model: null,
     targetLang: null,
     notes: '',
@@ -114,7 +115,6 @@ export const groupingOf = (s: BatchWizardState, rows: readonly BatchRow[]): Grou
   s.grouping ?? autoGroup(rows)
 
 export const defaultSettings = (o: BatchOptions): WorkSettings => ({
-  presetId: o.presetId,
   model: o.model,
   targetLang: o.targetLang,
   notes: o.notes
@@ -202,23 +202,26 @@ const trimmed = (notes: string): string | undefined => notes.trim() || undefined
 
 /**
  * The `batches:create` request: included files in plan order, each pointing at its work.
- * Unset defaults are left to the Main (Settings); a customized work sends all its settings.
+ * Unset defaults are left to the Main (Settings); a customized work sends all its settings. The
+ * preset is always the work's (the user's pick or the TMDB suggestion).
  */
 export function buildBatchRequest(
   plan: BatchPlan,
   rows: readonly BatchRow[],
   g: Grouping,
-  o: BatchOptions
+  o: BatchOptions,
+  suggestions: PresetSuggestions = {}
 ): BatchCreateRequest {
   const included = rows.filter((r) => r.include)
   const used = g.works.filter((w) => included.some((r) => g.of[r.item.path] === w.id))
   const index = new Map(used.map((w, i) => [w.id, i]))
   const groups: BatchGroup[] = used.map((w) => {
     const s = w.custom ? effectiveSettings(w, defaultSettings(o)) : null
+    const presetId = workPreset(w, suggestions)
     return {
       name: w.name.trim() || undefined,
       ...(w.ref && w.includeMedia ? { media: w.ref } : {}),
-      ...(s?.presetId ? { presetId: s.presetId } : {}),
+      ...(presetId ? { presetId } : {}),
       ...(s?.model ? { model: s.model } : {}),
       ...(s?.targetLang ? { targetLang: s.targetLang } : {}),
       ...(s ? { notes: s.notes.trim() } : {})
@@ -242,7 +245,6 @@ export function buildBatchRequest(
       }
     }),
     groups,
-    ...(o.presetId ? { presetId: o.presetId } : {}),
     ...(o.model ? { model: o.model } : {}),
     ...(o.targetLang ? { targetLang: o.targetLang } : {}),
     ...(notes ? { notes } : {}),

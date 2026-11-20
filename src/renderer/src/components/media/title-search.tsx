@@ -28,7 +28,7 @@ export function TitleSearch({
 
   return (
     <Popover open={open && debounced.length >= 2} onOpenChange={setOpen}>
-      <Command shouldFilter={false} className="grid gap-1">
+      <Command shouldFilter={false} className="grid grid-cols-[minmax(0,1fr)] gap-1">
         <label htmlFor="media-title" className="text-xs font-medium text-muted-foreground">
           {t('media.title')}
         </label>
