@@ -8,52 +8,59 @@ import { Progress } from '@renderer/components/ui/tabs'
 import { useBatch, useBatchAction } from '@renderer/data/batches'
 import { isTerminal, useJobs } from '@renderer/data/jobs'
 import { errorMessage } from '@renderer/i18n/error-message'
-import { batchFraction, jobFraction } from '../../translate/batch/batch-progress'
-import { extractCounts } from './extract-batch-progress'
+import { IpcCallError } from '@renderer/lib/ipc'
+import { batchFraction, jobFraction } from '@renderer/pages/translate/batch/batch-progress'
+import { jobCounts } from './simple-batch-counts'
 
 const baseName = (p: string): string => p.split(/[\\/]/).pop() ?? p
 const pct = (f: number): number => Math.round(f * 100)
 
-/** The batch just created: overall progress, counts per state, each file live. No cost step. */
-export function ExtractBatchRun({
+/**
+ * The batch just created: overall progress, counts per state, each file live (with the reason
+ * when a job failed). No cost step. Shared by the Extract and Mux batches; `ns` picks the
+ * i18n namespace (`extractBatch` | `muxBatch`).
+ */
+export function SimpleBatchRun({
   id,
+  ns,
   onAnother
 }: {
   id: string
+  ns: 'extractBatch' | 'muxBatch'
   onAnother: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const jobs = (useJobs().data ?? []).filter((j) => j.batchId === id)
   const batch = useBatch(id).data
   const action = useBatchAction()
-  if (!batch) return <p className="text-sm text-muted-foreground">{t('extractBatch.starting')}</p>
+  if (!batch) return <p className="text-sm text-muted-foreground">{t(`${ns}.starting`)}</p>
 
   const total = batch.total || jobs.length
   const finished = jobs.filter((j) => isTerminal(j.status)).length
   const done = jobs.length > 0 && finished === jobs.length
   const fraction = batchFraction(jobs)
-  const c = extractCounts(jobs)
+  const c = jobCounts(jobs)
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] min-w-0 gap-5">
       <header className="grid grid-cols-[minmax(0,1fr)] min-w-0 gap-2">
         <h2 className="text-base font-semibold break-all">{batch.name}</h2>
         <p className="text-sm text-muted-foreground" aria-live="polite">
-          {t(done ? 'extractBatch.run.done' : 'extractBatch.run.running')}
+          {t(done ? `${ns}.run.done` : `${ns}.run.running`)}
         </p>
         <div className="flex items-center gap-3">
           <Progress
             value={fraction}
             className="h-2 flex-1"
-            aria-label={t('extractBatch.run.progress', { done: finished, total })}
+            aria-label={t(`${ns}.run.progress`, { done: finished, total })}
           />
           <span className="text-sm font-medium tabular-nums">{pct(fraction)}%</span>
         </div>
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>{t('extractBatch.run.progress', { done: finished, total })}</span>
+          <span>{t(`${ns}.run.progress`, { done: finished, total })}</span>
           {(['queued', 'running', 'done', 'failed'] as const).map((k) =>
             c[k] ? (
               <span key={k} className={k === 'failed' ? 'text-destructive' : undefined}>
-                {t(`extractBatch.run.count.${k}`, { count: c[k] })}
+                {t(`${ns}.run.count.${k}`, { count: c[k] })}
               </span>
             ) : null
           )}
@@ -93,7 +100,7 @@ export function ExtractBatchRun({
           <Link to="/queue">{t('batch.detail.openQueue')}</Link>
         </Button>
         <Button variant="default" onClick={onAnother}>
-          {t('extractBatch.run.another')}
+          {t(`${ns}.run.another`)}
         </Button>
       </div>
     </div>
@@ -126,6 +133,11 @@ function FileRow({ job: j }: { job: Job }): React.JSX.Element {
         </span>
       ) : null}
       {running ? <Progress value={f} className="h-1" aria-label={baseName(j.source)} /> : null}
+      {j.error ? (
+        <span className="text-xs break-words text-destructive">
+          {errorMessage(new IpcCallError(j.error.code, j.error.message))}
+        </span>
+      ) : null}
     </Link>
   )
 }

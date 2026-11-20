@@ -287,7 +287,8 @@ export const common = {
   choose: {
     toMany: 'Select several files',
     toSingle: 'Translate a single file',
-    toSingleExtract: 'Extract from a single file'
+    toSingleExtract: 'Extract from a single file',
+    toSingleMux: 'Mux a single video'
   },
   batch: {
     title: 'Translate several files',
@@ -1077,6 +1078,84 @@ export const common = {
         queued_other: '{{count}} waiting',
         running_one: '{{count}} extracting',
         running_other: '{{count}} extracting',
+        done_one: '{{count}} done',
+        done_other: '{{count}} done',
+        failed_one: '{{count}} failed or cancelled',
+        failed_other: '{{count}} failed or cancelled'
+      }
+    }
+  },
+  muxBatch: {
+    title: 'Mux several videos',
+    steps: { files: 'Files', pairing: 'Pairing', output: 'Output' },
+    files: {
+      heading: 'Choose the videos and subtitles',
+      body: 'A folder (with or without subfolders) or several files, with the videos (.mkv) and their subtitle files (.srt, .ass, .ssa, .vtt) together. BakaSub pairs them by name or by season and episode.',
+      none: 'No video (.mkv) was found.'
+    },
+    status: {
+      paired_one: '{{count}} video with subtitles',
+      paired_other: '{{count}} videos with subtitles',
+      unmatchedSubs_one: '{{count}} subtitle needs a video',
+      unmatchedSubs_other: '{{count}} subtitles need a video',
+      unmatchedVideos_one: '{{count}} video without subtitles',
+      unmatchedVideos_other: '{{count}} videos without subtitles'
+    },
+    pairing: {
+      heading: 'Check the pairing',
+      body: 'Each video gets its subtitles. Change the language, the track name and the default track, move a subtitle to another video or remove it.',
+      unresolved_one: '{{count}} subtitle without a video',
+      unresolved_other: '{{count}} subtitles without a video',
+      unresolvedBody:
+        'BakaSub could not tell which video these belong to (no match, or more than one). Choose the video, or ignore the subtitle.',
+      assignTo: 'Video for {{name}}',
+      moveTo: 'Move {{name}} to another video',
+      addTo: 'Add a subtitle to {{name}}',
+      addSubtitle: 'Add a subtitle…',
+      pickVideo: 'Choose the video',
+      ignore: 'Ignore',
+      restore: 'Restore',
+      videos_one: '{{count}} video will be created',
+      videos_other: '{{count}} videos will be created',
+      noneIncluded: 'No video with subtitles to create.',
+      count_one: '{{count}} subtitle',
+      count_other: '{{count}} subtitles',
+      max: 'Over 32 subtitles',
+      byEpisode: 'By episode',
+      manual: 'Chosen by you',
+      undetermined: 'Undetermined',
+      out_one: '{{count}} item left out',
+      out_other: '{{count}} items left out',
+      noSubtitle: 'no subtitles',
+      blocked_one: 'Solve {{count}} subtitle to continue.',
+      blocked_other: 'Solve {{count}} subtitles to continue.'
+    },
+    output: {
+      heading: 'Where to save',
+      next: 'Without an output folder, each new video is saved next to its original.',
+      collision_one:
+        '{{count}} name repeats in the output folder; a number is added to the later ones:',
+      collision_other:
+        '{{count}} names repeat in the output folder; a number is added to the later ones:',
+      space: 'Each video is copied in full: keep free space of about the size of all the videos.',
+      review: '{{videos}} videos with {{subs}} subtitles will be created.'
+    },
+    error: {
+      item: 'The batch was not created: fix {{file}}.',
+      fix: 'Go to the pairing'
+    },
+    start: 'Create {{count}} videos',
+    starting: 'Starting…',
+    run: {
+      running: 'Muxing…',
+      done: 'Batch finished.',
+      progress: '{{done}} of {{total}} finished',
+      another: 'Mux other videos',
+      count: {
+        queued_one: '{{count}} waiting',
+        queued_other: '{{count}} waiting',
+        running_one: '{{count}} muxing',
+        running_other: '{{count}} muxing',
         done_one: '{{count}} done',
         done_other: '{{count}} done',
         failed_one: '{{count}} failed or cancelled',

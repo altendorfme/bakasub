@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BatchPlan, Job, SubtitleTrackInfo } from '@shared/ipc-contract'
-import { extractCounts } from './extract-batch-progress'
+import { jobCounts } from '@renderer/components/jobs/simple-batch-counts'
 import {
   EXTRACT_BATCH_STEPS,
   buildExtractRequest,
@@ -169,7 +169,7 @@ describe('extract counts', () => {
   const job = (status: Job['status']): Job => ({ status }) as Job
   it('groups statuses', () => {
     expect(
-      extractCounts([
+      jobCounts([
         job('queued'),
         job('running'),
         job('completed'),

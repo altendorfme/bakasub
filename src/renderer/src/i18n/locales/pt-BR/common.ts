@@ -293,7 +293,8 @@ export const common: LocaleShape<typeof en> = {
   choose: {
     toMany: 'Selecionar vários arquivos',
     toSingle: 'Traduzir um arquivo só',
-    toSingleExtract: 'Extrair de um arquivo só'
+    toSingleExtract: 'Extrair de um arquivo só',
+    toSingleMux: 'Fazer mux de um vídeo só'
   },
   batch: {
     title: 'Traduzir vários arquivos',
@@ -1093,6 +1094,85 @@ export const common: LocaleShape<typeof en> = {
         done_other: '{{count}} concluídos',
         failed_one: '{{count}} com falha ou cancelado',
         failed_other: '{{count}} com falha ou cancelados'
+      }
+    }
+  },
+  muxBatch: {
+    title: 'Fazer mux de vários vídeos',
+    steps: { files: 'Arquivos', pairing: 'Pareamento', output: 'Saída' },
+    files: {
+      heading: 'Escolha os vídeos e as legendas',
+      body: 'Uma pasta (com ou sem subpastas) ou vários arquivos, com os vídeos (.mkv) e suas legendas (.srt, .ass, .ssa, .vtt) juntos. O BakaSub pareia pelo nome ou por temporada e episódio.',
+      none: 'Nenhum vídeo (.mkv) encontrado.'
+    },
+    status: {
+      paired_one: '{{count}} vídeo com legendas',
+      paired_other: '{{count}} vídeos com legendas',
+      unmatchedSubs_one: '{{count}} legenda precisa de um vídeo',
+      unmatchedSubs_other: '{{count}} legendas precisam de um vídeo',
+      unmatchedVideos_one: '{{count}} vídeo sem legendas',
+      unmatchedVideos_other: '{{count}} vídeos sem legendas'
+    },
+    pairing: {
+      heading: 'Confira o pareamento',
+      body: 'Cada vídeo recebe as suas legendas. Mude o idioma, o nome e a faixa padrão, mova uma legenda para outro vídeo ou remova-a.',
+      unresolved_one: '{{count}} legenda sem vídeo',
+      unresolved_other: '{{count}} legendas sem vídeo',
+      unresolvedBody:
+        'O BakaSub não soube dizer a que vídeo estas pertencem (sem correspondência, ou mais de uma). Escolha o vídeo ou ignore a legenda.',
+      assignTo: 'Vídeo de {{name}}',
+      moveTo: 'Mover {{name}} para outro vídeo',
+      addTo: 'Adicionar uma legenda a {{name}}',
+      addSubtitle: 'Adicionar uma legenda…',
+      pickVideo: 'Escolha o vídeo',
+      ignore: 'Ignorar',
+      restore: 'Restaurar',
+      videos_one: '{{count}} vídeo será criado',
+      videos_other: '{{count}} vídeos serão criados',
+      noneIncluded: 'Nenhum vídeo com legendas para criar.',
+      count_one: '{{count}} legenda',
+      count_other: '{{count}} legendas',
+      max: 'Mais de 32 legendas',
+      byEpisode: 'Por episódio',
+      manual: 'Escolhida por você',
+      undetermined: 'Indeterminado',
+      out_one: '{{count}} item de fora',
+      out_other: '{{count}} itens de fora',
+      noSubtitle: 'sem legendas',
+      blocked_one: 'Resolva {{count}} legenda para continuar.',
+      blocked_other: 'Resolva {{count}} legendas para continuar.'
+    },
+    output: {
+      heading: 'Onde salvar',
+      next: 'Sem pasta de saída, cada vídeo novo é salvo ao lado do original.',
+      collision_one:
+        '{{count}} nome se repete na pasta de saída; um número é acrescentado aos seguintes:',
+      collision_other:
+        '{{count}} nomes se repetem na pasta de saída; um número é acrescentado aos seguintes:',
+      space:
+        'Cada vídeo é copiado por inteiro: deixe espaço livre de cerca do tamanho de todos os vídeos.',
+      review: '{{videos}} vídeos com {{subs}} legendas serão criados.'
+    },
+    error: {
+      item: 'O lote não foi criado: corrija {{file}}.',
+      fix: 'Ir para o pareamento'
+    },
+    start: 'Criar {{count}} vídeos',
+    starting: 'Iniciando…',
+    run: {
+      running: 'Fazendo mux…',
+      done: 'Lote concluído.',
+      progress: '{{done}} de {{total}} concluídos',
+      another: 'Fazer mux de outros vídeos',
+      count: {
+        queued_one: '{{count}} na espera',
+        queued_other: '{{count}} na espera',
+        running_one: '{{count}} em mux',
+        running_other: '{{count}} em mux',
+        done_one: '{{count}} concluído',
+        done_other: '{{count}} concluídos',
+        failed_one: '{{count}} falhou ou foi cancelado',
+        failed_other: '{{count}} falharam ou foram cancelados'
       }
     }
   },

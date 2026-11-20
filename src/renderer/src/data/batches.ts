@@ -10,6 +10,7 @@ import {
 import type {
   Batch,
   BatchCreateRequest,
+  BatchMuxPlan,
   BatchPlan,
   BatchPlanItem,
   BatchSource,
@@ -68,6 +69,22 @@ export function useExtractPlan(source: BatchSource | null): UseQueryResult<Batch
   return useQuery({
     queryKey: qk.batches.plan('extract', src),
     queryFn: () => unwrap(window.api.batches.plan({ kind: 'extract', source: src! })),
+    enabled: src !== null,
+    staleTime: Infinity
+  })
+}
+
+/** The plan of a mux batch: MKVs and subtitle files, paired by the Main (loose files of other types are dropped). */
+export function useMuxPlan(source: BatchSource | null): UseQueryResult<BatchMuxPlan | null> {
+  const src =
+    source?.type === 'files'
+      ? ((paths) => (paths.length ? { type: 'files' as const, paths } : null))(
+          source.paths.filter((p) => sourceKindOf(p) !== null)
+        )
+      : source
+  return useQuery({
+    queryKey: qk.batches.plan('mux', src),
+    queryFn: () => unwrap(window.api.batches.plan({ kind: 'mux', source: src! })),
     enabled: src !== null,
     staleTime: Infinity
   })

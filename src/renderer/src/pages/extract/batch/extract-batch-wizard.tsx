@@ -8,7 +8,7 @@ import { IpcCallError } from '@renderer/lib/ipc'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { usePageReducer, usePageState } from '@renderer/lib/page-state'
 import { StepBar } from '../../translate/step-bar'
-import { ExtractBatchRun } from './extract-batch-run'
+import { SimpleBatchRun } from '@renderer/components/jobs/simple-batch-run'
 import {
   EXTRACT_BATCH_STEPS,
   buildExtractRequest,
@@ -78,8 +78,9 @@ export function ExtractBatchWizard({
 
       {batchId ? (
         <section className="grid grid-cols-[minmax(0,1fr)] min-w-0 rounded-xl border bg-card/92 p-5">
-          <ExtractBatchRun
+          <SimpleBatchRun
             id={batchId}
+            ns="extractBatch"
             onAnother={() => {
               setBatchId(null)
               setFailure(null)

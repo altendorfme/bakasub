@@ -29,7 +29,7 @@ import {
 } from './mux-rows'
 
 /** Put existing subtitle files into a copy of a video. Then follows the job. */
-export function MuxPage(): React.JSX.Element {
+export function MuxPage({ onSwitchMode }: { onSwitchMode?: () => void } = {}): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [source, setSource] = usePageState<string | null>('mux.source', null)
   const [rows, setRows] = usePageState<MuxRow[]>('mux.rows', [])
@@ -182,7 +182,12 @@ export function MuxPage(): React.JSX.Element {
           <OutputFolder value={outputDir} onChange={setOutputDir} />
         </div>
 
-        <div className="flex justify-end border-t pt-4">
+        <div className="flex items-center justify-end gap-2 border-t pt-4">
+          {onSwitchMode ? (
+            <Button variant="ghost" className="mr-auto" onClick={onSwitchMode}>
+              {t('choose.toMany')}
+            </Button>
+          ) : null}
           <Button
             variant="default"
             disabled={!muxReady(source, rows) || create.isPending}

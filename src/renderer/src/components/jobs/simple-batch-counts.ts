@@ -1,6 +1,6 @@
 import type { Job } from '@shared/ipc-contract'
 
-export interface ExtractCounts {
+export interface JobCounts {
   queued: number
   running: number
   done: number
@@ -8,8 +8,8 @@ export interface ExtractCounts {
   failed: number
 }
 
-export function extractCounts(jobs: readonly Job[]): ExtractCounts {
-  const c: ExtractCounts = { queued: 0, running: 0, done: 0, failed: 0 }
+export function jobCounts(jobs: readonly Job[]): JobCounts {
+  const c: JobCounts = { queued: 0, running: 0, done: 0, failed: 0 }
   for (const j of jobs) {
     if (j.status === 'queued' || j.status === 'awaiting-confirmation') c.queued++
     else if (j.status === 'running') c.running++
