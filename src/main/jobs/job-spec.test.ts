@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { TEST_PRESET, testPresetSource } from '../presets/test-presets'
+import { AppError } from '../errors'
 import { resolveJobSpec } from './job-spec'
 
 let dir: string
@@ -229,7 +230,7 @@ describe('resolveJobSpec', () => {
     })
   })
 
-  it('media lookup failure: the job is created without context and the error is reported', async () => {
+  it('media lookup failure: no details, the reason is frozen and the error is reported', async () => {
     const onError = vi.fn()
     const s = await resolveJobSpec(
       {
@@ -238,10 +239,33 @@ describe('resolveJobSpec', () => {
         media: { ref: { provider: 'tmdb', id: 7, kind: 'movie' } }
       },
       presets,
-      { lookup: async () => Promise.reject(new Error('offline')), onError }
+      {
+        lookup: async () => Promise.reject(new AppError('TMDB_KEY_MISSING', 'no key')),
+        onError
+      }
     )
     expect(s).not.toHaveProperty('media')
+    expect(s).toMatchObject({ mediaUnavailable: 'TMDB lookup failed (TMDB_KEY_MISSING: no key)' })
     expect(onError).toHaveBeenCalled()
+  })
+
+  it('media requested without a lookup service: the reason is frozen too', async () => {
+    const s = await resolveJobSpec(
+      {
+        kind: 'pipeline',
+        source: join(dir, 'ep01.mkv'),
+        trackId: 2,
+        media: { ref: { provider: 'tmdb', id: 7, kind: 'movie' } }
+      },
+      presets
+    )
+    expect(s).toMatchObject({ mediaUnavailable: expect.stringContaining('not available') })
+  })
+
+  it('no media requested: no details and no reason', async () => {
+    const s = await resolveJobSpec({ kind: 'translate', source: join(dir, 'ep01.en.srt') }, presets)
+    expect(s).not.toHaveProperty('media')
+    expect(s).not.toHaveProperty('mediaUnavailable')
   })
 
   it('media ref is validated', async () => {

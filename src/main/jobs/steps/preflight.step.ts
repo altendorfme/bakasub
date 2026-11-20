@@ -1,4 +1,5 @@
 import type { Step } from '../step-context'
+import { summarizePrompt } from './prompt-summary'
 import { translationInput } from './translation-input'
 
 /**
@@ -38,6 +39,7 @@ export const preflightStep: Step = async (ctx) => {
         // Tudo em cache também para: a revisão mostra a cobertura e que nada vai ao LLM.
         !confirm || (cheap && !shortQuota) ? 'auto-confirmed' : 'needs-confirmation'
     },
-    coverage
+    coverage,
+    prompt: summarizePrompt(input)
   }
 }

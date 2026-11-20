@@ -770,6 +770,28 @@ export interface PreflightEstimate {
   decision: 'auto-confirmed' | 'needs-confirmation' | 'confirmed'
 }
 
+/**
+ * O que entrou no System Prompt de um job de tradução (idêntico em todos os chunks). Gravado
+ * pelo preflight, antes de qualquer chamada ao LLM.
+ */
+export interface PromptSummary {
+  /** Texto exato enviado como mensagem `system`. */
+  system: string
+  /** Tokens do System Prompt (o200k; aproximado para modelos de outra família). */
+  systemTokens: number
+  glossaryEntries: number
+  /** O preset tem orientação de estilo (`<style>`). */
+  style: boolean
+  /** Bloco `<media>`: o que foi incluído. */
+  media: {
+    tmdb: boolean
+    episode: boolean
+    notes: boolean
+    /** O usuário pediu o contexto do TMDB, mas ele não pôde ser obtido: o motivo. */
+    unavailable?: string
+  }
+}
+
 export interface PresetImportResult {
   /** `null` se o diálogo foi cancelado. */
   path: string | null
@@ -884,7 +906,7 @@ export interface IpcInvokeContract {
   /** Estimativa + cobertura completa (o que não será traduzido, onde e por quê). */
   'jobs:preflight': {
     req: { id: string }
-    res: { estimate: PreflightEstimate; coverage: CoverageReport } | null
+    res: { estimate: PreflightEstimate; coverage: CoverageReport; prompt?: PromptSummary } | null
   }
   /** Pasta de entrada de um batch (legível). `null` se cancelado. */
   'dialog:open-folder': { req: void; res: { path: string | null } }

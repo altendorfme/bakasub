@@ -6,12 +6,17 @@ import { analyzeCoverage, type SubtitleDocument } from '../../parsers'
 import { fileArtifact } from '../artifacts'
 import type { Step } from '../step-context'
 import { writeSubtitle } from './subtitle-io'
+import { mediaWarning } from './prompt-summary'
 import { translationInput } from './translation-input'
 
 /** Lê a legenda (origem ou faixa extraída), traduz e grava o resultado no diretório de trabalho. */
 export const translateStep: Step = async (ctx) => {
   const input = await translationInput(ctx)
   const { doc, format, formatId: id } = input
+  // Aqui (e não no preflight): esta etapa sempre roda na execução que produz o resultado final,
+  // inclusive depois de `jobs:confirm`, quando o preflight já está concluído e não roda de novo.
+  const missing = mediaWarning(input)
+  if (missing) ctx.warn(missing)
   let result
   try {
     result = await ctx.deps.translator.translate(

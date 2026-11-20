@@ -1,3 +1,4 @@
+import type { PromptSummary } from '../../../shared/ipc-contract'
 import { AppError } from '../../errors'
 import { buildMediaContext } from '../../media-context/media-block'
 import type { SubtitleDocument, SubtitleFormat } from '../../parsers'
@@ -12,6 +13,8 @@ export interface TranslationInput {
   readonly preset: PresetSnapshot
   /** Bloco `<media>`: detalhes do TMDB congelados no job + notas do usuário. */
   readonly media?: string
+  /** De onde veio o `<media>` (e por que o TMDB pedido ficou de fora), para o resumo do prompt. */
+  readonly mediaSources: PromptSummary['media']
   readonly targetLang: string
   readonly sourceLang?: string
 }
@@ -45,6 +48,12 @@ export async function translationInput(ctx: StepContext): Promise<TranslationInp
     formatId,
     preset: spec.preset,
     ...withMedia(buildMediaContext(spec.media, spec.notes)),
+    mediaSources: {
+      tmdb: !!spec.media,
+      episode: !!spec.media?.episode,
+      notes: !!spec.notes?.trim(),
+      ...(spec.mediaUnavailable ? { unavailable: spec.mediaUnavailable } : {})
+    },
     targetLang: spec.targetLang,
     ...(sourceLang ? { sourceLang } : {})
   }

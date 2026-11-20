@@ -34,7 +34,10 @@ export interface PresetSnapshot {
   readonly prompt: string
 }
 
-/** Busca dos detalhes do TMDB para congelar no job. Falha = job sem contexto (`onError`). */
+/**
+ * Busca dos detalhes do TMDB para congelar no job. Falha = job sem os detalhes, mas com o motivo
+ * congelado em `mediaUnavailable` (o job avisa) e reportado em `onError` (log).
+ */
 export interface MediaLookupSource {
   lookup(
     ref: JobMediaRequest['ref'],
@@ -46,14 +49,22 @@ export interface MediaLookupSource {
 async function resolveMedia(
   req: JobMediaRequest | undefined,
   source: MediaLookupSource | undefined
-): Promise<{ media?: MediaContextLookup }> {
-  if (!req || !source) return {}
+): Promise<{ media?: MediaContextLookup; mediaUnavailable?: string }> {
+  if (!req) return {}
+  if (!source) return { mediaUnavailable: 'media context service is not available' }
   try {
     return { media: await source.lookup(req.ref, { season: req.season, episode: req.episode }) }
   } catch (err) {
     source.onError?.(err)
-    return {}
+    return { mediaUnavailable: lookupFailure(err) }
   }
+}
+
+const MAX_REASON = 300
+function lookupFailure(err: unknown): string {
+  const code = err instanceof AppError ? `${err.code}: ` : ''
+  const msg = err instanceof Error ? err.message : String(err)
+  return `TMDB lookup failed (${code}${msg})`.slice(0, MAX_REASON)
 }
 
 /** Presets + padrões das configurações (`translation.*`). */
@@ -90,6 +101,8 @@ export type JobSpec =
       readonly notes?: string
       /** Detalhes do TMDB congelados na criação (retry usa os mesmos, mesmo offline). */
       readonly media?: MediaContextLookup
+      /** O usuário pediu o contexto do TMDB e ele não pôde ser obtido: o motivo (o job avisa). */
+      readonly mediaUnavailable?: string
       readonly confirmBeforeTranslate: boolean
     })
   | (Base &
@@ -104,6 +117,7 @@ export type JobSpec =
         readonly alsoWriteSubtitle: boolean
         readonly notes?: string
         readonly media?: MediaContextLookup
+        readonly mediaUnavailable?: string
         readonly confirmBeforeTranslate: boolean
       })
 

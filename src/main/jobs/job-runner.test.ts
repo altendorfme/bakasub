@@ -431,4 +431,90 @@ describe('JobRunner', () => {
     expect(r.status).toBe('awaiting-confirmation')
     expect(r.result.warnings.join()).toContain('free-model daily quota')
   })
+
+  describe('contexto de mídia (<media>) no System Prompt', () => {
+    const MEDIA = {
+      details: {
+        provider: 'tmdb' as const,
+        id: 21729,
+        kind: 'series' as const,
+        title: 'Gurren Lagann',
+        genres: ['Animation'],
+        synopsis: 'A young laborer escapes to the surface.'
+      },
+      episode: { season: 1, episode: 1, title: 'Bust Through the Heavens', synopsis: 'Simon.' }
+    }
+    const run = async (
+      over: Partial<JobSpec>
+    ): Promise<{
+      artifacts: Artifacts
+      warnings: string[]
+      sent: string | undefined
+    }> => {
+      const h = hooks()
+      const r = await runner().run({ spec: pipeline(over), artifacts: {}, workDir }, h)
+      return {
+        artifacts: h.saved.at(-1)!,
+        warnings: r.result.warnings,
+        sent: translator.translate.mock.calls[0]?.[0].media
+      }
+    }
+
+    it('contexto presente: o <media> entra no System Prompt gravado e vai ao tradutor', async () => {
+      const { artifacts, warnings, sent } = await run({ media: MEDIA, notes: 'Bro = mano' })
+      const p = artifacts.preflight!.prompt!
+      expect(p.media).toEqual({ tmdb: true, episode: true, notes: true })
+      expect(p.system).toContain('<media>\nTitle: Gurren Lagann, TV series')
+      expect(p.system).toContain('Episode S01E01 "Bust Through the Heavens": Simon.')
+      expect(p.system).toContain('Notes from the user:\nBro = mano')
+      expect(p.systemTokens).toBeGreaterThan(0)
+      expect(sent).toContain('Title: Gurren Lagann')
+      expect(warnings.join()).not.toContain('media context')
+    })
+
+    it('contexto vazio (nada pedido): sem <media> e sem aviso', async () => {
+      const { artifacts, warnings, sent } = await run({})
+      const p = artifacts.preflight!.prompt!
+      expect(p.media).toEqual({ tmdb: false, episode: false, notes: false })
+      expect(p.system).not.toContain('<media>')
+      expect(sent).toBeUndefined()
+      expect(warnings.join()).not.toContain('media context')
+    })
+
+    it('lookup falho com contexto pedido: o job avisa e o resumo mostra o motivo', async () => {
+      const why = 'TMDB lookup failed (offline)'
+      const { artifacts, warnings, sent } = await run({ mediaUnavailable: why } as Partial<JobSpec>)
+      const p = artifacts.preflight!.prompt!
+      expect(p.media).toEqual({ tmdb: false, episode: false, notes: false, unavailable: why })
+      expect(p.system).not.toContain('<media>')
+      expect(sent).toBeUndefined()
+      expect(warnings).toContain(`media context was not sent to the model (${why})`)
+    })
+
+    it('lookup falho com notas: só as notas vão, e o aviso diz isso', async () => {
+      const why = 'TMDB lookup failed (offline)'
+      const { artifacts, warnings, sent } = await run({
+        mediaUnavailable: why,
+        notes: "Kamina is Simon's bro"
+      } as Partial<JobSpec>)
+      expect(artifacts.preflight!.prompt!.system).toContain(
+        "<media>\nKamina is Simon's bro\n</media>"
+      )
+      expect(sent).toBe("Kamina is Simon's bro")
+      expect(warnings.join()).toContain('TMDB details were not sent, only the user notes')
+    })
+
+    it('aviso persiste depois de confirmar (o preflight não roda de novo)', async () => {
+      const spec = pipeline({
+        confirmBeforeTranslate: true,
+        mediaUnavailable: 'TMDB lookup failed (offline)'
+      } as Partial<JobSpec>)
+      const h = hooks()
+      await runner().run({ spec, artifacts: {}, workDir }, h)
+      const artifacts = structuredClone(h.saved.at(-1)!)
+      artifacts.preflight!.estimate.decision = 'confirmed'
+      const r2 = await runner().run({ spec, artifacts, workDir }, hooks())
+      expect(r2.result.warnings.join()).toContain('media context was not sent')
+    })
+  })
 })

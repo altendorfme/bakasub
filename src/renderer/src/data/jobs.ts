@@ -8,11 +8,10 @@ import {
   type UseQueryResult
 } from '@tanstack/react-query'
 import type {
-  CoverageReport,
+  IpcInvokeContract,
   Job,
   JobCreateRequest,
-  JobProgressEvent,
-  PreflightEstimate
+  JobProgressEvent
 } from '@shared/ipc-contract'
 import { IpcCallError, unwrap } from '@renderer/lib/ipc'
 import { notifyJob } from '@renderer/lib/notify'
@@ -32,11 +31,11 @@ export const useJob = (id: string | null): UseQueryResult<Job> =>
       !(err instanceof IpcCallError && err.code === 'JOB_NOT_FOUND') && count < 3
   })
 
-/** Estimate + full coverage of a job waiting for confirmation. */
+/** Estimate, full coverage and system prompt summary recorded by the job's preflight. */
 export const usePreflight = (
   id: string,
   enabled: boolean
-): UseQueryResult<{ estimate: PreflightEstimate; coverage: CoverageReport } | null> =>
+): UseQueryResult<IpcInvokeContract['jobs:preflight']['res']> =>
   useQuery({
     queryKey: qk.jobs.preflight(id),
     queryFn: () => unwrap(window.api.jobs.preflight(id)),

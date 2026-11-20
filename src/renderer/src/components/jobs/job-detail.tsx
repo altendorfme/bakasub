@@ -20,6 +20,7 @@ import { episodeCode } from '@renderer/lib/episode'
 import { JobProgress } from './job-progress'
 import { JobResult } from './job-result'
 import { PreflightReview } from './preflight-review'
+import { PromptSummary } from './prompt-summary'
 
 /** The "do it again" label of the wizard that created the job. */
 const ANOTHER_LABEL = {
@@ -59,7 +60,10 @@ export function JobDetail({
   const query = useJob(id)
   const job = query.data
   const waiting = job?.status === 'awaiting-confirmation'
-  const preflight = usePreflight(id, waiting)
+  const translates = job?.kind === 'translate' || job?.kind === 'pipeline'
+  const active = !!job && ACTIVE_STATUSES.has(job.status)
+  // Na revisão e no fim: o que foi (ou vai ser) enviado no System Prompt.
+  const preflight = usePreflight(id, waiting || (translates && !active))
   const action = useJobAction()
   const remove = useRemoveJob()
   const act = (a: JobAction): void =>
@@ -81,7 +85,6 @@ export function JobDetail({
     )
   }
   if (!job) return <p className="text-sm text-muted-foreground">{t('translate.starting')}</p>
-  const active = ACTIVE_STATUSES.has(job.status)
   const busy = action.isPending || remove.isPending
 
   return (
@@ -115,6 +118,7 @@ export function JobDetail({
             estimate={preflight.data.estimate}
             coverage={preflight.data.coverage}
             inspectPath={inspectPath}
+            prompt={preflight.data.prompt ?? null}
           />
         ) : (
           <p className="text-sm text-muted-foreground">{t('translate.starting')}</p>
@@ -122,7 +126,12 @@ export function JobDetail({
       ) : active ? (
         <JobProgress job={job} />
       ) : (
-        <JobResult job={job} />
+        <>
+          <JobResult job={job} />
+          {translates && preflight.data ? (
+            <PromptSummary prompt={preflight.data.prompt ?? null} />
+          ) : null}
+        </>
       )}
 
       <JobActions

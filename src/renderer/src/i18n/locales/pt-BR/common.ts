@@ -587,6 +587,23 @@ export const common: LocaleShape<typeof en> = {
       'Os modelos gratuitos têm limite diário e o BakaSub não conseguiu verificar quanto resta.',
     quotaOk: '{{remaining}} de {{limit}} requisições gratuitas restantes hoje'
   },
+  promptSummary: {
+    heading: 'O que a IA recebe',
+    blocks: 'Blocos no prompt de sistema',
+    glossary_one: 'Glossário ({{count}} termo)',
+    glossary_other: 'Glossário ({{count}} termos)',
+    noGlossary: 'Sem glossário',
+    style: 'Estilo do preset',
+    tmdb: 'Detalhes do TMDB',
+    episode: 'Sinopse do episódio',
+    notes: 'Suas notas',
+    noMedia: 'Sem contexto de mídia',
+    unavailable:
+      'Não foi possível buscar os detalhes do TMDB escolhidos; eles não serão enviados: {{reason}}',
+    tokens: 'Prompt de sistema: {{value}} tokens, repetido em cada requisição',
+    show: 'Ver o prompt de sistema exato',
+    missing: 'Este job foi criado antes de o BakaSub registrar o prompt.'
+  },
   fileCheck: {
     heading: 'Verificação do arquivo',
     encHeading: 'Encoding',

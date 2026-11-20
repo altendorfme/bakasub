@@ -579,6 +579,22 @@ export const common = {
     quotaUnknown: 'Free models have a daily limit and BakaSub could not check how much is left.',
     quotaOk: '{{remaining}} of {{limit}} free requests left today'
   },
+  promptSummary: {
+    heading: 'What the AI receives',
+    blocks: 'Blocks in the system prompt',
+    glossary_one: 'Glossary ({{count}} term)',
+    glossary_other: 'Glossary ({{count}} terms)',
+    noGlossary: 'No glossary',
+    style: 'Preset style',
+    tmdb: 'TMDB details',
+    episode: 'Episode synopsis',
+    notes: 'Your notes',
+    noMedia: 'No media context',
+    unavailable: 'The TMDB details you chose could not be fetched and will not be sent: {{reason}}',
+    tokens: 'System prompt: {{value}} tokens, repeated in every request',
+    show: 'Show the exact system prompt',
+    missing: 'This job was created before BakaSub recorded the prompt.'
+  },
   fileCheck: {
     heading: 'File check',
     encHeading: 'Encoding',

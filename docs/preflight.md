@@ -35,5 +35,6 @@ A job whose lines are all in the cache still stops for review (unless the thresh
 ## Results
 
 - `job.result.preflight`: `PreflightEstimate` (model and price, `approximate`, lines total/cached/to translate/chunks, input/output token ranges, cost range, decision). Small enough for `jobs:list`.
-- `jobs:preflight(id)`: the estimate plus the full `CoverageReport` (what will not be translated, where and why; capped at 500 entries).
+- `jobs:preflight(id)`: the estimate plus the full `CoverageReport` (what will not be translated, where and why; capped at 500 entries) and `prompt: PromptSummary`.
+- `PromptSummary` (`src/main/jobs/steps/prompt-summary.ts`): the exact system prompt the `translate` step will send (same `buildSystemPrompt` and inputs, so it is deterministic), its o200k token count, and which blocks went in: glossary entries, preset style, TMDB details, episode synopsis, user notes, plus `media.unavailable` when the user chose TMDB context that could not be fetched. Stored in `artifacts.preflight.prompt`; absent on jobs created before it existed. The job detail shows it both in the review and after the job ends.
 - Batches: `Batch.preflight` sums the jobs waiting for confirmation (`awaiting`, `toTranslate`, `cost` — `null` if any job has a dynamic price — and `approximate`); `batches:confirm` confirms them all.

@@ -1,18 +1,26 @@
 import { AlertTriangle, Coins, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { CoverageReport, PreflightEstimate } from '@shared/ipc-contract'
+import type {
+  CoverageReport,
+  PreflightEstimate,
+  PromptSummary as Prompt
+} from '@shared/ipc-contract'
 import { formatDate, formatInt, formatUsd } from '@renderer/lib/format'
 import { CoverageList } from './coverage-list'
 import { CoverageSummary, FileCheck } from './file-check'
+import { PromptSummary } from './prompt-summary'
 
 /** The numbers the user confirms: lines, requests, tokens, cost, free quota and coverage. */
 export function PreflightReview({
   estimate: e,
   coverage,
-  inspectPath
+  inspectPath,
+  prompt
 }: {
   estimate: PreflightEstimate
   coverage: CoverageReport
+  /** What goes into the system prompt; `null` for jobs created before it was recorded. */
+  prompt?: Prompt | null
   /** Subtitle file to check for encoding and parser warnings (not available for videos). */
   inspectPath?: string
 }): React.JSX.Element {
@@ -102,6 +110,7 @@ export function PreflightReview({
         )
       ) : null}
 
+      {prompt !== undefined ? <PromptSummary prompt={prompt} /> : null}
       {inspectPath ? <FileCheck path={inspectPath} /> : null}
       <CoverageSummary report={coverage} />
       <CoverageList report={coverage} />

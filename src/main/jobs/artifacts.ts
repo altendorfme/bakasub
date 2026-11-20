@@ -28,6 +28,8 @@ export interface Artifacts {
     estimate: import('../../shared/ipc-contract').PreflightEstimate
     /** `CoverageReport` completa (servida por `jobs:preflight`). */
     coverage: import('../parsers').CoverageReport
+    /** System Prompt e blocos enviados (ausente em jobs anteriores a este campo). */
+    prompt?: import('../../shared/ipc-contract').PromptSummary
   }
   validate?: { ok: true }
   write?: { outputs: string[] }
