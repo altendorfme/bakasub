@@ -28,7 +28,11 @@ function units(
         startMs: t,
         endMs: t + 1500,
         plain: payload,
-        unit: { cueId: i + 1, payload, skeleton: { head: [], tail: [], markers: {}, brs: [] } }
+        unit: {
+          cueId: i + 1,
+          payload,
+          skeleton: { head: [], tail: [], markers: {}, brs: [], inline: [] }
+        }
       })
     t += 2000 + (o.gaps?.includes(i) ? 30_000 : 0)
   }

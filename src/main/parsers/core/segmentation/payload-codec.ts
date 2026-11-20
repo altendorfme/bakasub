@@ -6,12 +6,24 @@ import type { LineBreakNode, Node, TagNode } from '../types'
  *   <xN/>       tag solta (override ASS, tag sem par)
  *   <br/>       quebra de linha (n-ésima ocorrência <-> n-ésima quebra original)
  * Tags nas bordas do cue (que só envolvem o conteúdo) não vão no payload: ficam no esqueleto.
+ * Overrides no meio de uma palavra (`Ne{\blur1.5}xt`) também não: são efeito visual sobre os
+ * glifos, o modelo não tem como mantê-los dentro da palavra traduzida. Ficam em `inline` com a
+ * posição relativa no segmento de texto e são reinseridos proporcionalmente (ver `reinject`).
  * Não há escape: texto que já pareça um marcador é detectado e o cue segue sem tradução.
  */
 
 export type Marker =
   | { readonly kind: 'pair'; readonly open: TagNode; readonly close: TagNode }
   | { readonly kind: 'single'; readonly node: TagNode }
+
+/** Override intra-palavra, fora do payload. */
+export interface InlineTag {
+  readonly node: TagNode
+  /** Índice do segmento de texto: quantos marcadores/`<br/>` do payload vêm antes dele. */
+  readonly segment: number
+  /** Posição relativa (0..1) no texto do segmento de origem. */
+  readonly ratio: number
+}
 
 export interface Skeleton {
   /** Tags reaplicadas antes do conteúdo traduzido, intactas. */
@@ -21,6 +33,8 @@ export interface Skeleton {
   readonly markers: Readonly<Record<number, Marker>>
   /** Quebras de linha originais, na ordem em que aparecem no payload. */
   readonly brs: readonly LineBreakNode[]
+  /** Overrides intra-palavra, na ordem original. */
+  readonly inline: readonly InlineTag[]
 }
 
 export interface BuiltPayload {
@@ -92,6 +106,31 @@ function edgeCounts(nodes: readonly Node[], partner: Map<number, number>): [numb
   }
 }
 
+const LETTER_END = /\p{L}$/u
+const LETTER_START = /^\p{L}/u
+
+const isOverride = (n: Node | undefined): boolean => n?.type === 'tag' && n.kind === 'override'
+
+/**
+ * Override cercado por letras (atravessando outros overrides colados): `Ti{\blur3}me`.
+ * Overrides nunca formam par, então tirá-los do payload não quebra o aninhamento.
+ */
+function isIntraWord(nodes: readonly Node[], i: number): boolean {
+  if (!isOverride(nodes[i])) return false
+  let j = i - 1
+  while (isOverride(nodes[j])) j--
+  let k = i + 1
+  while (isOverride(nodes[k])) k++
+  const prev = nodes[j]
+  const next = nodes[k]
+  return (
+    prev?.type === 'text' &&
+    next?.type === 'text' &&
+    LETTER_END.test(prev.value) &&
+    LETTER_START.test(next.value)
+  )
+}
+
 export function buildPayload(nodes: readonly Node[]): BuiltPayload {
   const partner = pairTags(nodes)
   const [h, t] = edgeCounts(nodes, partner)
@@ -100,17 +139,29 @@ export function buildPayload(nodes: readonly Node[]): BuiltPayload {
   const markers: Record<number, Marker> = {}
   const pairId = new Map<number, number>()
   const brs: LineBreakNode[] = []
+  const pending: { node: TagNode; segment: number; offset: number }[] = []
+  const segmentLength: number[] = [0]
+  let segment = 0
   let next = 1
   let payload = ''
+  const nextSegment = (): void => {
+    segment++
+    segmentLength.push(0)
+  }
 
   for (let i = h; i < end; i++) {
     const node = nodes[i]
     if (node.type === 'text') {
       payload += node.value
+      segmentLength[segment] += node.value.length
+    } else if (isIntraWord(nodes, i)) {
+      pending.push({ node: node as TagNode, segment, offset: segmentLength[segment] })
     } else if (node.type === 'br') {
+      nextSegment()
       brs.push(node)
       payload += '<br/>'
     } else {
+      nextSegment()
       const p = partner.get(i)
       if (p !== undefined && p >= h && p < end) {
         if (node.kind === 'open') {
@@ -130,9 +181,15 @@ export function buildPayload(nodes: readonly Node[]): BuiltPayload {
     }
   }
 
+  // Intra-palavra implica letra dos dois lados: o segmento nunca tem comprimento 0.
+  const inline = pending.map((t) => ({
+    node: t.node,
+    segment: t.segment,
+    ratio: t.offset / segmentLength[t.segment]
+  }))
   return {
     payload,
-    skeleton: { head: nodes.slice(0, h), tail: nodes.slice(end), markers, brs }
+    skeleton: { head: nodes.slice(0, h), tail: nodes.slice(end), markers, brs, inline }
   }
 }
 

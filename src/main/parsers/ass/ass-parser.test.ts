@@ -4,6 +4,7 @@ import { SubtitleParseError } from '../core/format'
 import { analyzeCoverage } from '../core/coverage'
 import { applyTranslation, validateTranslation } from '../core/segmentation/reinject'
 import { classify, toTranslationUnit } from '../core/segmentation/segmenter'
+import { nodesRaw } from '../core/nodes'
 import type { Cue, SubtitleDocument } from '../core/types'
 import { decodeSubtitle } from '../decode/subtitle-decoder'
 import { assFormat } from './index'
@@ -230,14 +231,63 @@ describe('tradução: reinjeção no ASS', () => {
   })
   it('MARKER_ORDER: overrides soltos mantêm a ordem', () => {
     const c = cuesOf(
-      parseAss(`[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,D,,0,0,0,,A{\\an8}B{\\pos(1,2)}C\n`)
+      parseAss(`[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,D,,0,0,0,,A {\\an8}B {\\pos(1,2)}C\n`)
     )[0]
     const u = toTranslationUnit(c)!
-    expect(u.payload).toBe('A<x1/>B<x2/>C')
-    expect(validateTranslation(u, 'A<x1/>B<x2/>C', assFormat.lexInline)).toEqual([])
-    expect(validateTranslation(u, 'A<x2/>B<x1/>C', assFormat.lexInline).map((i) => i.code)).toEqual(
-      ['MARKER_ORDER']
-    )
+    expect(u.payload).toBe('A <x1/>B <x2/>C')
+    expect(validateTranslation(u, 'A <x1/>B <x2/>C', assFormat.lexInline)).toEqual([])
+    expect(
+      validateTranslation(u, 'A <x2/>B <x1/>C', assFormat.lexInline).map((i) => i.code)
+    ).toEqual(['MARKER_ORDER'])
+  })
+
+  describe('overrides intra-palavra', () => {
+    const ev = (body: string): Cue<unknown> =>
+      cuesOf(parseAss(`[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,D,,0,0,0,,${body}\n`))[0]
+    const apply = (body: string, translated: string): string => {
+      const c = ev(body)
+      const r = applyTranslation(c, toTranslationUnit(c)!, translated, assFormat.lexInline)
+      if (!r.ok) throw new Error(JSON.stringify(r.issues))
+      return nodesRaw(r.cue.nodes)
+    }
+
+    it('saem do payload: o modelo recebe a frase limpa', () => {
+      const u = toTranslationUnit(ev('{\\fs270\\b1}Ne{\\blur1.5}xt Ti{\\blur3}me'))!
+      expect(u.payload).toBe('Next Time')
+      expect(u.skeleton.markers).toEqual({})
+    })
+
+    it('voltam na posição proporcional, dentro de uma palavra', () => {
+      expect(apply('{\\fs270\\b1}Ne{\\blur1.5}xt Ti{\\blur3}me', 'Próxima Vez')).toBe(
+        '{\\fs270\\b1}Pr{\\blur1.5}óxima V{\\blur3}ez'
+      )
+    })
+
+    it('tradução idêntica reproduz a linha original', () => {
+      const body = '{\\fs270}Ne{\\blur1.5}xt Ti{\\blur3}me'
+      expect(apply(body, 'Next Time')).toBe(body)
+    })
+
+    it('overrides colados viajam juntos e na ordem', () => {
+      expect(apply('Ab{\\blur1}{\\c&HFF&}cd', 'Wxyz')).toBe('Wx{\\blur1}{\\c&HFF&}yz')
+    })
+
+    it('ficam no seu segmento: nunca atravessam um marcador', () => {
+      const c = ev('Ab{\\blur1}cdef {\\an8}gh')
+      const u = toTranslationUnit(c)!
+      expect(u.payload).toBe('Abcdef <x1/>gh')
+      expect(apply('Ab{\\blur1}cdef {\\an8}gh', 'X <x1/>longo texto')).toBe(
+        'X{\\blur1} {\\an8}longo texto'
+      )
+    })
+
+    it('segmento traduzido vazio ainda recebe o override', () => {
+      expect(apply('Ab{\\blur1}cd {\\an8}ef', '<x1/>tudo')).toBe('{\\blur1}{\\an8}tudo')
+    })
+
+    it('override entre espaço e letra continua marcador', () => {
+      expect(toTranslationUnit(ev('Olá {\\i1}mundo'))!.payload).toBe('Olá <x1/>mundo')
+    })
   })
 })
 

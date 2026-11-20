@@ -11,7 +11,7 @@ const unit = (cueId: number, payload: string, timeIndex = cueId - 1): HashedUnit
   startMs: timeIndex * 1000,
   endMs: timeIndex * 1000 + 500,
   plain: payload.replace(/<[^>]+>/g, ''),
-  unit: { cueId, payload, skeleton: { head: [], tail: [], markers: {}, brs: [] } }
+  unit: { cueId, payload, skeleton: { head: [], tail: [], markers: {}, brs: [], inline: [] } }
 })
 
 describe('estimateTokens', () => {
