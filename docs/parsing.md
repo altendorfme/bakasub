@@ -179,7 +179,7 @@ output:   {\an8}Hello <i>world</i>, how are you?
 | untranslated | `UNTRANSLATED_VALIDATION_FAILED` | LLM layer: the line exhausted its validation attempts                                                              |
 | untranslated | `UNTRANSLATED_CONTENT_FILTERED`  | LLM layer: blocked by the provider's moderation                                                                    |
 
-Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤120-char `excerpt` with line breaks/control characters made visible, `outcome` (`kept-original` or `omitted`, following the `unparsed` export option), `params`, `cause` and `actions`. Untranslated entries come first and `maxEntries` (default 500) caps the payload while the totals stay complete. After a translation, pass `{ failures: result.failed }` so lines the LLM could not translate are reported with their LLM reason. The UI requirements are tracked in [`frontend-requirements.md`](./frontend-requirements.md).
+Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤120-char `excerpt` with line breaks/control characters made visible, `outcome` (`kept-original` or `omitted`, following the `unparsed` export option), `params`, `cause` and `actions`. Untranslated entries come first and `maxEntries` (default 500) caps the payload while the totals stay complete. After a translation, pass `{ failures: result.failed }` so lines the LLM could not translate are reported with their LLM reason.
 
 ## Inspection (`files:inspect`)
 

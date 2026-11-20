@@ -1,0 +1,67 @@
+name: Feature request
+description: Suggest an idea or improvement for BakaSub
+title: '[Idea] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Out of scope for now: image-based subtitles (OCR for PGS/VobSub), macOS builds and code signing. Other ideas are welcome.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: What were you doing, and what was hard or missing?
+      placeholder: 'When I translate a whole season, I have to...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: How would you like it to work?
+      description: Describe the behavior you imagine. Examples of input and output help.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: What do you do today, or what else did you consider?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Translate
+        - Batch mode
+        - Extract
+        - Mux
+        - Queue
+        - Cost estimate / preflight
+        - Presets / glossary
+        - Models / OpenRouter
+        - TMDB media context
+        - Subtitle formats / parsing
+        - Settings
+        - Interface language / translations
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links, screenshots, sample files.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this idea is not there yet.
+          required: true

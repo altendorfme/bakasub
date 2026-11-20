@@ -1,9 +1,10 @@
 {
   "name": "bakasub",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "BakaSub - extract, AI-translate and merge MKV subtitles",
   "main": "./out/main/index.js",
   "author": "BakaSub",
+  "license": "GPL-3.0-only",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",

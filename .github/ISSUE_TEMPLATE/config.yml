@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/lsilvatti/bakasub/security/advisories/new
+    about: Report a security problem privately. Do not open a public issue.
+  - name: User guide and troubleshooting
+    url: https://github.com/lsilvatti/bakasub/blob/main/docs/user-guide.md#troubleshooting
+    about: Common problems (missing tools, invalid key, free-model limits, encoding) and how to fix them.

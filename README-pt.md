@@ -4,178 +4,62 @@
 
 🇬🇧 [English](./README.md) · 🇧🇷 **Português**
 
-Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
+**Extraia, traduza com IA e remuxe as legendas dos seus vídeos `.mkv`**, num app desktop, na sua própria máquina.
 
-> Status: **infraestrutura base, parsers SRT, ASS/SSA e WebVTT, cache Job Memory, camada de tradução LLM, Job Manager (com modo batch) e preflight de custo concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI está implementada, exceto diagnósticos do parser e confiança de encoding. Veja o [roadmap](#roadmap).
+Versão **1.0.0** · Windows x64 e Linux x64 · [GPL-3.0](./LICENSE)
 
-## Stack
+## O que faz
 
-| Camada            | Tecnologia                                                                                                 |
-| ----------------- | ---------------------------------------------------------------------------------------------------------- |
-| Wrapper / backend | Electron (Main Process em Node.js + TypeScript)                                                            |
-| Frontend          | React 19 (Vite) + Tailwind CSS v4 + TanStack Query                                                         |
-| Comunicação       | IPC nativo estrito: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, bridge no preload |
-| Banco             | SQLite (WAL) via Drizzle ORM + driver LibSQL                                                               |
-| Validação         | Zod (IPC e manifests)                                                                                      |
-| LLM               | OpenRouter via SSE (`fetch` nativo)                                                                        |
-| Sidecars          | mkvtoolnix (`mkvextract`/`mkvmerge`) e ffmpeg via `child_process`                                          |
-| Logs              | `electron-log` com rotação em `userData/logs`                                                              |
+- **Traduz** `.srt`, `.ass`, `.ssa` e `.vtt` com qualquer modelo do [OpenRouter](https://openrouter.ai). Só o texto vai ao modelo: timestamps, estilos e tags voltam exatamente onde estavam.
+- **Cuida de todo o fluxo do MKV**: extrai uma faixa de legenda, traduz e remuxa no vídeo (ou só salva o arquivo de legenda). Use cada etapa separada ou rode tudo de uma vez.
+- **Mostra o custo antes de você pagar**: contagem de tokens e estimativa de preço com os preços atuais do OpenRouter, mais a lista do que _não_ será traduzido.
+- **Lembra o que já traduziu**: um cache local deixa o reprocessamento de um arquivo quase de graça.
+- **Sabe o que você está assistindo**: lê o nome do release e pode buscar sinopse e dados do episódio no TMDB para melhorar a tradução.
+- **Mantém seus termos consistentes** com presets (Filme, Série, Anime, Documentário ou os seus) e um glossário para nomes, honoríficos e jargões.
+- **Trabalha em lote**: traduza, extraia ou remuxe uma pasta ou temporada inteira de uma vez.
+- Interface em inglês e português do Brasil. Sem conta, sem telemetria; sua chave e seus arquivos ficam no seu computador.
 
-Runtime: Node **26** no tooling (`.nvmrc`). O Main Process roda no Node embutido do Electron 44 (24.x), por isso `@types/node` permanece em `^24`.
+## Instalação
 
-## Desenvolvimento
+Baixe a última versão na [página de Releases](https://github.com/lsilvatti/bakasub/releases):
 
-```bash
-nvm use            # Node 26
-npm install
-npm run dev        # electron-vite com HMR
-```
+| Sistema | Arquivo                 | Observações                                                                                                                             |
+| ------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | `bakasub-<v>-setup.exe` | O Windows pode mostrar um aviso do SmartScreen porque o instalador não é assinado. Escolha "Mais informações" → "Executar assim mesmo". |
+| Linux   | `bakasub-<v>.AppImage`  | `chmod +x bakasub-<v>.AppImage` e execute. A atualização automática só funciona com o AppImage.                                         |
 
-| Script                            | Função                                                        |
-| --------------------------------- | ------------------------------------------------------------- |
-| `npm run typecheck`               | `tsc` para main/preload (`node`) e renderer (`web`)           |
-| `npm run lint` / `format`         | ESLint / Prettier                                             |
-| `npm run db:generate`             | Gera migration Drizzle a partir de `src/main/database/schema` |
-| `npm run db:check`                | Valida consistência das migrations                            |
-| `npm run build`                   | Typecheck + `electron-vite build`                             |
-| `npm run dist:linux` / `dist:win` | Empacota em runner nativo (usado pelo CI)                     |
-| `npm run build:win`               | Gera o instalador Windows a partir do Linux (wine em Docker)  |
-| `npm run build:all`               | Linux + Windows localmente                                    |
-| `npm run clean`                   | Remove `out/`, `dist/` e cache do ESLint                      |
+Você pode conferir o download com o `SHA256SUMS.txt` da mesma release.
 
-Plataformas suportadas: **Linux x64** e **Windows x64**. Não há build para macOS.
+## Primeiros passos
 
-## Estrutura
+Você precisa de uma **API key do OpenRouter**: crie uma em [openrouter.ai/keys](https://openrouter.ai/keys). Alguns modelos são gratuitos (com limite diário); os outros são cobrados por uso.
 
-```
-src/
-  main/
-    config/        paths (userData), URLs remotas
-    database/      client (WAL, migrate no boot), schema/, repositories/
-    ipc/           create-handler (valida sender + Zod), register, handlers/ por domínio
-    logging/       electron-log (scopes: app, db, ipc, sidecar, llm)
-    services/      shutdown-coordinator, app-info, app-update, consentimento nativo
-    sidecars/      módulo de sidecars (sem dependência de `electron`, testável em Node puro)
-    parsers/       parsing de legendas: decoder, AST comum, SRT, ASS/SSA, WebVTT, segmentação, cobertura (puro, testável)
-    llm/           cliente OpenRouter (SSE), catálogo de modelos, chunking, prompts, retries, translateDocument
-    memory/        Job Memory: context hash e serviço de cache
-    media-context/ contexto de mídia (TMDB): parser de nome, cliente, cache, protocolo de arte
-    media/         fachada do mkvtoolnix (probe/extract/mux), idiomas, nomes de saída, validação de caminhos
-    jobs/          fila de jobs, runner, etapas (probe/extract/translate/validate/write/mux), specs
-    batch/         planejamento de batch (varredura, probe, seleção de faixas) e serviço de batch
-    preflight/     contagem de tokens (js-tiktoken) e estimativa de custo
-    presets/       presets de tradução embutidos (imutáveis) e personalizados
-    settings/      registro tipado de configurações e o cofre de segredos cifrado
-    window/        criação da BrowserWindow
-  preload/         única superfície exposta ao renderer (window.api), com allowlist
-  renderer/        React + Tailwind + TanStack Query + TanStack Router + i18next (veja docs/renderer.md)
-    src/guides/    guias do usuário exibidos no app, uma pasta por idioma (en, pt-BR)
-  shared/          contrato IPC tipado e utilitários puros (sem zod/electron)
-drizzle/           migrations versionadas
-scripts/           build cruzado (Docker/wine) e binários nativos
-```
+1. Abra o BakaSub. O guia de primeiro uso pede sua chave do OpenRouter, um modelo favorito e padrão, e os idiomas de destino.
+2. Deixe-o baixar o **ffmpeg e o mkvtoolnix** quando pedir (necessários para `.mkv`; só baixa com o seu consentimento). Arquivos de legenda sozinhos não precisam deles.
+3. Opcionalmente, adicione uma chave gratuita do [TMDB](https://www.themoviedb.org/settings/api) para enriquecer as traduções com sinopses.
+4. Vá em **Traduzir**, solte um vídeo ou uma legenda, escolha um preset, revise o custo e confirme.
 
-### Contrato IPC
+Progresso, custo e resultados ficam na **Fila**. O passo a passo completo está no [guia do usuário](./docs/user-guide.md) (em inglês).
 
-`src/shared/ipc-contract.ts` é a fonte única de verdade para canais, payloads e `window.api`. O preload expõe apenas canais presentes nas allowlists `INVOKE_CHANNELS`/`EVENT_CHANNELS`; nunca o `ipcRenderer`. Todo handler passa por `createHandler`, que:
+## Bom saber
 
-1. rejeita `senderFrame` fora da origem do app;
-2. valida o payload com Zod;
-3. devolve o envelope `{ ok, data } | { ok, error: { code, message } }`, mapeando `AppError` para códigos estáveis.
+- **Custo e privacidade.** Você paga o OpenRouter diretamente pelo que traduz. O texto das legendas, suas notas e o glossário são enviados ao OpenRouter; o nome do arquivo vai ao TMDB se você adicionar uma chave. Nada é enviado sem você iniciar um job, e nada vai para o autor. Detalhes no [guia do usuário](./docs/user-guide.md#privacy-what-leaves-your-computer).
+- **Seus dados** ficam em `~/.config/bakasub` (Linux) ou `%APPDATA%\bakasub` (Windows). Atualizar ou desinstalar o app não os apaga.
+- **Não suportado**: legendas em imagem (PGS, VobSub, DVB) e macOS.
+- **Limitações conhecidas**: não há tela geral do lote depois de sair da página que o criou (os jobs aparecem um a um na Fila); não há override manual de encoding, então um arquivo mal detectado deve ser salvo de novo como UTF-8.
 
-Para adicionar um canal: declarar em `IpcInvokeContract` + allowlist, expor em `BakaSubApi`/preload e registrar um handler em `src/main/ipc/handlers/`.
+## Documentação
 
-### Shutdown gracioso
+A documentação detalhada está em inglês.
 
-`ShutdownCoordinator` executa disposers em ordem LIFO, com timeout global, no `before-quit` e em `SIGINT`/`SIGTERM`. Primeiro aborta os jobs em execução (marcando-os `interrupted`), depois libera os processos filhos dos sidecars (SIGTERM → SIGKILL), as escritas do Job Memory e o banco (`wal_checkpoint(TRUNCATE)`).
+- **Usando o app**: [Guia do usuário](./docs/user-guide.md) · [Reportar um problema](./docs/reporting-issues.md)
+- **Contribuindo**: [CONTRIBUTING.md](./CONTRIBUTING.md) · [Desenvolvimento](./docs/development.md) · [Arquitetura](./docs/architecture.md)
+- **Internos**: [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md)
 
-## Dados do usuário
+## Suporte e contribuição
 
-Tudo fica em `app.getPath('userData')` (Linux: `~/.config/bakasub`, Windows: `%APPDATA%\bakasub`), nunca na pasta de instalação:
+Achou um bug ou tem uma ideia? [Abra uma issue](https://github.com/lsilvatti/bakasub/issues/new/choose); o [guia](./docs/reporting-issues.md) diz o que incluir. Pull requests são bem-vindos depois de uma conversa numa issue: veja o [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-```
-bakasub.db            SQLite (WAL)
-logs/main.log         JSON por linha, rotação em 5 MB (5 arquivos)
-cache/manifests/      último manifest remoto válido (fallback offline)
-bin/                  sidecars (ver abaixo)
-```
+## Licença
 
-## Sidecars
-
-ffmpeg e mkvtoolnix **não são empacotados**. O app lê o [`manifests/sidecar.json`](./manifests/sidecar.json) deste repositório (via `raw.githubusercontent.com`): URL, SHA-256, tipo de arquivo e caminho do binário por `tool × plataforma × arquitetura`. O procedimento para atualizar uma versão está em [`docs/sidecars.md`](./docs/sidecars.md).
-
-Regras de segurança e comportamento:
-
-- **Nunca baixa automaticamente.** `sidecars:check` só consulta metadados. `sidecars:install` exige um diálogo nativo no Main (padrão "Cancelar"), que um renderer comprometido não consegue aprovar.
-- Download em streaming com SHA-256 calculado on-the-fly, **resume por HTTP Range** (`If-Range` com ETag/Last-Modified) e retry com backoff. O `.part` sobrevive a falhas, cancelamentos e reinícios. Divergência de hash descarta o arquivo.
-- Redirects para `http` são recusados; manifests remotos inválidos nunca caem no cache.
-- Extração via `7zip-bin` (zip/7z) e `--appimage-extract`. `binaryRelativePath` é validado contra path traversal.
-- **Poda:** após extrair, mantém só os binários e suas dependências (fecho de `DT_NEEDED` lido do ELF no Linux; DLLs vizinhas no Windows). A cópia podada é validada antes de ser adotada; se falhar, mantém a árvore completa.
-- Cada binário é executado (`--version`/`-version`) antes de ser registrado em `bin/installed.json`.
-- Artefatos são deduplicados por SHA-256 em `bin/archives/<sha256>/` (mkvextract e mkvmerge compartilham um único download).
-
-Consumo no código de negócio:
-
-```ts
-const { path, env } = await sidecars.resolve('mkvmerge')
-// `env` é obrigatório: no Linux injeta LD_LIBRARY_PATH para as libs do AppImage extraído
-```
-
-Toda execução de CLI externo deve passar pelo `ProcessRunner` (timeout, SIGTERM→SIGKILL, captura de stderr no log, rastreio para o shutdown).
-
-> Observação para o parser de legendas: `mkvextract` grava `.srt` com **BOM UTF-8**; o lexer deve descartá-lo antes de ler o primeiro cue.
-
-## Banco de dados
-
-SQLite em modo WAL (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), com migrations Drizzle aplicadas no boot (`drizzle/` é copiado para `resources/` no pacote). Tabelas principais: `presets` (presets de tradução personalizados, com glossário/termbase; os embutidos vivem no código), `jobs`/`batches`, `settings`/`secrets` e `job_memory` (cache de linhas traduzidas, chave única `context_hash + target_lang + model + prompt_hash`; veja [`docs/job-memory.md`](./docs/job-memory.md)).
-
-## Releases
-
-O workflow `.github/workflows/release.yml` é disparado por tags `v*` (a tag precisa ser igual à versão do `package.json`) e gera, em runners nativos:
-
-| Artefato                                       | Origem               |
-| ---------------------------------------------- | -------------------- |
-| `bakasub-<v>.AppImage`                         | Linux                |
-| `bakasub-<v>-linux-x64-unpacked.tar.gz`        | Linux                |
-| `bakasub-<v>-setup.exe` (NSIS)                 | Windows              |
-| `bakasub-<v>-win-x64-unpacked.zip`             | Windows              |
-| `SHA256SUMS.txt`                               | —                    |
-| `latest.yml`, `latest-linux.yml`, `*.blockmap` | metadados do updater |
-
-Cada job executa lint, `db:check`, typecheck, build e um smoke test do binário desempacotado (o app precisa registrar `database ready`, validando libsql e migrations no SO real). A release é criada como **rascunho**: publicá-la manualmente é o "go" do auto-update.
-
-**Auto-update** (electron-updater + GitHub Releases): o app checa silenciosamente uma vez após o boot (desligável) e só baixa e reinicia **quando o usuário pede**. Funciona no instalador do Windows e no AppImage do Linux; build de dev e `linux-unpacked` apontam para a página de releases. Detalhes em [`docs/release.md`](./docs/release.md).
-
-```bash
-git tag v0.0.1 && git push origin v0.0.1
-```
-
-Para testar sem criar release, rode o workflow manualmente (`workflow_dispatch`).
-
-Notas: o `linux-unpacked` exige `--no-sandbox` ou `chrome-sandbox` com suid (`chown root` + `chmod 4755`); os binários não são assinados (SmartScreen avisará no Windows).
-
-## Documentação detalhada
-
-Fluxos do sistema em [`docs/`](./docs) (em inglês): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md) · [Backlog do frontend](./docs/frontend-requirements.md).
-
-## Roadmap
-
-Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
-
-- [x] IPC estrito, logging, banco com migrations, shutdown gracioso
-- [x] Sidecars: manifests, download verificável, resume, poda, consentimento
-- [x] Verificação de versão do app
-- [x] Build e release (Linux + Windows)
-- [x] **Parser SRT**: AST lossless (nós Text / Tag / LineBreak), scanner tolerante com diagnósticos, modo de reparo seguro, segmentação estilo XLIFF para o LLM, relatório de cobertura (veja [`docs/parsing.md`](./docs/parsing.md))
-- [x] **Parser ASS/SSA**: mesma AST de `core/`; só `Dialogue:` vira cue e o resto é trivia lossless; desenhos e karaokê nunca vão ao LLM (veja [`docs/parsing.md`](./docs/parsing.md))
-- [x] **Job Manager**: jobs persistidos (`extract`, `translate`, `mux`, `pipeline`), fila FIFO com concorrência limitada, `AbortController` por job, retry a partir da etapa que falhou, saídas atômicas, shutdown gracioso, presets (4 embutidos imutáveis + personalizados, export/import em JSON; escreva o prompt de estilo em inglês, qualquer que seja o idioma de destino), caminhos validados (veja [`docs/jobs.md`](./docs/jobs.md))
-- [x] **Modo batch**: pastas (com recursão opcional) ou vários arquivos em Traduzir, Extrair e Mux, plano com seleção automática de faixas, pareamento MKV ↔ legendas no mux (por nome base ou temporada/episódio), criação atômica, espelhamento de pastas, cancelamento do lote (veja [`docs/jobs.md`](./docs/jobs.md))
-- [x] **Parser WebVTT**: mesma AST de `core/`; cabeçalho/NOTE/STYLE/REGION como trivia lossless, entidades decodificadas com escape na saída, falante do `<v>`, reparo seguro (veja [`docs/parsing.md`](./docs/parsing.md)). Legendas em imagem (PGS/VobSub) estão fora do escopo
-- [x] **Camada LLM**: chunks `<context>`/`<target>` sobre os misses do cache, traduzidos em lanes paralelas cortadas nas pausas entre falas (mesmo custo do sequencial), teto de requisições em voo com AIMD, JSON estruturado (`json_schema` → `json_object` → prompt) validado com Zod e validação de marcadores, reparo por linha, política de retry de transporte, termbase no System Prompt, SSE do OpenRouter com cancelamento e contabilização de custo, API key cifrada (veja [`docs/llm.md`](./docs/llm.md))
-- [x] **Passada de consistência de termos**: após cada tradução, uma verificação local (sem LLM) lista termos recorrentes da origem traduzidos de formas diferentes (ex.: `Bro` → `mano`/`Bro`), exibidos no resultado do job para salvar as formas escolhidas no glossário do preset (ou num preset novo com o nome da mídia, quando o job usou um embutido) (veja [`docs/llm.md`](./docs/llm.md))
-- [x] **Job Memory**: cache validado com chave _context hash_ + idioma + modelo + glossário, upsert transacional por chunk, prune com vacuum incremental (veja [`docs/job-memory.md`](./docs/job-memory.md))
-- [x] **Preflight**: estimativa local de tokens (`js-tiktoken`, exata para GPT, faixa de ±20% para outros tokenizers) × taxa de acerto do Job Memory × preços de `/api/v1/models`, relatório de cobertura, confirmação antes de traduzir (limite de auto-confirmação), totais do batch (veja [`docs/preflight.md`](./docs/preflight.md))
-- [x] **Contexto de mídia** (backend): parse do nome do release, busca/detalhes/episódios no TMDB com identificação conservadora, cache das respostas, cache local de arte servido por `bakasub-media://`, detalhes congelados no job e enviados no `<media>` (veja [`docs/media-context.md`](./docs/media-context.md))
-- [x] **Limites e retries**: limitador único no processo por faixa (free/pago), cooldown da faixa após 429, cota diária de modelos free via `GET /key` com aviso no preflight, rodadas extras por chunk, tudo ajustável nas configurações avançadas (ver [`docs/rate-limits.md`](./docs/rate-limits.md))
-- [x] **Frontend**: onboarding, wizard de tradução com contexto do TMDB (arquivo único ou lote de arquivos/pasta), fila, Extrair e Mux (arquivo único ou lote), Presets, Modelos, Idiomas, Logs, Configurações; inglês e português do Brasil (ver [`docs/renderer.md`](./docs/renderer.md))
-- [ ] **Diagnósticos do parser e confiança de encoding na UI**: precisam antes de um canal IPC; ver [`docs/frontend-requirements.md`](./docs/frontend-requirements.md)
+O BakaSub é software livre sob a [GNU GPL v3](./LICENSE). ffmpeg e mkvtoolnix são programas separados, baixados por você e executados como processos externos; mantêm suas próprias licenças. Os dados de filmes e séries vêm do TMDB (atribuição exibida no app); este produto usa a API do TMDB, mas não é endossado nem certificado por ele.

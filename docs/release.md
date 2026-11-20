@@ -50,15 +50,26 @@ Limitations:
 
 ### Testing an update end to end
 
-1. Publish a release `vN` (e.g. 0.0.1) and install it (Windows installer or AppImage).
+1. Publish a release `vN` (e.g. 1.0.0) and install it (Windows installer or AppImage).
 2. Bump `package.json` to `vN+1`, tag, wait for the draft, **publish it**.
 3. In the installed app (`vN`): `app:check-update` → `available`; `app:download-update` → `downloaded`; `app:install-update` → relaunches as `vN+1`. Also try it with a job running (expect `UPDATE_JOBS_ACTIVE`, then `confirmJobs: true`).
 4. Logs: `userData/logs/main.log` (scope `app`).
 
+## Releasing a version
+
+1. Work on `main` with a clean tree. Locally: `npm run lint`, `npm run typecheck`, `npm test`, `npm run db:check`, and a manual pass through `npm run dev` (onboarding, one translation, extract, mux).
+2. If the schema changed, `npm run db:generate` and commit the migration in `drizzle/`.
+3. Bump `version` in `package.json` (and `package-lock.json`): `npm version <x.y.z> --no-git-tag-version`. The tag must equal this version or CI fails on the first step.
+4. Commit (`chore(release): vX.Y.Z`) and push to `main`.
+5. Optional dry run: run the **Release** workflow by hand (`workflow_dispatch`) and download the artifacts; no release is created.
+6. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. A tag with `-` (e.g. `v1.1.0-rc.1`) creates a pre-release, which the updater ignores.
+7. CI builds Linux and Windows, runs the smoke tests and creates a **draft** release with the artifacts, `SHA256SUMS.txt` and the updater metadata.
+8. Open the draft on GitHub, check the artifacts and edit the generated notes, then **publish**. From this moment installed apps see the update.
+9. If a published release is bad, mark it as a draft again (or delete it) so the updater stops offering it, and ship a fixed patch version. Never reuse a tag.
+
 ## Caveats
 
-- The Windows job and the release job have not run on GitHub yet; the Linux job steps were reproduced locally.
 - `linux-unpacked` needs `--no-sandbox` or a setuid `chrome-sandbox` (`chown root` + `chmod 4755`).
-- Not validated on real hardware yet: the Windows NSIS update and the AppImage self-replace (unit tests mock `electron-updater`). Use the procedure above with a throwaway `vN+1`.
+- Validate the Windows NSIS update and the AppImage self-replace on real hardware before relying on them (unit tests mock `electron-updater`). Use the procedure above with a throwaway `vN+1`.
 - Binaries are unsigned. Actions are pinned by major tag, not by commit SHA.
 - Hosting sidecar binaries yourself would make you their distributor (GPL/LGPL source obligations); the current design only stores URLs and checksums.

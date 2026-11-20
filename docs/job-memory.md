@@ -59,7 +59,7 @@ hash = sha256_hex("v1" + "\0" + prev + "\0" + normalizeForHash(payload))
 
 ## IPC
 
-Only `memory:stats` and `memory:prune` are exposed ([`ipc.md`](./ipc.md)). Lookup and writes are internal to the Main process. UI requirements: [`frontend-requirements.md`](./frontend-requirements.md).
+Only `memory:stats` and `memory:prune` are exposed ([`ipc.md`](./ipc.md)). Lookup and writes are internal to the Main process.
 
 ## Open points
 

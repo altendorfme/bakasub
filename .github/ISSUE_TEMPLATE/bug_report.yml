@@ -1,0 +1,128 @@
+name: Bug report
+description: Something in BakaSub does not work as expected
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please read [Reporting a problem](https://github.com/lsilvatti/bakasub/blob/main/docs/reporting-issues.md) first and search the existing issues.
+        **Never paste your OpenRouter or TMDB key.**
+
+  - type: input
+    id: version
+    attributes:
+      label: BakaSub version
+      description: Settings → About.
+      placeholder: '1.0.0'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Windows installer (setup.exe)
+        - Windows unpacked (.zip)
+        - Linux AppImage
+        - Linux unpacked (.tar.gz)
+        - Built from source (npm run dev)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: 'Windows 11 23H2, Arch Linux, Ubuntu 24.04...'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Translate (one file)
+        - Translate (several files or a folder)
+        - Extract
+        - Mux
+        - Queue / job progress
+        - Cost review (preflight)
+        - Presets / glossary
+        - Models / OpenRouter / API key
+        - TMDB media context
+        - Video tools (ffmpeg / mkvtoolnix download)
+        - Settings
+        - Updates
+        - Installation / startup
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, including the exact error message shown by the app.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Start from the screen you were on.
+      placeholder: |
+        1. Translate → Several files → pick a folder
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: The files involved
+      description: |
+        For translation, parsing or muxing problems: file type (`.mkv`, `.srt`, `.ass`, `.ssa`, `.vtt`), subtitle format, encoding if known, the MKV track list, and the file name pattern.
+        A **small sample** (a few lines of the subtitle) is very helpful. Do not attach full copyrighted episodes.
+
+  - type: input
+    id: model
+    attributes:
+      label: Model and preset
+      description: For translation quality problems, untranslated lines or refusals.
+      placeholder: 'e.g. a model id from OpenRouter, preset Anime'
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Logs → **Export logs** (keys are hidden and your home folder becomes `~`). If it is reproducible, enable _Detailed logs_ in Settings → General first, and use **Show logs** on the failing job. Paste the relevant part here or attach the file.
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag and drop images here.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and updated to the latest version.
+          required: true
+        - label: I did not include my API keys or private data.
+          required: true

@@ -1,6 +1,6 @@
 # Renderer
 
-React 19 + Vite, inside the sandboxed renderer. It only talks to the Main through `window.api` (see [`ipc.md`](./ipc.md)). The visual design was settled with a throwaway prototype (branch `prototype/ui-variants`, `npm run prototype`); production code is written from scratch, not copied from it.
+React 19 + Vite, inside the sandboxed renderer. It only talks to the Main through `window.api` (see [`ipc.md`](./ipc.md)).
 
 ```
 src/renderer/src/
@@ -82,9 +82,7 @@ Steps: Files → Tracks (videos only) → Works → Preset & context → Output,
 - **Backdrop** (`batch-backdrop.tsx`): from Works on, the artwork of one work (with media included), drawn again on every step change (`draw` in the state, generated in the click handler). A mosaic was tried and rejected: under the gradient and the 92% panels it reads as texture.
 - **After creating** (`batch-detail.tsx`): `BatchRun` keeps the step bar with two more steps, Review cost and Translation, driven by `batchPhase` (`batch-progress.ts`: `review` while a file is queued/probing/extracting/estimating or awaits confirmation and nothing translates yet, or whenever one awaits; `run`; `done`). The card shows the phase, an overall bar weighted per step (`jobFraction`: translation ≈ 68%, extraction 15%, by kind; awaiting = up to the preflight) with %, per-state counts, the **cost review** (each awaiting file's `result.preflight`: lines to translate, cache, parts, cost; the batch total from `batches:get`; free-quota warning; "N still being prepared" while estimates arrive one by one) with "Confirm all" (`batches:confirm`), "Cancel all", and each file live (step, %, lines, cost so far, untranslated count; links to `?job=` in the queue). Every grid/flex row is `min-w-0` so long release names truncate instead of widening the card. `useBatch` refetches `batches:get` whenever a job of the batch changes status.
 
-Batches of `extract` and `mux` have their own wizards inside Extract and Mux (see [Extract and Mux in batch](#extract-and-mux-in-batch)). Not yet: a batch view after leaving the page (the jobs show one by one in the queue, with the "Batch" badge; `batches:list` is unused), and removing a whole batch.
-
-The decision came from a prototype (variants A–D, D chosen); it is kept out of `src/` in `prototype-archive/batch-flow/` until archived on a branch.
+Batches of `extract` and `mux` have their own wizards inside Extract and Mux (see [Extract and Mux in batch](#extract-and-mux-in-batch)). Known limitations: no batch view after leaving the page (the jobs show one by one in the queue, with the "Batch" badge; `batches:list` is unused), and no way to remove a whole batch.
 
 ## Media context panel
 
@@ -108,7 +106,7 @@ Artwork backdrop (`Backdrop`): the chosen title's `backdropUrl` behind the wizar
 
 ## Queue and status bar
 
-`pages/queue/`. Workspace layout (prototype variant D): the job list on the left (tabs All / Active / Needs you / Done with counts, `matchesFilter` in `data/jobs.ts`; "Needs you" = awaiting confirmation, failed, interrupted), the selected job on the right. The selection is the `?job=` search param, so the wizard's "Open in Queue" lands on the job and the browser history keeps it.
+`pages/queue/`. Workspace layout: the job list on the left (tabs All / Active / Needs you / Done with counts, `matchesFilter` in `data/jobs.ts`; "Needs you" = awaiting confirmation, failed, interrupted), the selected job on the right. The selection is the `?job=` search param, so the wizard's "Open in Queue" lands on the job and the browser history keeps it.
 
 The inspector is `JobDetail` (`components/jobs/`), the same component the wizard shows after creating a job: header (kind, batch, status, attempt, dates), preflight review / live progress / result, and the actions that apply to the state (cancel with the billing hint, confirm, retry for failed/cancelled/interrupted, remove for terminal jobs). `JobError` turns error codes into actions: `LLM_DAILY_LIMIT` shows the local time of 00:00 UTC, `LLM_CREDITS` opens OpenRouter's credits page, `SIDECAR_MISSING` installs the missing tools; `interrupted` explains that a retry resumes from the step that stopped. Only codes are used, never the Main's message.
 
@@ -194,7 +192,3 @@ Dark only (`color-scheme: dark`), pink (`--primary`) and violet (`--violet`) on 
 ## Tests
 
 `vitest` + Testing Library. Renderer test files start with `// @vitest-environment jsdom`. `test/fake-api.ts` installs a typed `window.api` where every unmocked call rejects (a test cannot pass on an accidental channel) and `emit()` pushes IPC events.
-
-## Backend gaps found by the UI design
-
-Tracked in [`frontend-requirements.md`](./frontend-requirements.md#9-backend-gaps-from-the-ui-design).
