@@ -54,6 +54,9 @@ jobs:
       - name: Testes
         run: npm test
 
+      - name: Validar manifests/** com o schema do app
+        run: npx vitest run src/main/sidecars/manifest.schema.test.ts
+
       - name: Migrations Drizzle consistentes
         run: npm run db:check
 
@@ -76,6 +79,9 @@ jobs:
         run: |
           mkdir release
           cp "dist/bakasub-${{ steps.meta.outputs.version }}.AppImage" release/
+          # Metadados do electron-updater (checksum sha512 + blockmap da AppImage).
+          cp dist/latest-linux.yml release/
+          cp "dist/bakasub-${{ steps.meta.outputs.version }}.AppImage.blockmap" release/
           # tar preserva o bit de execução (zip não preserva).
           tar -czf "release/bakasub-${{ steps.meta.outputs.version }}-linux-x64-unpacked.tar.gz" -C dist linux-unpacked
 
@@ -103,6 +109,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Name release | Out-Null
           Copy-Item "dist/bakasub-${{ steps.meta.outputs.version }}-setup.exe" release/
+          Copy-Item "dist/latest.yml" release/
+          Copy-Item "dist/bakasub-${{ steps.meta.outputs.version }}-setup.exe.blockmap" release/
           Compress-Archive -Path "dist/win-unpacked" -DestinationPath "release/bakasub-${{ steps.meta.outputs.version }}-win-x64-unpacked.zip"
 
       - uses: actions/upload-artifact@v4
@@ -126,19 +134,25 @@ jobs:
           path: release
           merge-multiple: true
 
-      - name: Conferir os 4 artefatos esperados
+      - name: Conferir os artefatos esperados
         shell: bash
         run: |
           V="${GITHUB_REF_NAME#v}"
           for f in "bakasub-$V.AppImage" "bakasub-$V-setup.exe" \
-                   "bakasub-$V-linux-x64-unpacked.tar.gz" "bakasub-$V-win-x64-unpacked.zip"; do
+                   "bakasub-$V-linux-x64-unpacked.tar.gz" "bakasub-$V-win-x64-unpacked.zip" \
+                   latest.yml latest-linux.yml \
+                   "bakasub-$V.AppImage.blockmap" "bakasub-$V-setup.exe.blockmap"; do
             test -s "release/$f" || { echo "::error::Faltando $f"; exit 1; }
           done
+          # O updater resolve o arquivo pelo nome citado no yml: eles precisam bater.
+          grep -q "bakasub-$V-setup.exe" release/latest.yml || { echo "::error::latest.yml não cita o setup.exe"; exit 1; }
+          grep -q "bakasub-$V.AppImage" release/latest-linux.yml || { echo "::error::latest-linux.yml não cita a AppImage"; exit 1; }
 
       - name: Gerar SHA256SUMS
         shell: bash
         working-directory: release
-        run: sha256sum bakasub-* > SHA256SUMS.txt
+        # Só os binários baixados à mão; latest*.yml já trazem sha512 e são lidos pelo updater.
+        run: sha256sum bakasub-*.AppImage bakasub-*-setup.exe bakasub-*.tar.gz bakasub-*.zip > SHA256SUMS.txt
 
       - name: Criar release (rascunho)
         shell: bash
@@ -146,7 +160,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           PRE=""; [[ "$GITHUB_REF_NAME" == *-* ]] && PRE="--prerelease"
-          # Rascunho: revise e publique manualmente na UI do GitHub.
+          # Rascunho: revise e PUBLIQUE manualmente. O updater só enxerga releases publicadas (é o "go" do update).
           gh release create "$GITHUB_REF_NAME" release/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "BakaSub $GITHUB_REF_NAME" \

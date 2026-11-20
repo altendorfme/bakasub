@@ -12,14 +12,64 @@ export interface AppInfo {
   userDataPath: string
 }
 
+/**
+ * Estados do auto-update (ver docs/release.md). `unsupported`: dev, `linux-unpacked`, AppImage
+ * sem `APPIMAGE` ou plataforma sem updater; use `fallbackUrl` para a página da release.
+ */
+export type AppUpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+  | 'unsupported'
+
+export interface AppUpdateProgress {
+  /** 0–100. */
+  percent: number
+  transferred: number
+  total: number
+  bytesPerSecond: number
+}
+
+/** Retrato completo do updater; também é o payload do evento push `app:update-state`. */
+export interface AppUpdateStatus {
+  state: AppUpdateState
+  /** Versão em execução. */
+  current: string
+  /** Versão publicada mais recente (a partir de `available`). */
+  latest?: string
+  /** ISO 8601 da release. */
+  publishedAt?: string
+  /** Notas da release (HTML vindo do GitHub, não confiável: sanitize antes de renderizar). */
+  notes?: string
+  /** Bytes do download. */
+  size?: number
+  /** Só em `downloading`. */
+  progress?: AppUpdateProgress
+  /** Só em `error`. */
+  error?: IpcError
+  /** `error` causado por rede/HTTP: o app segue normalmente. */
+  offline?: boolean
+  /** Só em `unsupported`: página da release (passa em `isAllowedExternalUrl`). */
+  fallbackUrl?: string
+}
+
 export interface AppUpdateInfo {
   current: string
   latest: string
   updateAvailable: boolean
-  /** `updatedAt` do version.json remoto. */
+  /** Data da release (ISO 8601); vazio quando desconhecida. */
   publishedAt: string
-  /** true quando o manifest veio do cache local (rede indisponível). */
+  /** true quando a checagem falhou por rede/HTTP. */
   offline: boolean
+  notes?: string
+  size?: number
+  state?: AppUpdateState
+  fallbackUrl?: string
+  error?: IpcError
 }
 
 export type SidecarState = 'ok' | 'missing' | 'outdated' | 'unsupported'
@@ -87,6 +137,8 @@ export interface PublicSettings {
   'preflight.autoConfirmBelowUsd': number | null
   'tracks.preferredSourceLangs': string[]
   'logs.level': 'info' | 'debug'
+  /** Checagem silenciosa de atualização ~30 s após o boot. Nunca baixa nem instala sozinha. */
+  'updates.autoCheck': boolean
   /** `null` = idioma do sistema (`navigator.language`). */
   'ui.language': AppLanguage | null
   /** Avançado (Settings → Advanced). Ver docs/rate-limits.md. */
@@ -640,6 +692,57 @@ export interface CoverageReport {
   truncated: boolean
 }
 
+/** Severidade de um diagnóstico do parser. */
+export type DiagnosticSeverity = 'info' | 'warn' | 'error'
+
+/** Espelho serializável do `Diagnostic` do parser (o Main checa a compatibilidade no tipo). */
+export interface ParserDiagnostic {
+  /** Código estável (ex.: `SRT_OVERLAP`); a UI localiza a mensagem. */
+  code: string
+  severity: DiagnosticSeverity
+  /** `auto`: a exportação reparada corrige sozinha; `report`: só informa. */
+  fix: 'auto' | 'report'
+  /** 1-based. */
+  line: number
+  /** 1-based. */
+  column: number
+  ref?: { kind: 'cue'; cueId: number } | { kind: 'block'; blockIndex: number }
+  /** Para a UI localizar a mensagem; o Main nunca manda texto. */
+  params?: Readonly<Record<string, string | number>>
+}
+
+/**
+ * Confiança da detecção de encoding. `certain`: decisão determinística (BOM ou UTF-8 estrito);
+ * os demais derivam da pontuação do detector (`score`): `high` ≥ 0.8, `medium` ≥ 0.5, senão `low`.
+ */
+export type EncodingConfidence = 'certain' | 'high' | 'medium' | 'low'
+
+export interface DetectedEncoding {
+  /** Ex.: `utf-8`, `utf-16le`, `windows-1252`. */
+  name: string
+  confidence: EncodingConfidence
+  /** 0..1 do detector; `null` quando `confidence` é `certain`. */
+  score: number | null
+  /** O arquivo tinha BOM. */
+  bom: boolean
+  /** Estilo de quebra de linha do arquivo. */
+  eol: 'lf' | 'crlf' | 'cr' | 'mixed'
+}
+
+export interface SubtitleInspection {
+  file: { name: string; sizeBytes: number }
+  format: SubtitleTextFormat
+  encoding: DetectedEncoding
+  diagnostics: {
+    /** Ordem do arquivo. Cortado em `maxItems` (500); os totais seguem completos. */
+    items: ParserDiagnostic[]
+    totals: Record<DiagnosticSeverity, number>
+    truncated: boolean
+  }
+  /** O que não seria traduzido (sem falhas do LLM: nada foi enviado). */
+  coverage: CoverageReport
+}
+
 /** Estimativa do preflight (antes de qualquer chamada ao LLM). */
 export interface PreflightEstimate {
   model: {
@@ -650,7 +753,11 @@ export interface PreflightEstimate {
   }
   /** Tokenizer local (o200k) diferente do do modelo: faixa alargada em ±20%. */
   approximate: boolean
-  lines: { total: number; cached: number; toTranslate: number; chunks: number }
+  /**
+   * `toTranslate`: falas distintas enviadas ao LLM. `copies`: falas com o mesmo context hash de
+   * uma delas (letreiro quadro a quadro), resolvidas sem requisição. `total` inclui as duas.
+   */
+  lines: { total: number; cached: number; toTranslate: number; copies: number; chunks: number }
   tokens: { input: Range; output: Range }
   /** USD; `null` quando o preço é dinâmico. */
   cost: Range | null
@@ -678,7 +785,21 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError 
 /** Canais request/response (ipcRenderer.invoke <-> ipcMain.handle). */
 export interface IpcInvokeContract {
   'app:get-info': { req: void; res: AppInfo }
+  /** Nunca rejeita por falha de rede: devolve `offline: true`. Sem download nem instalação. */
   'app:check-update': { req: void; res: AppUpdateInfo }
+  /** Snapshot atual do updater, sem rede (o renderer lê ao montar; depois segue `app:update-state`). */
+  'app:get-update-state': { req: void; res: AppUpdateStatus }
+  /**
+   * Inicia o download (só em `available`, senão `UPDATE_NOT_READY`; `UPDATE_UNSUPPORTED` fora do
+   * AppImage/instalador). Retorna na hora com `downloading`; progresso e fim vêm por `app:update-state`.
+   */
+  'app:download-update': { req: void; res: AppUpdateStatus }
+  'app:cancel-update-download': { req: void; res: { cancelled: boolean } }
+  /**
+   * Só em `downloaded` (senão `UPDATE_NOT_READY`). Com job executando e sem `confirmJobs`,
+   * `UPDATE_JOBS_ACTIVE`. Com confirmação: aborta jobs, encerra sidecars/DB e reinicia instalando.
+   */
+  'app:install-update': { req: { confirmJobs?: boolean }; res: { installing: true } }
   /** Só HTTPS para hosts da allowlist do Main (TMDB, OpenRouter, GitHub, Buy Me a Coffee); senão `URL_NOT_ALLOWED`. */
   'app:open-external': { req: { url: string }; res: { opened: true } }
   'sidecars:check': { req: void; res: SidecarReport }
@@ -755,6 +876,11 @@ export interface IpcInvokeContract {
   'jobs:clear-completed': { req: void; res: { removed: string[] } }
   /** `awaiting-confirmation` -> fila; retoma na tradução, sem reextrair nem reestimar. */
   'jobs:confirm': { req: { id: string }; res: Job }
+  /**
+   * Inspeciona uma legenda (.srt/.ass/.ssa/.vtt) sem custo de LLM e sem criar job: diagnósticos
+   * do parser, cobertura e encoding detectado. Caminho revalidado no Main.
+   */
+  'files:inspect': { req: { path: string }; res: SubtitleInspection }
   /** Estimativa + cobertura completa (o que não será traduzido, onde e por quê). */
   'jobs:preflight': {
     req: { id: string }
@@ -779,6 +905,8 @@ export interface IpcInvokeContract {
 /** Canais push (main -> renderer). Payload tipado por canal. */
 export interface IpcEventContract {
   'sidecars:progress': SidecarProgress
+  /** Cada transição do updater; `downloading` com throttle de 250 ms. */
+  'app:update-state': AppUpdateStatus
   /** Throttle de 250 ms por job; transições de estado saem na hora. */
   'jobs:progress': JobProgressEvent
   /** Lotes a cada 250 ms, só enquanto `logs:watch` estiver ligado. */
@@ -792,6 +920,10 @@ export type EventChannel = keyof IpcEventContract
 export const INVOKE_CHANNELS = [
   'app:get-info',
   'app:check-update',
+  'app:get-update-state',
+  'app:download-update',
+  'app:cancel-update-download',
+  'app:install-update',
   'app:open-external',
   'sidecars:check',
   'sidecars:install',
@@ -844,10 +976,12 @@ export const INVOKE_CHANNELS = [
   'batches:remove',
   'batches:confirm',
   'jobs:confirm',
-  'jobs:preflight'
+  'jobs:preflight',
+  'files:inspect'
 ] as const satisfies readonly InvokeChannel[]
 export const EVENT_CHANNELS = [
   'sidecars:progress',
+  'app:update-state',
   'jobs:progress',
   'logs:entry'
 ] as const satisfies readonly EventChannel[]
@@ -857,6 +991,10 @@ export interface BakaSubApi {
   app: {
     getInfo(): Promise<IpcResult<AppInfo>>
     checkUpdate(): Promise<IpcResult<AppUpdateInfo>>
+    getUpdateState(): Promise<IpcResult<AppUpdateStatus>>
+    downloadUpdate(): Promise<IpcResult<AppUpdateStatus>>
+    cancelUpdateDownload(): Promise<IpcResult<{ cancelled: boolean }>>
+    installUpdate(opts?: { confirmJobs?: boolean }): Promise<IpcResult<{ installing: true }>>
     openExternal(url: string): Promise<IpcResult<{ opened: true }>>
   }
   sidecars: {
@@ -937,6 +1075,7 @@ export interface BakaSubApi {
     ): Promise<IpcResult<{ estimate: PreflightEstimate; coverage: CoverageReport } | null>>
   }
   files: {
+    inspect(path: string): Promise<IpcResult<SubtitleInspection>>
     /** Drag & drop: caminho real de um `File` (`webUtils.getPathForFile`). Revalidado no Main. */
     pathFor(file: File): string
   }

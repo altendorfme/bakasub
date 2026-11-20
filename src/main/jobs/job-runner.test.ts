@@ -95,7 +95,7 @@ beforeEach(() => {
 const ESTIMATE = {
   model: { id: 'a/b', pricing: { prompt: 0, completion: 0 }, catalogFetchedAt: null },
   approximate: false,
-  lines: { total: 1, cached: 0, toTranslate: 1, chunks: 1 },
+  lines: { total: 1, cached: 0, toTranslate: 1, copies: 0, chunks: 1 },
   tokens: { input: { low: 100, high: 115 }, output: { low: 20, high: 23 } },
   cost: { low: 0.01, high: 0.02 }
 }

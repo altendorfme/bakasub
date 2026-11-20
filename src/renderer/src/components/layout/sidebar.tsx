@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { NAV } from '@renderer/app/pages'
 import logo from '@renderer/assets/logo.svg'
+import { updatePending, useAppUpdateStatus } from '@renderer/data/app'
 import { jobCounts, useJobs } from '@renderer/data/jobs'
 import { cn } from '@renderer/lib/utils'
 
@@ -9,6 +10,7 @@ export function Sidebar(): React.JSX.Element {
   const { t } = useTranslation()
   const counts = jobCounts(useJobs().data)
   const queueBadge = counts.running + counts.queued + counts.awaiting
+  const updateReady = updatePending(useAppUpdateStatus().data)
   const main = NAV.find((n) => n.group === 'main')!
 
   return (
@@ -59,6 +61,14 @@ export function Sidebar(): React.JSX.Element {
               >
                 <Icon className="size-4" aria-hidden />
                 <span className="flex-1">{t(`nav.${page}`)}</span>
+                {page === 'settings' && updateReady && (
+                  <span
+                    role="img"
+                    aria-label={t('status.update')}
+                    title={t('status.update')}
+                    className="size-2 rounded-full bg-primary"
+                  />
+                )}
                 {page === 'queue' && queueBadge > 0 && (
                   <span
                     className={cn(

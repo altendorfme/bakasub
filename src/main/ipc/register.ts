@@ -1,5 +1,5 @@
 import type { AppInfoService } from '../services/app-info.service'
-import type { AppUpdateService } from '../services/app-update.service'
+import type { AppUpdater } from '../services/app-updater'
 import type { BatchService } from '../batch/batch-service'
 import type { JobManager } from '../jobs/job-manager'
 import type { FreeQuota } from '../llm/free-quota'
@@ -14,6 +14,7 @@ import type { SecretVault } from '../settings/secret-vault'
 import type { SidecarManager } from '../sidecars/sidecar-manager'
 import { registerAppHandlers } from './handlers/app.handler'
 import { registerBatchHandlers } from './handlers/batches.handler'
+import { registerFileHandlers } from './handlers/files.handler'
 import { registerJobHandlers } from './handlers/jobs.handler'
 import { registerLogHandlers } from './handlers/logs.handler'
 import { registerMediaHandlers } from './handlers/media.handler'
@@ -25,7 +26,7 @@ import { registerSidecarHandlers } from './handlers/sidecar.handler'
 
 export interface IpcDependencies {
   appInfo: AppInfoService
-  appUpdate: AppUpdateService
+  appUpdate: AppUpdater
   sidecars: SidecarManager
   memory: JobMemoryService
   vault: SecretVault
@@ -50,6 +51,7 @@ export function registerIpc(deps: IpcDependencies): void {
   registerPresetHandlers(deps)
   registerJobHandlers(deps)
   registerMediaHandlers(deps)
+  registerFileHandlers()
   registerBatchHandlers(deps)
   registerLogHandlers()
   registerMediaContextHandlers(deps)

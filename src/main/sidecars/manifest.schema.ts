@@ -22,12 +22,6 @@ export const sidecarManifestSchema = z.object({
   tools: z.array(tool).min(1)
 })
 
-export const versionManifestSchema = z.object({
-  updatedAt: z.string().min(1),
-  version: z.string().min(1)
-})
-
 export type SidecarManifest = z.infer<typeof sidecarManifestSchema>
 export type SidecarToolManifest = SidecarManifest['tools'][number]
 export type SidecarArtifact = z.infer<typeof artifact>
-export type VersionManifest = z.infer<typeof versionManifestSchema>

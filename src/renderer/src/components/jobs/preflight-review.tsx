@@ -37,6 +37,7 @@ export function PreflightReview({
               {e.lines.cached > 0
                 ? ` · ${t('preflight.cachedLines', { count: e.lines.cached })}`
                 : ''}
+              {e.lines.copies > 0 ? ` · ${t('preflight.copies', { count: e.lines.copies })}` : ''}
             </dd>
           </div>
           <div className="grid gap-0.5 rounded-lg border bg-background/40 p-3">

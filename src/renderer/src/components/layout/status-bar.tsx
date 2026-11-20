@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { Job } from '@shared/ipc-contract'
 import { jobCounts, useJobs } from '@renderer/data/jobs'
-import { useAppInfo, useAppUpdate } from '@renderer/data/app'
+import { updatePending, useAppInfo, useAppUpdateStatus } from '@renderer/data/app'
 import { useApiKeyStatus, useTmdbKeyStatus } from '@renderer/data/settings'
 import { useSidecarReport } from '@renderer/data/sidecars'
 import { cooldownUntil, sessionCost } from '@renderer/data/jobs'
@@ -46,7 +46,7 @@ export function StatusBar(): React.JSX.Element {
   const apiKey = useApiKeyStatus()
   const tmdb = useTmdbKeyStatus()
   const info = useAppInfo()
-  const update = useAppUpdate()
+  const update = useAppUpdateStatus()
   // "mkvmerge 88.0 · ffmpeg 7.1": the installed versions, so a bug report can quote them.
   const installed = tools.data?.tools.filter((x) => x.installedVersion) ?? []
   const toolVersions = installed.map((x) => `${x.name} ${x.installedVersion}`).join(' · ')
@@ -121,7 +121,7 @@ export function StatusBar(): React.JSX.Element {
       {info.data ? (
         <Link to="/settings" search={{ tab: 'about' }} className="hover:text-foreground">
           {t('status.version', { version: info.data.version })}
-          {update.data?.updateAvailable ? (
+          {updatePending(update.data) ? (
             <span className="ml-1 text-primary">{t('status.update')}</span>
           ) : null}
         </Link>

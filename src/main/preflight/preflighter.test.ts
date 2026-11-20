@@ -43,7 +43,7 @@ describe('Preflighter', () => {
       preset: { model: 'a/b', glossary: [], temperature: 0.3, prompt: '' },
       targetLang: 'pt-BR'
     })
-    expect(r.estimate.lines).toEqual({ total: 1, cached: 0, toTranslate: 1, chunks: 1 })
+    expect(r.estimate.lines).toEqual({ total: 1, cached: 0, toTranslate: 1, copies: 0, chunks: 1 })
     expect(r.estimate.model.catalogFetchedAt).toBe(new Date(5).toISOString())
     expect(r.coverage.byReason).toEqual({ SKIPPED_NO_LETTERS: 1 })
   })

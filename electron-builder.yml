@@ -17,6 +17,13 @@ extraResources:
     to: resources
 # Sidecars (ffmpeg/mkvtoolnix) NÃO são empacotados: baixados em userData/bin via manifest remoto.
 npmRebuild: false
+# Gera app-update.yml (lido pelo electron-updater). A publicação continua manual (`--publish never`
+# no CI): o job `release` anexa latest*.yml e blockmaps à release.
+publish:
+  provider: github
+  owner: lsilvatti
+  repo: bakasub
+  releaseType: release
 win:
   files:
     - '!**/node_modules/7zip-bin/{linux,mac}/**'

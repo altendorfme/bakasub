@@ -29,8 +29,17 @@ export interface MemoryHitResult {
 export interface DocumentLookup {
   /** Por `cueId`. */
   readonly hits: ReadonlyMap<number, MemoryHitResult>
-  /** Cues traduzíveis sem tradução válida em cache, em ordem de documento. */
+  /**
+   * Cues traduzíveis sem tradução válida em cache, em ordem de documento, um por context hash:
+   * o primeiro de cada grupo representa os demais (ver `copies`).
+   */
   readonly misses: readonly HashedUnit[]
+  /**
+   * Misses com o mesmo context hash de um representante em `misses`, por `cueId` dele: mesma
+   * chave de cache, logo mesma tradução (ex.: letreiro animado quadro a quadro). Traduz-se só o
+   * representante e a tradução é reaplicada em cada cópia.
+   */
+  readonly copies: ReadonlyMap<number, readonly HashedUnit[]>
 }
 
 export interface ChunkEntry {
@@ -107,6 +116,8 @@ export class JobMemoryService {
 
     const hits = new Map<number, MemoryHitResult>()
     const misses: HashedUnit[] = []
+    const copies = new Map<number, HashedUnit[]>()
+    const representative = new Map<string, number>()
     const touched: number[] = []
     for (const u of units) {
       const row = rows.get(u.hash)
@@ -117,10 +128,20 @@ export class JobMemoryService {
       if (valid) {
         hits.set(u.cueId, { translated: row.translatedText, unit: u })
         touched.push(row.id)
-      } else misses.push(u)
+        continue
+      }
+      const rep = representative.get(u.hash)
+      if (rep === undefined) {
+        representative.set(u.hash, u.cueId)
+        misses.push(u)
+      } else {
+        const group = copies.get(rep)
+        if (group) group.push(u)
+        else copies.set(rep, [u])
+      }
     }
     if (!options.peek) await this.write(() => this.repo.touch(touched))
-    return { hits, misses }
+    return { hits, misses, copies }
   }
 
   /**

@@ -1,7 +1,6 @@
-const BASE = 'https://raw.githubusercontent.com/lsilvatti/bakasub-manifests/refs/heads/main'
+const BASE = 'https://raw.githubusercontent.com/lsilvatti/bakasub/main/manifests'
 
 export const remote = {
-  versionManifestUrl: `${BASE}/version.json`,
   sidecarManifestUrl: `${BASE}/sidecar.json`,
   manifestTimeoutMs: 10_000,
   /** Download aborta se nenhum byte chegar neste intervalo. */

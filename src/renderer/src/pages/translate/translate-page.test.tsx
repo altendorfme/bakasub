@@ -37,7 +37,7 @@ const estimate: PreflightEstimate = {
     catalogFetchedAt: '2026-11-19T00:00:00.000Z'
   },
   approximate: false,
-  lines: { total: 300, cached: 20, toTranslate: 280, chunks: 7 },
+  lines: { total: 300, cached: 20, toTranslate: 280, copies: 0, chunks: 7 },
   tokens: { input: { low: 20000, high: 23000 }, output: { low: 8000, high: 9200 } },
   cost: { low: 0.036, high: 0.0414 },
   decision: 'needs-confirmation'

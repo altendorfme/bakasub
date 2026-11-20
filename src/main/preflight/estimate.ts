@@ -64,6 +64,8 @@ export function estimatePreflight(input: EstimateInput): Omit<PreflightEstimate,
     limits: { ...DEFAULT_CHUNK_LIMITS, ...input.limits }
   })
   const chunks = lanes.flat()
+  // Cópias (mesmo context hash de um miss) não vão ao LLM: reaplicam a tradução do representante.
+  const copies = [...lookup.copies.values()].reduce((n, g) => n + g.length, 0)
 
   let inputTokens = 0
   let outputTokens = 0
@@ -108,9 +110,10 @@ export function estimatePreflight(input: EstimateInput): Omit<PreflightEstimate,
     },
     approximate,
     lines: {
-      total: timeline.length,
+      total: timeline.length + copies,
       cached: lookup.hits.size,
       toTranslate: lookup.misses.length,
+      copies,
       chunks: chunks.length
     },
     tokens,

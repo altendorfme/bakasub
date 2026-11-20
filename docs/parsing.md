@@ -165,21 +165,31 @@ output:   {\an8}Hello <i>world</i>, how are you?
 
 `classify(item)` is the only place that decides "does this go to the LLM?". The segmenter and `analyzeCoverage` both call it, so the report cannot diverge from the pipeline (property test).
 
-| Status       | Reason                           | Cause                                                            |
-| ------------ | -------------------------------- | ---------------------------------------------------------------- |
-| skipped      | `SKIPPED_NO_LETTERS`             | cue without any Unicode letter (`♪♪`, `...`, numbers, only tags) |
-| skipped      | `SKIPPED_EMPTY_BLOCK`            | lone index number                                                |
-| skipped      | `SKIPPED_DRAWING`                | ASS/SSA vector drawing (`\p1`)                                   |
+| Status       | Reason                           | Cause                                                                                                              |
+| ------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| skipped      | `SKIPPED_NO_LETTERS`             | cue without any Unicode letter (`♪♪`, `...`, numbers, only tags)                                                   |
+| skipped      | `SKIPPED_EMPTY_BLOCK`            | lone index number                                                                                                  |
+| skipped      | `SKIPPED_DRAWING`                | ASS/SSA vector drawing (`\p1`)                                                                                     |
 | skipped      | `SKIPPED_FRAGMENT`               | typeset karaoke: ≤4-char token, no spaces, `\pos`/`\move` + `\t`/`\move`/`\org` (1-char: `\pos`/`\move` is enough) |
-| untranslated | `UNTRANSLATED_ORPHAN_TEXT`       | text after a blank line without timing                           |
-| untranslated | `UNTRANSLATED_BAD_TIMING`        | unreadable `-->` line                                            |
-| untranslated | `UNTRANSLATED_MARKER_COLLISION`  | text resembles a marker                                          |
-| untranslated | `UNTRANSLATED_KARAOKE`           | ASS/SSA karaoke tags                                             |
-| untranslated | `UNTRANSLATED_BAD_EVENT`         | unreadable ASS/SSA `Dialogue:`                                   |
-| untranslated | `UNTRANSLATED_VALIDATION_FAILED` | LLM layer: the line exhausted its validation attempts            |
-| untranslated | `UNTRANSLATED_CONTENT_FILTERED`  | LLM layer: blocked by the provider's moderation                  |
+| untranslated | `UNTRANSLATED_ORPHAN_TEXT`       | text after a blank line without timing                                                                             |
+| untranslated | `UNTRANSLATED_BAD_TIMING`        | unreadable `-->` line                                                                                              |
+| untranslated | `UNTRANSLATED_MARKER_COLLISION`  | text resembles a marker                                                                                            |
+| untranslated | `UNTRANSLATED_KARAOKE`           | ASS/SSA karaoke tags                                                                                               |
+| untranslated | `UNTRANSLATED_BAD_EVENT`         | unreadable ASS/SSA `Dialogue:`                                                                                     |
+| untranslated | `UNTRANSLATED_VALIDATION_FAILED` | LLM layer: the line exhausted its validation attempts                                                              |
+| untranslated | `UNTRANSLATED_CONTENT_FILTERED`  | LLM layer: blocked by the provider's moderation                                                                    |
 
 Entries carry `ref`, `location` (lines and, for cues, `startMs`/`endMs`), a ≤120-char `excerpt` with line breaks/control characters made visible, `outcome` (`kept-original` or `omitted`, following the `unparsed` export option), `params`, `cause` and `actions`. Untranslated entries come first and `maxEntries` (default 500) caps the payload while the totals stay complete. After a translation, pass `{ failures: result.failed }` so lines the LLM could not translate are reported with their LLM reason. The UI requirements are tracked in [`frontend-requirements.md`](./frontend-requirements.md).
+
+## Inspection (`files:inspect`)
+
+`inspectSubtitle(path)` (`main/files/subtitle-inspector.ts`) exposes what the parser knows about a subtitle file without creating a job or calling the LLM: `validateInputFile` (absolute path, subtitle extension, ≤ 50 MB) → `readSubtitle` → `SubtitleInspection`.
+
+- `encoding`: `meta.encoding`, `bom`, `eol` (`lf|crlf|cr|mixed`) and a confidence level derived from `meta.confidence`: `certain` (BOM or strict UTF-8, `score: null`), `high` (≥ 0.8), `medium` (≥ 0.5), `low` (below; includes the `windows-1252` fallback). The UI should warn on `medium`/`low`.
+- `diagnostics`: the parser's `Diagnostic`s as-is (`code`, `severity`, `fix`, 1-based `line`/`column`, `ref`, `params`), in file order, capped at 500 with `truncated`; `totals` per severity are always complete. Codes only: the Main never sends localized text.
+- `coverage`: `analyzeCoverage(doc)` with no LLM failures (nothing was sent), so it shows what the preflight would skip.
+
+Errors use the same envelope as other channels: `INVALID_INPUT` (payload), `INVALID_PATH` (reason in the message), `INVALID_SUBTITLE` (empty or no valid cues). A separate channel (instead of extending `jobs:preflight`) lets the UI inspect a file before any job exists.
 
 ## Tests
 

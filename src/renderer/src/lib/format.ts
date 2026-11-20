@@ -18,3 +18,16 @@ export function formatTimecode(ms: number): string {
   const pad = (n: number): string => String(n).padStart(2, '0')
   return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`
 }
+
+/** Binary size for downloads ("84.3 MB"). */
+export function formatBytes(bytes: number, lang: string): string {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let v = bytes
+  let i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  const n = new Intl.NumberFormat(lang, { maximumFractionDigits: i === 0 ? 0 : 1 }).format(v)
+  return `${n} ${units[i]}`
+}

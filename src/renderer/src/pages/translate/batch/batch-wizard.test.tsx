@@ -120,7 +120,7 @@ const batchJob = (id: string, source: string, status: Job['status']): Job => ({
           preflight: {
             model: { id: 'm', pricing: { prompt: 1e-6, completion: 1e-6 }, catalogFetchedAt: null },
             approximate: false,
-            lines: { total: 300, cached: 0, toTranslate: 300, chunks: 3 },
+            lines: { total: 300, cached: 0, toTranslate: 300, copies: 0, chunks: 3 },
             tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
             cost: { low: 0.03, high: 0.04 },
             decision: 'needs-confirmation'

@@ -28,7 +28,8 @@ export const useJob = (id: string | null): UseQueryResult<Job> =>
     queryFn: () => unwrap(window.api.jobs.get(id!)),
     enabled: id !== null,
     // A job that no longer exists will not come back: no retries, the screen shows it.
-    retry: (count, err) => !(err instanceof IpcCallError && err.code === 'JOB_NOT_FOUND') && count < 3
+    retry: (count, err) =>
+      !(err instanceof IpcCallError && err.code === 'JOB_NOT_FOUND') && count < 3
   })
 
 /** Estimate + full coverage of a job waiting for confirmation. */

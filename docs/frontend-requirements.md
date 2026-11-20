@@ -105,16 +105,13 @@ API: `dialog:open-folder`, `dialog:open-files` (multiple), drag & drop, `batches
 
 ## 8. Sidecars (already implemented API)
 
-- `sidecars:check`, `sidecars:install` (native consent dialog), `sidecars:progress`, `app:check-update`: the current `App.tsx` is a placeholder. A proper onboarding/settings screen is still missing.
+- ~~`sidecars:check`, `sidecars:install` (native consent dialog), `sidecars:progress`, `app:check-update`~~: done (onboarding and Settings → Sidecars/About; see [`renderer.md`](./renderer.md)).
 
 ## 9. Backend gaps from the UI design
 
 The approved design (prototype variant D, see [`renderer.md`](./renderer.md)) needs IPC that does not exist yet:
 
 - ~~Settings read/write, favorite models, target languages~~: done (`settings:get`/`settings:update`, `models.favorites`, `translation.targetLangs`, see [`database.md`](./database.md)). The request carries `model?`; presets no longer have a model or target language.
-- ~~Logs~~: done (JSON lines, `jobId` via async context, 5 rotated files, `logs.level`, `logs:tail`/`watch`/`entry`/`open-folder`/`export`/`report`; see [`logging.md`](./logging.md)).
-- ~~Media context~~: done with **TMDB** (backend: [`media-context.md`](./media-context.md); UI: [`renderer.md`](./renderer.md#media-context-panel)). Still open from this list: media panel (title search popover, read-only details, season/episode fields, movie-vs-`SxxEyy` warning, "Include" checkbox), artwork backdrop through `bakasub-media://` URLs, "Metadata and images from TMDB" in the panel and the full TMDB notice in Settings → About, and the key guides rendered in-app (`useGuide('tmdb-key' | 'openrouter-key')`, see [`renderer.md`](./renderer.md#in-app-guides); external links through `app:open-external`).
-- ~~Rate limits and retries~~: backend done (see [`rate-limits.md`](./rate-limits.md)). UI still to build: Settings → Advanced with the `llm.rateLimit.*`/`llm.retry.*` fields and "Restore defaults" (`settings:reset`), the free-model quota from `models:free-quota` (tier, used/remaining today), the preflight `freeQuota` warning (`enough: false` → "needs ~N requests, M left today"), `JobProgress.waiting` in the queue and status bar as a countdown ("Waiting for the rate limit", "Paused after a rate limit", "Retrying"), `LLM_DAILY_LIMIT` with the reset time, and the user guide rendered in-app (`useGuide('openrouter-limits')`).
 - **Translate a file**: a subtitle file goes through `translate` (no track step, no mux options); a video goes through `pipeline`.
 
 ## 10. Implementation order

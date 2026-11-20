@@ -37,7 +37,10 @@ export const APP_ERROR_CODES = [
   'TARGET_LANG_NOT_SET',
   'TMDB_AUTH',
   'TMDB_KEY_MISSING',
-  'URL_NOT_ALLOWED'
+  'URL_NOT_ALLOWED',
+  'UPDATE_UNSUPPORTED',
+  'UPDATE_NOT_READY',
+  'UPDATE_JOBS_ACTIVE'
 ] as const
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number]
 

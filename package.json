@@ -51,6 +51,7 @@
     "cmdk": "^1.1.1",
     "drizzle-orm": "^0.45.4",
     "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.11",
     "i18next": "^27.2.2",
     "js-tiktoken": "1.0.21",
     "lucide-react": "^1.76.0",

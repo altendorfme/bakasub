@@ -42,6 +42,8 @@ export const SETTINGS_SCHEMA = {
   },
   /** `debug` = log detalhado (tela Settings: "Verbose logging"). Vale na hora. */
   'logs.level': { schema: z.enum(['info', 'debug']), default: 'info' as 'info' | 'debug' },
+  /** Checagem silenciosa de atualização após o boot (nunca baixa nem instala sozinha). */
+  'updates.autoCheck': { schema: z.boolean(), default: true },
   /** Jobs executados ao mesmo tempo. */
   'jobs.concurrency': { schema: z.number().int().min(1).max(4), default: 2 },
   /** Preflight: o job segue sozinho se o custo máximo estimado (USD) ficar abaixo disto. `null` = sempre perguntar. */

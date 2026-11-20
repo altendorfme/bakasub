@@ -14,7 +14,8 @@ import { emitToRenderers } from './ipc/events'
 import { registerIpc } from './ipc/register'
 import { paths } from './config/paths'
 import { createSidecarModule } from './sidecars/create-sidecar-manager'
-import { AppUpdateService } from './services/app-update.service'
+import { scheduleAutoCheck } from './services/app-updater'
+import { createAppUpdater } from './services/create-app-updater'
 import { NativeConsentGate } from './services/sidecar-consent'
 import { consentLanguage } from './services/sidecar-consent-text'
 import { path7za } from '7zip-bin'
@@ -102,9 +103,10 @@ if (!app.requestSingleInstanceLock()) {
       shutdown.register('jobs', () => jobModule.jobs.dispose(5000))
       await jobModule.jobs.init()
 
+      const appUpdate = createAppUpdater({ hasActiveJobs: () => jobModule.jobs.isBusy() })
       registerIpc({
         appInfo: new AppInfoService(),
-        appUpdate: new AppUpdateService(sidecarModule.manifests),
+        appUpdate,
         sidecars: sidecarModule.manager,
         memory,
         vault,
@@ -120,6 +122,10 @@ if (!app.requestSingleInstanceLock()) {
         mediaContext: mediaContext.service
       })
       createMainWindow()
+      scheduleAutoCheck(appUpdate, {
+        enabled: () => jobModule.settings.get('updates.autoCheck'),
+        log: logger.app
+      })
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createMainWindow()

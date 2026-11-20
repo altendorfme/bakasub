@@ -266,7 +266,7 @@ describe('JobManager', () => {
     const estimate = {
       model: { id: 'a/b', pricing: null, catalogFetchedAt: null },
       approximate: true,
-      lines: { total: 1, cached: 0, toTranslate: 1, chunks: 1 },
+      lines: { total: 1, cached: 0, toTranslate: 1, copies: 0, chunks: 1 },
       tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
       cost: null,
       decision: 'needs-confirmation' as const

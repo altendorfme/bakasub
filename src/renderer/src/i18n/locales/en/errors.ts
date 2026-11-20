@@ -43,6 +43,9 @@ const codes = {
   TMDB_AUTH: 'TMDB rejected the key. Check it in Settings.',
   TMDB_KEY_MISSING: 'Add a TMDB key in Settings to look up titles. It is optional.',
   URL_NOT_ALLOWED: 'This link cannot be opened from BakaSub.',
+  UPDATE_UNSUPPORTED: 'Updates are only installed on an AppImage or the Windows installer.',
+  UPDATE_NOT_READY: 'No update is ready to install.',
+  UPDATE_JOBS_ACTIVE: 'Jobs are running. Confirm to cancel them and install the update.',
   FORBIDDEN: 'The request was blocked.',
   INTERNAL: 'Something went wrong inside BakaSub. Details are in the logs.'
 } satisfies Record<ErrorCode, string>

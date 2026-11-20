@@ -256,7 +256,7 @@ describe('BatchService: estado agregado, cancel e remove', () => {
     const est = (high: number): NonNullable<JobResult['preflight']> => ({
       model: { id: 'a/b', pricing: { prompt: 0, completion: 0 }, catalogFetchedAt: null },
       approximate: false,
-      lines: { total: 10, cached: 2, toTranslate: 8, chunks: 1 },
+      lines: { total: 10, cached: 2, toTranslate: 8, copies: 0, chunks: 1 },
       tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
       cost: { low: high / 2, high },
       decision: 'needs-confirmation' as const

@@ -1,4 +1,4 @@
-import type { PublicSettings } from '@shared/ipc-contract'
+import type { PublicSettings, SubtitleInspection } from '@shared/ipc-contract'
 
 /** Settings of a user who finished the onboarding (the shell opens without redirecting). */
 export const onboardedSettings: PublicSettings = {
@@ -11,6 +11,7 @@ export const onboardedSettings: PublicSettings = {
   'preflight.autoConfirmBelowUsd': null,
   'tracks.preferredSourceLangs': ['en'],
   'logs.level': 'info',
+  'updates.autoCheck': true,
   'ui.language': 'en',
   'llm.rateLimit.freeRpm': 20,
   'llm.rateLimit.paidRpm': null,
@@ -23,4 +24,21 @@ export const onboardedSettings: PublicSettings = {
   'llm.concurrency.perJob': 4,
   'llm.concurrency.paidMaxInFlight': 8,
   'llm.concurrency.freeMaxInFlight': 3
+}
+
+/** `files:inspect` result for a clean UTF-8 SRT; override fields per test. */
+export function subtitleInspection(over: Partial<SubtitleInspection> = {}): SubtitleInspection {
+  return {
+    file: { name: 'episode.srt', sizeBytes: 1024 },
+    format: 'srt',
+    encoding: { name: 'utf-8', confidence: 'certain', score: null, bom: false, eol: 'lf' },
+    diagnostics: { items: [], totals: { info: 0, warn: 0, error: 0 }, truncated: false },
+    coverage: {
+      totals: { cues: 2, blocks: 0, translatable: 2, skipped: 0, untranslated: 0 },
+      byReason: {},
+      entries: [],
+      truncated: false
+    },
+    ...over
+  }
 }

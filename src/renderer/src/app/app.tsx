@@ -1,17 +1,27 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 import { I18nextProvider } from 'react-i18next'
+import { useAppUpdateEvents } from '@renderer/data/app'
 import { useJobEvents } from '@renderer/data/jobs'
 import { i18n } from '@renderer/i18n'
 import { useLanguageSync } from '@renderer/i18n/use-language-sync'
 import { ErrorBoundary } from '@renderer/components/common/error-boundary'
 import { TooltipProvider } from '@renderer/components/ui/popover'
 import { Toaster } from '@renderer/components/ui/toaster'
+import { useUpdateToast } from './use-update-toast'
 import type { AppRouter } from './router'
 
 /** App-wide IPC event subscriptions (once, at the root). */
-function EventBridge({ queryClient }: { queryClient: QueryClient }): null {
+function EventBridge({
+  queryClient,
+  router
+}: {
+  queryClient: QueryClient
+  router: AppRouter
+}): null {
   useJobEvents(queryClient)
+  useAppUpdateEvents(queryClient)
+  useUpdateToast(router)
   useLanguageSync()
   return null
 }
@@ -27,7 +37,7 @@ export function App({
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={300}>
-          <EventBridge queryClient={queryClient} />
+          <EventBridge queryClient={queryClient} router={router} />
           <ErrorBoundary>
             <RouterProvider router={router} />
           </ErrorBoundary>

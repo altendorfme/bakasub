@@ -16,6 +16,7 @@ export const PUBLIC_SETTING_KEYS = [
   'preflight.autoConfirmBelowUsd',
   'tracks.preferredSourceLangs',
   'logs.level',
+  'updates.autoCheck',
   'ui.language',
   'llm.rateLimit.freeRpm',
   'llm.rateLimit.paidRpm',

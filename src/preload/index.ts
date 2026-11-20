@@ -27,6 +27,10 @@ const api: BakaSubApi = {
   app: {
     getInfo: () => invoke('app:get-info'),
     checkUpdate: () => invoke('app:check-update'),
+    getUpdateState: () => invoke('app:get-update-state'),
+    downloadUpdate: () => invoke('app:download-update'),
+    cancelUpdateDownload: () => invoke('app:cancel-update-download'),
+    installUpdate: (opts) => invoke('app:install-update', opts ?? {}),
     openExternal: (url) => invoke('app:open-external', { url })
   },
   sidecars: {
@@ -102,6 +106,7 @@ const api: BakaSubApi = {
     preflight: (id) => invoke('jobs:preflight', { id })
   },
   files: {
+    inspect: (path) => invoke('files:inspect', { path }),
     pathFor: (file) => webUtils.getPathForFile(file)
   },
   events: {

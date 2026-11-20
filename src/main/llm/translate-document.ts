@@ -5,6 +5,7 @@ import type { HashedUnit } from '../memory/context-hash'
 import { JobMemoryService } from '../memory/job-memory.service'
 import {
   applyTranslation,
+  validateTranslation,
   type Cue,
   type InlineLexer,
   type Item,
@@ -30,7 +31,10 @@ import { laneOf, RateLimiter, type WaitInfo } from './rate-limiter'
 import { DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 import { planLanes } from './segmenter'
 
-/** Acima desta fração de linhas esgotadas (validação), o job falha. Moderação não conta. */
+/**
+ * Acima desta fração de falas distintas (context hash) esgotadas na validação, o job falha.
+ * Moderação não conta; cópias de uma fala (letreiro quadro a quadro) contam uma vez só.
+ */
 export const MAX_FAILED_RATIO = 0.1
 /** Espera antes da rodada extra N de um chunk (60 s, 120 s…). */
 export const CHUNK_ROUND_DELAY_MS = 60_000
@@ -103,6 +107,8 @@ export interface TranslateResult<F> {
   readonly failed: readonly LineFailure[]
   readonly usage: UsageTotals
   readonly cache: { readonly hits: number; readonly misses: number }
+  /** Falas resolvidas reaplicando a tradução de outra com o mesmo context hash. */
+  readonly copies: number
   readonly status: 'completed' | 'completed-with-warnings'
 }
 
@@ -148,9 +154,13 @@ export async function translateDocument<F>(
   const lookup = await deps.memory.lookupDocument(input.doc, ctx)
   const known = new Map<number, string>()
   for (const [cueId, hit] of lookup.hits) known.set(cueId, hit.translated)
+  // Contexto do LLM: cache + representantes. As cópias repetiriam a mesma fala no `<context>`.
   const timeline: HashedUnit[] = [...[...lookup.hits.values()].map((h) => h.unit), ...lookup.misses]
-  const total = timeline.length
-  const maxFailed = Math.floor(total * MAX_FAILED_RATIO)
+  const copyUnits = [...lookup.copies.values()].flat()
+  const allUnits = [...timeline, ...copyUnits]
+  const total = allUnits.length
+  const distinct = new Set(allUnits.map((u) => u.hash)).size
+  const maxFailed = Math.floor(distinct * MAX_FAILED_RATIO)
 
   const sleep = deps.sleep ?? realSleep
   const now = deps.now ?? Date.now
@@ -167,7 +177,7 @@ export async function translateDocument<F>(
   if (lanes.length > 1)
     log.info(`translating in ${lanes.length} lanes: ${lanes.map((l) => l.length).join('+')} chunks`)
 
-  const timeIndexOf = new Map(timeline.map((u) => [u.cueId, u.timeIndex]))
+  const timeIndexOf = new Map(allUnits.map((u) => [u.cueId, u.timeIndex]))
   const cachedRanges = toRanges([...lookup.hits.values()].map((h) => h.unit.timeIndex))
   const laneRanges: TimelineRange[] = lanes.map((l) => {
     const lastChunk = l[l.length - 1]
@@ -184,7 +194,15 @@ export async function translateDocument<F>(
 
   const failed: LineFailure[] = []
   const failedIds = new Set<number>()
+  /** Representantes esgotados na validação (uma vez por grupo de cópias). */
   let validationFailed = 0
+  const markFailed = (f: LineFailure): void => {
+    failed.push(f)
+    failedIds.add(f.cueId)
+    const idx = timeIndexOf.get(f.cueId)
+    if (idx !== undefined) failedIdx.add(idx)
+    done++
+  }
   let done = 0
   let completed = 0
   let phase: TranslateProgress['phase'] = 'lookup'
@@ -284,21 +302,34 @@ export async function translateDocument<F>(
         accept: async (entries) => {
           // Sem `signal`: a resposta já foi paga e validada; o abort só impede novas requisições
           // (a próxima `session.request` vê o signal e cancela). A transação é curta e atômica.
+          // Só os representantes: as cópias têm o mesmo context hash, logo a mesma linha no cache.
           const r = await deps.memory.commitChunk(
             ctx,
             entries.map((e) => ({ hashed: e.unit, translated: e.translated }))
           )
           done += entries.length
-          for (const e of entries) translatedIdx.add(e.unit.timeIndex)
+          for (const e of entries) {
+            translatedIdx.add(e.unit.timeIndex)
+            for (const copy of lookup.copies.get(e.unit.cueId) ?? []) {
+              // Mesmo payload normalizado => mesma forma de marcadores; valida contra o esqueleto
+              // da própria cópia por segurança.
+              const issues = validateTranslation(copy.unit, e.translated, input.format.lexInline)
+              if (issues.length > 0) {
+                markFailed({ cueId: copy.cueId, reason: 'UNTRANSLATED_VALIDATION_FAILED', issues })
+                continue
+              }
+              known.set(copy.cueId, e.translated)
+              translatedIdx.add(copy.timeIndex)
+              done++
+            }
+          }
           if (r.rejected.length) log.warn(`memory rejected ids: ${r.rejected.join(',')}`)
           emit()
         },
         fail: (f) => {
-          failed.push(f)
-          failedIds.add(f.cueId)
-          const idx = timeIndexOf.get(f.cueId)
-          if (idx !== undefined) failedIdx.add(idx)
-          done++
+          markFailed(f)
+          for (const copy of lookup.copies.get(f.cueId) ?? [])
+            markFailed({ ...f, cueId: copy.cueId })
           if (f.reason === 'UNTRANSLATED_VALIDATION_FAILED') validationFailed++
         }
       }
@@ -352,7 +383,7 @@ export async function translateDocument<F>(
         stop(
           new AppError(
             'LLM_TOO_MANY_FAILURES',
-            `${validationFailed} of ${total} lines failed validation`
+            `${validationFailed} of ${distinct} distinct lines failed validation`
           )
         )
       emit()
@@ -386,7 +417,7 @@ export async function translateDocument<F>(
   }
   emit()
 
-  const units = new Map(timeline.map((u) => [u.cueId, u]))
+  const units = new Map(allUnits.map((u) => [u.cueId, u]))
   const items = input.doc.items.map((item): Item<F> => {
     if (item.kind !== 'cue') return item
     const translated = known.get(item.id)
@@ -400,7 +431,8 @@ export async function translateDocument<F>(
     doc: { ...input.doc, items },
     failed,
     usage: usage(),
-    cache: { hits: lookup.hits.size, misses: lookup.misses.length },
+    cache: { hits: lookup.hits.size, misses: lookup.misses.length + copyUnits.length },
+    copies: copyUnits.length,
     status: failed.length > 0 ? 'completed-with-warnings' : 'completed'
   }
 }
