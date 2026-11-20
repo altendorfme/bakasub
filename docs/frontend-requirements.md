@@ -92,12 +92,15 @@ API: `jobs:*`, `presets:*`, `media:probe`, `dialog:*`, event `jobs:progress` (se
 
 API: `dialog:open-folder`, `dialog:open-files` (multiple), drag & drop, `batches:*` (see [`jobs.md`](./jobs.md#batch-mode-srcmainbatch)).
 
-- **Source**: a folder (with an "include subfolders" toggle) or several files; batch kinds extract / translate / full pipeline.
+- **Source**: a folder (with an "include subfolders" toggle) or several files; batch kinds extract / translate / full pipeline / mux (MKVs paired with subtitle files by the Main).
 - **Plan review before creating**: one row per file with the chosen track(s) (`selected`) and a picker over `tracks`; `extract` allows several tracks, `pipeline` exactly one. Files with `skipped` (no subtitles, only image or unsupported tracks, probe failed + `error`) are shown and excluded by default; `rejected` paths and `truncated` (more than 2,000 files) must be visible.
 - **Common options**: preset, notes, target/source language, output folder (default next to each file; with a folder, the structure is mirrored), mux options.
 - **Preferred source languages** (setting `tracks.preferredSourceLangs`) drive the automatic selection; expose it in the settings.
 - **Batch view**: counts per status, overall progress, cancel all, remove when finished, drill down into its jobs (`batches:jobs`).
 - Creating a batch is all-or-nothing: an `INVALID_INPUT` with `item N: …` points to the file to fix or drop.
+- **Mux pairing review**: video ↔ subtitles table from the plan; move, drop or assign unmatched subtitles, leave videos out, language (`und` allowed) / name / default per subtitle, ≤ 32 per video.
+
+Done: Translate (with works), Extract and Mux each have a multi-file mode (see [`renderer.md`](./renderer.md#translate-several-files-batch) and [`renderer.md`](./renderer.md#extract-and-mux-in-batch)). Gaps: no batch view after leaving the page (`batches:list` and `batches:jobs` unused) and no "remove batch".
 
 ## 7. Encoding confidence
 
@@ -135,4 +138,4 @@ Priority = shortest path to a full translation through the UI, then whatever unb
 
 **P3, needs a decision or is polish**
 
-11. ~~Batch~~ (done after a prototype, inside Translate as "Several files or a folder": works with per-work context and settings; see [`renderer.md`](./renderer.md#translate-several-files-batch)). 12. ~~Parser diagnostics and encoding confidence~~ (done for subtitle files in the Translate wizard's preflight, see [`renderer.md`](./renderer.md#translate-a-file); gaps: no encoding override in `jobs:create`, and videos / queue detail have no inspectable path). 13. ~~Full pt-BR UI locale, native notifications, accessibility review, bundle splitting~~ (done, see [`renderer.md`](./renderer.md#polish)); language picker also on the first onboarding screen.
+11. ~~Batch~~ (done after a prototype, inside Translate as "Several files or a folder": works with per-work context and settings; see [`renderer.md`](./renderer.md#translate-several-files-batch); then the same mode in Extract and Mux, with MKV ↔ subtitle pairing for mux, see [`renderer.md`](./renderer.md#extract-and-mux-in-batch)). 12. ~~Parser diagnostics and encoding confidence~~ (done for subtitle files in the Translate wizard's preflight, see [`renderer.md`](./renderer.md#translate-a-file); gaps: no encoding override in `jobs:create`, and videos / queue detail have no inspectable path). 13. ~~Full pt-BR UI locale, native notifications, accessibility review, bundle splitting~~ (done, see [`renderer.md`](./renderer.md#polish)); language picker also on the first onboarding screen.

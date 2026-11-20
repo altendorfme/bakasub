@@ -18,10 +18,24 @@ During the translate step `progress.translation` carries `done/total/cached`, `c
 
 | `kind`      | Input                                           | Steps                                                   | Output                                                        |
 | ----------- | ----------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
-| `extract`   | MKV + track ids                                 | probe → extract → write                                 | `<base>.<trackId>.<lang\|und>.<ext>` per track                |
+| `extract`   | MKV + track ids                                 | probe → extract → write                                 | `<base>.<lang\|und>.<ext>` (`naming: 'player'`, default with one track; same language twice → `<base>.<lang>.<n>.<ext>`) or `<base>.<trackId>.<lang\|und>.<ext>` (`naming: 'track'`, default with several tracks) |
 | `translate` | `.srt` / `.ass` / `.ssa` / `.vtt`               | translate → write                                       | `<base>.<targetLang>.<ext>`                                   |
 | `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                                  | `<base>.<lang>.mkv`                                           |
-| `pipeline`  | MKV + track id                                  | probe → extract → preflight → translate → [write] → mux | `<base>.<targetLang>.mkv` (+ subtitle if `alsoWriteSubtitle`) |
+| `pipeline`  | MKV + track id                                  | probe → extract → preflight → translate → [write] → [mux] | by `outputMode` (see below): `<base>.<targetLang>.mkv`, `<base>.<targetLang>.<ext>`, or both |
+
+### Pipeline output mode (`options.outputMode`)
+
+| `outputMode`        | Steps after `translate` | Result                                                                                   |
+| ------------------- | ----------------------- | ---------------------------------------------------------------------------------------- |
+| `mux` (default)     | `mux`                   | `<base>.<targetLang>.mkv`                                                                |
+| `subtitle`          | `write`                 | `<base>.<targetLang>.<ext>` next to the video (or in `outputDir`); the MKV is never read again, no remux free-space check |
+| `both`              | `write` → `mux`         | both files                                                                               |
+
+- The subtitle name is `<video base>.<BCP-47 language>.<ext>` (`Episode.mkv` → `Episode.pt-BR.ass`), the convention players use to auto-load external subtitles. `JobResult.subtitle` carries its path (also the first entry of `outputs`).
+- **Compatibility**: `options.alsoWriteSubtitle` (old requests) is deprecated: when `outputMode` is absent, `true` → `both`, `false`/absent → `mux`; an explicit `outputMode` wins. New specs store `outputMode`; specs persisted before it (only `alsoWriteSubtitle`) keep working: `planFor` reads them through `pipelineOutputMode`, so queued/failed jobs resume with the same steps. The renderer's default stays `mux` (the last choice is remembered in Settings by the UI).
+- `jobs:retry`/cancel need no special case: `write` is never reused from a previous attempt, and `subtitle` mode has no step that touches the MKV. Cancel removes the `.partial` and leaves the source and any finished output alone.
+- **Name collisions** (`extract`, `translate`, `pipeline` subtitle): ` (2)`, ` (3)`… by default; `options.overwrite: true` replaces the existing file (atomic rename), except when the target is the job's own source file. The remuxed `.mkv` always gets a unique name.
+- `extract` naming: `options.naming` (`player` | `track`); default `player` with a single track, `track` with several (batch: `options.extractNaming`, applied per item). Specs persisted without `naming` behave as `track`.
 
 Steps (`steps/*.step.ts`) are shared by every kind (`plan.ts`):
 
@@ -35,7 +49,7 @@ Steps (`steps/*.step.ts`) are shared by every kind (`plan.ts`):
 
 ## Outputs never corrupt anything
 
-- The source is never overwritten. Name collisions get ` (2)`, ` (3)`…
+- The source is never overwritten. Name collisions get ` (2)`, ` (3)`… (unless `overwrite` is requested for a subtitle output).
 - Every final file is written as `.<name>.bakasub-partial.<ext>` in the destination directory and renamed only on success (atomic on the same filesystem); failures and cancellation delete it.
 - Free space is checked before mux (`source + subtitles × 1.05`, `DISK_FULL`) and before extraction (100 MB in the work dir).
 
@@ -79,7 +93,7 @@ Paths only come from the native dialogs (`dialog:open-files`, `dialog:choose-out
 
 ## Batch mode (`src/main/batch/`)
 
-A batch groups independent jobs created together; it executes nothing itself. Kinds: `extract`, `translate`, `pipeline`, `mux` (one `mux` job per MKV, with its paired subtitles).
+A batch groups independent jobs created together; it executes nothing itself. Kinds: `extract`, `translate`, `pipeline`, `mux` (one `mux` job per MKV, with its paired subtitles). Every kind has a screen: Translate (`translate` / `pipeline`, "Several files or a folder"), Extract and Mux ("Select several files"); see [`renderer.md`](./renderer.md#translate-several-files-batch).
 
 ```
 dialog:open-folder | dialog:open-files (multiple) | drag & drop
@@ -100,8 +114,9 @@ dialog:open-folder | dialog:open-files (multiple) | drag & drop
   2. Otherwise, same folder and same season/episode taken from the file names with the release-name parser of the media context (`S01E05`, `1x05`, or absolute anime numbering `Show - 28`).
   3. More than one candidate video (two files with the same base name or the same episode) is **ambiguous**: never resolved here, the subtitle goes to `unmatchedSubtitles` for the UI to place. A subtitle beyond the 32nd of a video also lands there.
   - Language comes from the filename suffix (`.pt-BR`, `.en`), `und` without one; the user edits it before `create`. `und` is a valid language for the mux job.
-  - `batches:create` takes `items: { video, subtitles: { path, language, name?, default? }[] }[]` plus the batch-level `options` (`setDefault`, `keepOriginalSubtitles`; `alsoWriteSubtitle` is ignored). Every item is resolved before the transaction (same `resolveJobSpec` as the single mux job); a bad item, a repeated video, an item of the wrong shape for the kind, or `groups` → `INVALID_INPUT` (`item N: …`). Subtitle parsing is validated in the job (`validate` step, `INVALID_SUBTITLE`), as in the single mux. Preset/model/language/notes/media settings do not apply.
+  - `batches:create` takes `items: { video, subtitles: { path, language, name?, default? }[] }[]` plus the batch-level `options` (`setDefault`, `keepOriginalSubtitles`; `alsoWriteSubtitle`, `outputMode` and `extractNaming` are ignored). Every item is resolved before the transaction (same `resolveJobSpec` as the single mux job); a bad item, a repeated video, an item of the wrong shape for the kind, or `groups` → `INVALID_INPUT` (`item N: …`). Subtitle parsing is validated in the job (`validate` step, `INVALID_SUBTITLE`), as in the single mux. Preset/model/language/notes/media settings do not apply.
   - Output `<base>.<lang>.mkv` (first subtitle's language) next to the source, mirrored under `outputDir` for a folder batch; collisions get ` (2)`. FIFO, cancel and remove behave as in the other kinds.
+- **Output options** (`batches:create` `options`): `outputMode` (`pipeline`, default `mux`; `alsoWriteSubtitle` is the deprecated alias), `extractNaming` (`extract`), `overwrite` (`extract`/`translate`/`pipeline` subtitles); all forwarded to every item's job.
 - **Output**: without `outputDir`, next to each source. With `outputDir` and a folder batch, the relative structure is **mirrored** (subfolders created on demand); items must be inside the batch folder. Loose-file batches with `outputDir` are flat; name collisions get ` (2)`.
 - **Order**: jobs keep the plan order in the FIFO queue (staggered `created_at`).
 - **State**: `Batch.counts` per job status, `total`, `state: active | finished`.
