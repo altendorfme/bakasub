@@ -1,7 +1,6 @@
 import {
   Cpu,
   FileDown,
-  FolderOpen,
   Bookmark,
   Combine,
   Languages,
@@ -16,7 +15,6 @@ export const PAGES = [
   'translate',
   'extract',
   'mux',
-  'batch',
   'queue',
   'presets',
   'models',
@@ -35,7 +33,6 @@ export const NAV: readonly {
   { group: 'main', page: 'translate', icon: TranslateIcon },
   { group: 'work', page: 'extract', icon: FileDown },
   { group: 'work', page: 'mux', icon: Combine },
-  { group: 'work', page: 'batch', icon: FolderOpen },
   { group: 'manage', page: 'queue', icon: ListOrdered },
   { group: 'manage', page: 'presets', icon: Bookmark },
   { group: 'manage', page: 'models', icon: Cpu },

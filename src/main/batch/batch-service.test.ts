@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JobResult } from '../../shared/ipc-contract'
-import { testPresetSource } from '../presets/test-presets'
+import { TEST_PRESET, testPresetSource } from '../presets/test-presets'
 import { BatchRepository } from '../database/repositories/batch.repository'
 import { JobRepository } from '../database/repositories/job.repository'
 import { openTestDatabase } from '../database/test-db'
@@ -295,5 +295,111 @@ describe('BatchService: estado agregado, cancel e remove', () => {
     })
     await until(() => runs.length === 1)
     expect(runs[0].spec).toMatchObject({ confirmBeforeTranslate: false })
+  })
+})
+
+describe('BatchService: obras (groups)', () => {
+  const lookup = vi.fn(
+    async (
+      ref: { id: number; kind: 'movie' | 'series' },
+      ep: { season?: number; episode?: number }
+    ) => ({
+      details: {
+        provider: 'tmdb' as const,
+        id: ref.id,
+        kind: ref.kind,
+        title: `T${ref.id}`,
+        genres: [],
+        synopsis: 's'
+      },
+      episode:
+        ep.season !== undefined && ep.episode !== undefined
+          ? { season: ep.season, episode: ep.episode, title: `E${ep.episode}` }
+          : null
+    })
+  )
+  const withGroups = (): BatchService =>
+    new BatchService({
+      batches: new BatchRepository(t.db),
+      jobs,
+      mkv: { probe: probe as unknown as BatchServiceDeps['mkv']['probe'] },
+      presets: testPresetSource([TEST_PRESET, { ...TEST_PRESET, id: 'p-two', name: 'Two' }]),
+      media: { lookup },
+      preferredSourceLangs: async () => ['en'],
+      newId: () => 'batch-g'
+    })
+
+  it('cada obra substitui os padrões do batch; mídia e episódio só vêm da obra', async () => {
+    await withGroups().create({
+      kind: 'pipeline',
+      root: null,
+      presetId: 'p-test',
+      model: 'base/model',
+      notes: 'batch notes',
+      groups: [
+        { name: 'Show', media: { provider: 'tmdb', id: 7, kind: 'series' } },
+        { name: 'Other', presetId: 'p-two', model: 'g/model', targetLang: 'es', notes: 'own' }
+      ],
+      items: [
+        { path: join(root, 'show', 'ep1.mkv'), trackIds: [3], group: 0, season: 1, episode: 1 },
+        { path: join(root, 'show', 'ep2.mkv'), trackIds: [3], group: 1, season: 1, episode: 2 },
+        { path: join(root, 'show', 'S02', 'ep1.mkv'), trackIds: [3] }
+      ]
+    })
+    const specs = (await jobs.list()).map((j) => j.source)
+    expect(specs).toHaveLength(3)
+    await until(() => runs.length === 1)
+    expect(runs[0].spec).toMatchObject({
+      preset: { id: 'p-test', model: 'base/model' },
+      targetLang: 'pt-BR',
+      notes: 'batch notes',
+      media: { details: { id: 7 }, episode: { season: 1, episode: 1 } }
+    })
+    expect(lookup).toHaveBeenCalledTimes(1)
+    runs[0].resolve({ status: 'completed', result: { outputs: [], warnings: [] } })
+    await until(() => runs.length === 2)
+    expect(runs[1].spec).toMatchObject({
+      preset: { id: 'p-two', model: 'g/model' },
+      targetLang: 'es',
+      notes: 'own'
+    })
+    expect(runs[1].spec).not.toHaveProperty('media')
+    runs[1].resolve({ status: 'completed', result: { outputs: [], warnings: [] } })
+    await until(() => runs.length === 3)
+    expect(runs[2].spec).toMatchObject({ preset: { id: 'p-test' }, notes: 'batch notes' })
+    expect(runs[2].spec).not.toHaveProperty('media')
+  })
+
+  it('obra inexistente, obras num extract ou item inválido: nada é criado, erro do primeiro item', async () => {
+    const svcG = withGroups()
+    await expect(
+      svcG.create({
+        kind: 'translate',
+        root: null,
+        groups: [{}],
+        items: [{ path: join(root, 'show', 'ep1.en.srt'), group: 1 }]
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(
+      svcG.create({
+        kind: 'extract',
+        root: null,
+        groups: [{}],
+        items: [{ path: join(root, 'show', 'ep1.mkv'), trackIds: [2] }]
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(
+      svcG.create({
+        kind: 'pipeline',
+        root: null,
+        presetId: 'p-test',
+        items: [
+          { path: join(root, 'show', 'ep1.mkv'), trackIds: [3] },
+          { path: join(root, 'show', 'missing.mkv'), trackIds: [3] },
+          { path: join(root, 'show', 'ep2.mkv'), trackIds: [] }
+        ]
+      })
+    ).rejects.toThrow(/^item 1:/)
+    expect(await jobs.list()).toEqual([])
   })
 })

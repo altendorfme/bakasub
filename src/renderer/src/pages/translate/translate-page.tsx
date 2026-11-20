@@ -32,8 +32,11 @@ import {
   type WizardStep
 } from './wizard-state'
 
-/** "Translate a file": file → track (video) → preset & context → output → job (preflight, progress). */
-export function TranslatePage(): React.JSX.Element {
+/**
+ * "Translate a file": file → track (video) → preset & context → output → job (preflight, progress).
+ * `onBack`: from the first step, back to the "one file / several" choice.
+ */
+export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [state, dispatch] = useReducer(wizardReducer, initialWizard)
   const [jobId, setJobId] = useState<string | null>(null)
@@ -116,6 +119,7 @@ export function TranslatePage(): React.JSX.Element {
             <StepBar
               steps={steps}
               current={state.step}
+              label={(s) => t(`translate.steps.${s}`)}
               done={(s) => steps.indexOf(s) <= state.furthest && stepValid(state, s, defaults)}
               reachable={reachable}
               onGo={go}
@@ -164,26 +168,28 @@ export function TranslatePage(): React.JSX.Element {
                   ) : null}
                   {state.step === 'preset' ? (
                     <PresetStep
-                      state={state}
+                      value={state}
                       onChange={(patch) => dispatch({ type: 'set', patch })}
                     />
                   ) : null}
                   {state.step === 'output' ? (
                     <OutputStep
-                      state={state}
+                      video={state.file?.kind === 'video'}
+                      outputDir={state.outputDir}
+                      mux={state.mux}
                       onFolder={(outputDir) => dispatch({ type: 'set', patch: { outputDir } })}
                       onMux={(patch) => dispatch({ type: 'mux', patch })}
                     />
                   ) : null}
 
                   <div className="flex items-center justify-end gap-2 border-t pt-4">
-                    {index > 0 ? (
+                    {index > 0 || onBack ? (
                       <Button
                         variant="ghost"
                         className="mr-auto"
-                        onClick={() => dispatch({ type: 'back' })}
+                        onClick={() => (index > 0 ? dispatch({ type: 'back' }) : onBack?.())}
                       >
-                        {t('translate.back')}
+                        {index > 0 ? t('translate.back') : t('choose.back')}
                       </Button>
                     ) : null}
                     {last ? (

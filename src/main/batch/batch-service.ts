@@ -5,6 +5,7 @@ import { z } from 'zod'
 import type {
   Batch,
   BatchCreateRequest,
+  BatchGroup,
   BatchPlan,
   BatchPlanRequest,
   Job,
@@ -15,7 +16,12 @@ import type {
 import type { BatchRepository, BatchRow } from '../database/repositories/batch.repository'
 import { AppError } from '../errors'
 import type { JobManager } from '../jobs/job-manager'
-import { resolveJobSpec, type JobSpec, type PresetSource } from '../jobs/job-spec'
+import {
+  resolveJobSpec,
+  type JobSpec,
+  type MediaLookupSource,
+  type PresetSource
+} from '../jobs/job-spec'
 import { MAX_USER_NOTES } from '../presets/preset.schema'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import {
@@ -25,6 +31,10 @@ import {
   validateOutputDir
 } from '../media/path-guard'
 import { planBatch } from './batch-planner'
+import { mapPool } from './pool'
+
+/** Resolução dos itens (validação de caminho + lookup do TMDB por episódio) em paralelo. */
+const RESOLVE_CONCURRENCY = 4
 
 const TERMINAL: ReadonlySet<JobStatus> = new Set([
   'completed',
@@ -46,39 +56,81 @@ export const BatchPlanRequestSchema = z.object({
   ])
 }) satisfies z.ZodType<BatchPlanRequest>
 
-export const BatchCreateRequestSchema = z.object({
-  kind,
-  name: z.string().trim().min(1).max(120).optional(),
-  root: path.nullable(),
-  items: z
-    .array(
-      z.object({
-        path,
-        trackIds: z.array(z.number().int().min(0).max(10_000)).max(64).optional()
-      })
-    )
-    .min(1)
-    .max(MAX_ITEMS),
-  presetId: z.string().min(1).max(64).optional(),
-  notes: z.string().max(MAX_USER_NOTES).optional(),
-  targetLang: z.string().min(1).max(64).optional(),
-  sourceLang: z.string().min(1).max(64).optional(),
-  outputDir: path.optional(),
-  options: z
+const episodeNumber = z.number().int().min(0).max(9999)
+const optionalText = (max: number): z.ZodOptional<z.ZodString> =>
+  z.string().trim().min(1).max(max).optional()
+
+const BatchGroupSchema = z.object({
+  name: optionalText(120),
+  media: z
     .object({
-      setDefault: z.boolean().optional(),
-      keepOriginalSubtitles: z.boolean().optional(),
-      alsoWriteSubtitle: z.boolean().optional()
+      provider: z.literal('tmdb'),
+      id: z.number().int().positive(),
+      kind: z.enum(['movie', 'series'])
     })
     .optional(),
-  confirmBeforeTranslate: z.boolean().optional()
-}) satisfies z.ZodType<BatchCreateRequest>
+  presetId: optionalText(64),
+  model: optionalText(200),
+  targetLang: optionalText(64),
+  notes: z.string().max(MAX_USER_NOTES).optional()
+}) satisfies z.ZodType<BatchGroup>
+
+export const BatchCreateRequestSchema = z
+  .object({
+    kind,
+    name: z.string().trim().min(1).max(120).optional(),
+    root: path.nullable(),
+    items: z
+      .array(
+        z.object({
+          path,
+          trackIds: z.array(z.number().int().min(0).max(10_000)).max(64).optional(),
+          group: z.number().int().min(0).max(MAX_ITEMS).optional(),
+          season: episodeNumber.optional(),
+          episode: episodeNumber.optional()
+        })
+      )
+      .min(1)
+      .max(MAX_ITEMS),
+    groups: z.array(BatchGroupSchema).max(MAX_ITEMS).optional(),
+    presetId: z.string().min(1).max(64).optional(),
+    model: optionalText(200),
+    notes: z.string().max(MAX_USER_NOTES).optional(),
+    targetLang: z.string().min(1).max(64).optional(),
+    sourceLang: z.string().min(1).max(64).optional(),
+    outputDir: path.optional(),
+    options: z
+      .object({
+        setDefault: z.boolean().optional(),
+        keepOriginalSubtitles: z.boolean().optional(),
+        alsoWriteSubtitle: z.boolean().optional()
+      })
+      .optional(),
+    confirmBeforeTranslate: z.boolean().optional()
+  })
+  .superRefine((req, ctx) => {
+    if (req.groups && req.kind === 'extract')
+      ctx.addIssue({ code: 'custom', path: ['groups'], message: 'extract batches have no groups' })
+    req.items.forEach((item, i) => {
+      if (item.group !== undefined && item.group >= (req.groups?.length ?? 0))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['items', i, 'group'],
+          message: `item ${i}: unknown group`
+        })
+    })
+  }) satisfies z.ZodType<BatchCreateRequest>
+
+type ParsedCreate = z.output<typeof BatchCreateRequestSchema>
+type ParsedItem = ParsedCreate['items'][number]
 
 export interface BatchServiceDeps {
   readonly batches: BatchRepository
   readonly jobs: JobManager
   readonly mkv: Pick<MkvToolnix, 'probe'>
   readonly presets: PresetSource
+  /** TMDB por obra (mesma fonte dos jobs avulsos); sem ela os jobs vão sem contexto de mídia. */
+  readonly media?: MediaLookupSource
   readonly preferredSourceLangs: () => Promise<string[]>
   readonly newId?: () => string
 }
@@ -105,34 +157,18 @@ export class BatchService {
     const outRoot = req.outputDir ? await validateOutputDir(req.outputDir) : null
     const exts = req.kind === 'translate' ? SUBTITLE_EXTENSIONS : MEDIA_EXTENSIONS
 
-    // Tudo é resolvido e validado ANTES de inserir: um item ruim recusa o batch inteiro.
-    const specs: JobSpec[] = []
-    for (const [i, item] of req.items.entries()) {
-      const src = await validateInputFile(item.path, exts).catch((err: AppError) => {
-        throw new AppError('INVALID_INPUT', `item ${i}: ${err.message}`)
-      })
-      let outputDir: string | undefined
-      if (outRoot) {
-        const relDir = realRoot ? relative(realRoot, dirname(src.path)) : ''
-        if (relDir.startsWith('..') || isAbsolute(relDir))
-          throw new AppError('INVALID_INPUT', `item ${i}: outside the batch folder`)
-        outputDir = join(outRoot, relDir)
-        await mkdir(outputDir, { recursive: true })
+    // Tudo é resolvido e validado ANTES de inserir: um item ruim recusa o batch inteiro (o
+    // erro reportado é o do primeiro item, em ordem, independente do paralelismo).
+    const resolved = await mapPool(req.items, RESOLVE_CONCURRENCY, async (item, i) => {
+      try {
+        return { spec: await this.resolveItem(req, item, i, exts, realRoot, outRoot) }
+      } catch (err) {
+        return { err }
       }
-      specs.push(
-        await resolveJobSpec(
-          this.jobRequest(req, item, src.path, outputDir, i),
-          this.deps.presets
-        ).catch((err: unknown) => {
-          if (
-            err instanceof AppError &&
-            (err.code === 'INVALID_INPUT' || err.code === 'INVALID_PATH')
-          )
-            throw new AppError('INVALID_INPUT', `item ${i}: ${err.message}`)
-          throw err
-        })
-      )
-    }
+    })
+    const failed = resolved.find((r) => 'err' in r)
+    if (failed && 'err' in failed) throw failed.err
+    const specs = resolved.map((r) => (r as { spec: JobSpec }).spec)
 
     const id = this.newId()
     const name =
@@ -146,9 +182,11 @@ export class BatchService {
         root: realRoot,
         options: {
           presetId: req.presetId,
+          model: req.model,
           notes: req.notes,
           targetLang: req.targetLang,
           sourceLang: req.sourceLang,
+          groups: req.groups,
           outputDir: outRoot,
           options: req.options,
           confirmBeforeTranslate: req.confirmBeforeTranslate
@@ -211,9 +249,64 @@ export class BatchService {
     await this.deps.batches.delete(id)
   }
 
+  private async resolveItem(
+    req: ParsedCreate,
+    item: ParsedItem,
+    i: number,
+    exts: readonly string[],
+    realRoot: string | null,
+    outRoot: string | null
+  ): Promise<JobSpec> {
+    const src = await validateInputFile(item.path, exts).catch((err: AppError) => {
+      throw new AppError('INVALID_INPUT', `item ${i}: ${err.message}`)
+    })
+    let outputDir: string | undefined
+    if (outRoot) {
+      const relDir = realRoot ? relative(realRoot, dirname(src.path)) : ''
+      if (relDir.startsWith('..') || isAbsolute(relDir))
+        throw new AppError('INVALID_INPUT', `item ${i}: outside the batch folder`)
+      outputDir = join(outRoot, relDir)
+      await mkdir(outputDir, { recursive: true })
+    }
+    return resolveJobSpec(
+      this.jobRequest(req, item, src.path, outputDir, i),
+      this.deps.presets,
+      this.deps.media
+    ).catch((err: unknown) => {
+      if (err instanceof AppError && (err.code === 'INVALID_INPUT' || err.code === 'INVALID_PATH'))
+        throw new AppError('INVALID_INPUT', `item ${i}: ${err.message}`)
+      throw err
+    })
+  }
+
+  /** Padrões do batch, substituídos pelos da obra do item; a mídia vem só da obra. */
+  private translation(
+    req: ParsedCreate,
+    item: ParsedItem
+  ): Omit<Extract<JobCreateRequest, { kind: 'translate' }>, 'kind' | 'source' | 'outputDir'> {
+    const g = item.group === undefined ? undefined : req.groups?.[item.group]
+    return {
+      presetId: g?.presetId ?? req.presetId,
+      model: g?.model ?? req.model,
+      notes: g?.notes ?? req.notes,
+      targetLang: g?.targetLang ?? req.targetLang,
+      sourceLang: req.sourceLang,
+      ...(g?.media
+        ? {
+            media: {
+              ref: g.media,
+              ...(item.season !== undefined ? { season: item.season } : {}),
+              ...(item.episode !== undefined ? { episode: item.episode } : {})
+            }
+          }
+        : {}),
+      confirmBeforeTranslate: req.confirmBeforeTranslate
+    }
+  }
+
   private jobRequest(
-    req: z.output<typeof BatchCreateRequestSchema>,
-    item: { trackIds?: number[] },
+    req: ParsedCreate,
+    item: ParsedItem,
     source: string,
     outputDir: string | undefined,
     index: number
@@ -223,15 +316,7 @@ export class BatchService {
       case 'extract':
         return { kind: 'extract', ...common, trackIds: item.trackIds ?? [] }
       case 'translate':
-        return {
-          kind: 'translate',
-          ...common,
-          presetId: req.presetId,
-          notes: req.notes,
-          targetLang: req.targetLang,
-          sourceLang: req.sourceLang,
-          confirmBeforeTranslate: req.confirmBeforeTranslate
-        }
+        return { kind: 'translate', ...common, ...this.translation(req, item) }
       case 'pipeline': {
         const [trackId] = item.trackIds ?? []
         if (trackId === undefined)
@@ -240,12 +325,8 @@ export class BatchService {
           kind: 'pipeline',
           ...common,
           trackId,
-          presetId: req.presetId,
-          notes: req.notes,
-          targetLang: req.targetLang,
-          sourceLang: req.sourceLang,
-          options: req.options,
-          confirmBeforeTranslate: req.confirmBeforeTranslate
+          ...this.translation(req, item),
+          options: req.options
         }
       }
     }

@@ -188,6 +188,20 @@ describe('JobManager', () => {
     await expect(manager.get('job-1')).rejects.toMatchObject({ code: 'JOB_NOT_FOUND' })
   })
 
+  it('clearFinished remove só concluídos/cancelados, com workdir', async () => {
+    concurrency = 1
+    await manager.create(req())
+    await manager.create(req())
+    await tick()
+    await manager.cancel('job-2')
+    expect(await manager.clearFinished()).toEqual(['job-2'])
+    expect(existsSync(join(workRoot, 'job-2'))).toBe(false)
+    await expect(manager.get('job-2')).rejects.toMatchObject({ code: 'JOB_NOT_FOUND' })
+    // O que roda (job-1) não é tocado.
+    expect((await manager.get('job-1')).status).toBe('running')
+    expect(await manager.clearFinished()).toEqual([])
+  })
+
   it('isPresetInUse considera jobs não terminais', async () => {
     concurrency = 1
     await manager.create(req())

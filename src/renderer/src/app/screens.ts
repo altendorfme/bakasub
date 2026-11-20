@@ -7,7 +7,7 @@ const page = <M>(load: () => Promise<M>, name: keyof M): LazyExoticComponent<Com
 
 /** Screens already built; the router shows a placeholder for the rest. */
 export const SCREENS: Partial<Record<PageKey, LazyExoticComponent<ComponentType>>> = {
-  translate: page(() => import('@renderer/pages/translate/translate-page'), 'TranslatePage'),
+  translate: page(() => import('@renderer/pages/translate/translate-entry'), 'TranslateEntry'),
   queue: page(() => import('@renderer/pages/queue/queue-page'), 'QueuePage'),
   settings: page(() => import('@renderer/pages/settings/settings-page'), 'SettingsPage'),
   models: page(() => import('@renderer/pages/models/models-page'), 'ModelsPage'),

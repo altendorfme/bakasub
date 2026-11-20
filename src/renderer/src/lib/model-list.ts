@@ -94,16 +94,8 @@ export function inPriceRange(m: ModelSummary, min: number | null, max: number | 
   )
 }
 
-/** "Nice" stops for the price slider (USD per 1M), up to the most expensive model. */
-const NICE = [0, 0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 15, 25, 50, 75, 100, 150, 250, 500]
-
-export function priceStops(models: readonly ModelSummary[]): number[] {
-  const top = Math.max(
-    0,
-    ...models.flatMap((m) =>
-      m.pricing ? [perMillion(m.pricing.prompt), perMillion(m.pricing.completion)] : []
-    )
-  )
-  const i = NICE.findIndex((v) => v >= top)
-  return i === -1 ? [...NICE, Math.ceil(top)] : NICE.slice(0, Math.max(i, 1) + 1)
-}
+/**
+ * Price slider stops (USD per 1M). Fine-grained at the bottom, where most of the catalog sits and
+ * small steps matter; the last stop means "and above" (only a handful of models cost more than $10).
+ */
+export const PRICE_STOPS: readonly number[] = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 1, 3, 5, 10]

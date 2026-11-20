@@ -13,8 +13,8 @@ export function Sidebar(): React.JSX.Element {
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r bg-card">
-      <div className="px-4 pt-5 pb-4">
-        <img src={logo} alt={t('appName')} className="h-11 w-auto" draggable={false} />
+      <div className="px-2.5 pt-4 pb-4">
+        <img src={logo} alt={t('appName')} className="block h-auto w-full" draggable={false} />
       </div>
       <nav aria-label="Main" className="grid gap-5 px-2.5">
         {/* Translate is the core of the app: on its own, larger, highlighted by colour. */}

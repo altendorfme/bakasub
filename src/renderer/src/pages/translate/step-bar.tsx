@@ -2,24 +2,25 @@ import { Fragment } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@renderer/lib/utils'
-import type { WizardStep } from './wizard-state'
 
 /**
  * Steps in a row with arrows between them. Done steps show a check; any step the user can
  * reach (see `canGo`) is a button.
  */
-export function StepBar({
+export function StepBar<S extends string>({
   steps,
   current,
+  label,
   done,
   reachable,
   onGo
 }: {
-  steps: readonly WizardStep[]
-  current: WizardStep
-  done: (s: WizardStep) => boolean
-  reachable: (s: WizardStep) => boolean
-  onGo: (s: WizardStep) => void
+  steps: readonly S[]
+  current: S
+  label: (s: S) => string
+  done: (s: S) => boolean
+  reachable: (s: S) => boolean
+  onGo: (s: S) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
@@ -64,7 +65,7 @@ export function StepBar({
                 >
                   {ok ? <Check className="size-3" strokeWidth={3} /> : i + 1}
                 </span>
-                {t(`translate.steps.${s}`)}
+                {label(s)}
               </button>
             </li>
           </Fragment>

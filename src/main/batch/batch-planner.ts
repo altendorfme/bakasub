@@ -1,24 +1,12 @@
 import type { BatchPlan, BatchPlanItem, BatchPlanRequest } from '../../shared/ipc-contract'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import { MEDIA_EXTENSIONS, SUBTITLE_EXTENSIONS } from '../media/path-guard'
+import { mapPool } from './pool'
 import { collectFiles, scanFolder, type ScannedFile } from './scan-files'
 import { selectExtractTracks, selectTranslationTrack } from './track-selection'
 
 /** `mkvmerge -J` é leve: alguns em paralelo, sem saturar o disco. */
 const PROBE_CONCURRENCY = 4
-
-async function mapPool<T, R>(xs: readonly T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(xs.length)
-  let next = 0
-  const worker = async (): Promise<void> => {
-    while (next < xs.length) {
-      const i = next++
-      out[i] = await fn(xs[i])
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(n, xs.length) }, worker))
-  return out
-}
 
 /**
  * Plano de um batch: enumera (pasta ou arquivos avulsos), faz o probe dos MKV e pré-seleciona

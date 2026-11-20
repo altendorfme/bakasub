@@ -97,6 +97,7 @@ const api: BakaSubApi = {
     cancel: (id) => invoke('jobs:cancel', { id }),
     retry: (id) => invoke('jobs:retry', { id }),
     remove: (id) => invoke('jobs:remove', { id }),
+    clearCompleted: () => invoke('jobs:clear-completed'),
     confirm: (id) => invoke('jobs:confirm', { id }),
     preflight: (id) => invoke('jobs:preflight', { id })
   },

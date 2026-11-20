@@ -63,6 +63,7 @@ const JOBS: Job[] = [
 function setup(path: string): {
   retry: ReturnType<typeof vi.fn>
   remove: ReturnType<typeof vi.fn>
+  clearCompleted: ReturnType<typeof vi.fn>
 } {
   const byId = new Map(JOBS.map((j) => [j.id, j]))
   const retry = vi.fn(async (id: string) => ({
@@ -70,8 +71,15 @@ function setup(path: string): {
     data: { ...byId.get(id)!, status: 'queued' as const, error: null }
   }))
   const remove = vi.fn(async () => ({ ok: true as const, data: { removed: true as const } }))
+  const clearCompleted = vi.fn(async () => ({ ok: true as const, data: { removed: ['done'] } }))
   installFakeApi({
-    jobs: { list: () => ok(JOBS), get: (id: string) => ok(byId.get(id)!), retry, remove },
+    jobs: {
+      list: () => ok(JOBS),
+      get: (id: string) => ok(byId.get(id)!),
+      retry,
+      remove,
+      clearCompleted
+    },
     sidecars: {
       check: () =>
         ok({
@@ -94,7 +102,7 @@ function setup(path: string): {
     history: createMemoryHistory({ initialEntries: [path] })
   })
   render(<App queryClient={queryClient} router={router} />)
-  return { retry, remove }
+  return { retry, remove, clearCompleted }
 }
 
 afterEach(cleanup)
@@ -131,6 +139,17 @@ describe('Queue', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(remove).toHaveBeenCalledWith('done')
     expect(await screen.findByText('Select a job to see its details.')).toBeTruthy()
+  })
+
+  it('"Clear finished" drops completed jobs and closes the inspector if it showed one', async () => {
+    const { clearCompleted } = setup('/queue?job=done')
+    expect(await screen.findByText('/out/done.pt-BR.mkv')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear finished' }))
+    expect(clearCompleted).toHaveBeenCalledOnce()
+    expect(await screen.findByText('Select a job to see its details.')).toBeTruthy()
+    const list = screen.getByRole('list', { name: 'Jobs' })
+    expect(within(list).queryByText('done.mkv')).toBeNull()
+    expect(within(list).getAllByRole('button')).toHaveLength(3)
   })
 
   it('interrupted jobs invite a retry', async () => {

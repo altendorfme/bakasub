@@ -22,6 +22,7 @@ import { SettingsService } from '../settings/settings.service'
 import type { JobProgressEvent } from '../../shared/ipc-contract'
 import { JobManager } from './job-manager'
 import { JobRunner } from './job-runner'
+import type { MediaLookupSource } from './job-spec'
 import { Preflighter } from '../preflight/preflighter'
 import type { SubtitleTranslator } from './step-context'
 
@@ -124,6 +125,13 @@ export function createJobModule(o: JobModuleOptions): {
       targetLang: await settings.get('translation.defaultTargetLang')
     })
   }
+  const media: MediaLookupSource | undefined = o.mediaContext
+    ? {
+        lookup: (ref, ep) => o.mediaContext!.lookup(ref, ep),
+        onError: (err) =>
+          o.log.jobs.warn('media context lookup failed; the job continues without it', err)
+      }
+    : undefined
   const jobs = new JobManager({
     repo: new JobRepository(o.db),
     runner: new JobRunner({
@@ -135,15 +143,7 @@ export function createJobModule(o: JobModuleOptions): {
       }
     }),
     presets: presetSource,
-    ...(o.mediaContext
-      ? {
-          media: {
-            lookup: (ref, ep) => o.mediaContext!.lookup(ref, ep),
-            onError: (err) =>
-              o.log.jobs.warn('media context lookup failed; the job continues without it', err)
-          }
-        }
-      : {}),
+    ...(media ? { media } : {}),
     workRoot: o.workRoot,
     concurrency: () => settings.get('jobs.concurrency'),
     emit: o.emit,
@@ -155,6 +155,7 @@ export function createJobModule(o: JobModuleOptions): {
     jobs,
     mkv,
     presets: presetSource,
+    ...(media ? { media } : {}),
     preferredSourceLangs: () => settings.get('tracks.preferredSourceLangs')
   })
   const preferences = new PreferencesService({

@@ -6,7 +6,6 @@ export const common = {
     translate: 'Translate',
     extract: 'Extract',
     mux: 'Mux',
-    batch: 'Batch',
     queue: 'Queue',
     presets: 'Presets',
     models: 'Models',
@@ -40,7 +39,6 @@ export const common = {
     translate: { title: 'Translate a file' },
     extract: { title: 'Extract subtitles' },
     mux: { title: 'Mux subtitles' },
-    batch: { title: 'Batch' },
     queue: { title: 'Queue' },
     presets: { title: 'Presets' },
     models: { title: 'Models' },
@@ -278,6 +276,154 @@ export const common = {
         'BakaSub first estimates the cost and asks you to confirm before anything is sent to the AI.'
     }
   },
+  choose: {
+    heading: 'What do you want to translate?',
+    single: 'One file',
+    singleBody:
+      'A video (.mkv) or a subtitle file. You pick the track, the preset and the context.',
+    many: 'Several files or a folder',
+    manyBody:
+      'A whole season, a folder of movies or several files at once. Works are recognized and grouped for you.',
+    back: 'One file or several'
+  },
+  batch: {
+    title: 'Translate several files',
+    steps: {
+      files: 'Files',
+      tracks: 'Tracks',
+      works: 'Works',
+      preset: 'Preset & context',
+      output: 'Output'
+    },
+    files: {
+      heading: 'Choose the files',
+      body: 'A folder (with or without subfolders) or several files: videos (.mkv) or subtitle files (.srt, .ass, .ssa, .vtt).',
+      drop: 'Drop files here, or choose a folder',
+      folder: 'Choose a folder',
+      files: 'Choose files',
+      recursive: 'Include subfolders',
+      fromFolder: 'Folder {{path}}',
+      fromFolderRecursive: 'Folder {{path}}, with subfolders',
+      fromFiles_one: '{{count}} file',
+      fromFiles_other: '{{count}} files',
+      reading: 'Reading the files…',
+      identifying: 'Recognizing the works on TMDB…',
+      none: 'No video (.mkv) or subtitle file was found.',
+      truncated: 'The folder has more than 2,000 files: only the first ones are listed.',
+      rejected_one: '{{count}} file was refused:',
+      rejected_other: '{{count}} files were refused:',
+      both: 'This folder has videos and subtitle files. Translate:',
+      videos: 'Videos ({{count}})',
+      subtitles: 'Subtitle files ({{count}})'
+    },
+    status: {
+      ready: '{{count}} ready',
+      attention: '{{count}} need you',
+      out: '{{count}} left out',
+      works_one: '{{count}} work recognized',
+      works_other: '{{count}} works recognized'
+    },
+    problem: {
+      'no-subtitle-track': 'No subtitles',
+      'no-supported-track': 'Only image subtitles (PGS, VobSub)',
+      'probe-failed': 'The file could not be read',
+      'no-track': 'Pick a track',
+      'odd-track': 'Different track from the rest of the work',
+      'no-episode': 'Episode not recognized'
+    },
+    issues: {
+      title: 'Need you ({{count}})',
+      leaveOut: 'Leave out',
+      include: 'Include',
+      out_one: '{{count}} left out',
+      out_other: '{{count}} left out',
+      byYou: 'Left out by you'
+    },
+    tracks: {
+      heading: 'Check the subtitle tracks',
+      body: 'Picked by your preferred source language. Change the track of a whole work or of a single file.',
+      workTrack: 'Track for the whole work',
+      pick: 'Pick a track',
+      different_one: '{{count}} different',
+      different_other: '{{count}} different',
+      noLanguage: 'No language',
+      image: 'image'
+    },
+    works: {
+      heading: 'Check the works',
+      body: 'The files were grouped by the work recognized in their names. Each work has its own context (synopsis, preset, notes). Move files, merge or split works when the grouping is wrong.',
+      regroup: 'Group automatically again',
+      name: 'Work name',
+      manual: 'Manual',
+      tmdb: 'Work on TMDB',
+      series: 'Series',
+      movie: 'Movie',
+      notFound: 'Not found on TMDB',
+      mergeInto: 'Merge with…',
+      moveTo: 'Move to…',
+      newWork: 'New work',
+      season: 'Season',
+      episode: 'Episode',
+      files_one: '{{count}} file',
+      files_other: '{{count}} files'
+    },
+    preset: {
+      heading: 'How to translate each work',
+      body: 'The batch defaults apply to every work. Customize a work when it needs another preset, model, language or notes.',
+      defaults: 'Batch defaults',
+      defaultsHint: 'Used by the works that are not customized',
+      useDefaults: 'Use the batch defaults',
+      customize: 'Customize this work',
+      customized: 'Customized',
+      usesDefaults: 'Batch defaults',
+      notes: 'Notes for this work (optional)',
+      includeMedia: 'Send the title, genres and synopsis (and the episode’s) to the AI',
+      withMedia: 'with synopsis',
+      withoutMedia: 'without synopsis',
+      noMedia: 'No TMDB work: only the notes go as context. Pick the work in Works.'
+    },
+    output: {
+      heading: 'Where to save',
+      mirror: 'The subfolders of {{root}} are recreated inside the output folder.',
+      confirm: 'Show the total cost and wait for my confirmation before translating',
+      confirmOff:
+        'Each file starts as soon as its cost is estimated (Settings may still ask above a limit).',
+      review: 'Review'
+    },
+    summary: {
+      title: 'Summary',
+      source: 'Source',
+      files: 'Files',
+      tracks: 'Tracks',
+      tracksValue: 'Per work, by your preferred language',
+      works: 'Works',
+      preset: 'Preset',
+      customized_one: '{{preset}} · {{count}} work customized',
+      customized_other: '{{preset}} · {{count}} works customized',
+      model: 'Model',
+      language: 'Into',
+      output: 'Output',
+      nextToEach: 'Next to each file',
+      included: '{{count}} included',
+      includedOut: '{{count}} included · {{out}} out',
+      none: '—'
+    },
+    start_one: 'Translate {{count}} file',
+    start_other: 'Translate {{count}} files',
+    starting: 'Creating…',
+    detail: {
+      progress: '{{done}} of {{total}} finished',
+      awaiting_one: '{{count}} file is waiting for your confirmation.',
+      awaiting_other: '{{count}} files are waiting for your confirmation.',
+      cost: 'Estimated total: US$ {{low}} – {{high}}',
+      costUnknown: 'Some files use a model with a dynamic price: the total is not known.',
+      confirmAll: 'Confirm all',
+      cancelAll: 'Cancel all',
+      openQueue: 'Open in the queue',
+      another: 'Translate other files',
+      files: 'Files'
+    }
+  },
   jobs: {
     step: {
       probe: 'Reading the video',
@@ -335,6 +481,11 @@ export const common = {
   },
   queue: {
     new: 'New translation',
+    clearDone: 'Clear finished',
+    clearDoneHint:
+      'Removes completed and cancelled jobs from the queue. Failed and interrupted ones stay.',
+    cleared_one: '{{count}} job removed',
+    cleared_other: '{{count}} jobs removed',
     filters: { all: 'All', active: 'Active', attention: 'Needs you', done: 'Done' },
     empty: {
       all: 'No jobs yet. Translate a file to see it here.',
@@ -574,7 +725,7 @@ export const common = {
     prompt:
       'Instructions about tone and register (formal, casual, keep jokes, adapt idioms…). The fixed rules that protect timing and formatting are added by BakaSub.',
     glossary:
-      'Terms the AI must always translate the same way (names, places, techniques). Use a rule for things like “keep honorifics”.',
+      'Terms the AI must always translate the same way (names, places, techniques). Use a rule for things like “keep honorifics”. Built-in presets have no glossary: to add one, duplicate an existing preset or create a new one.',
     include:
       'Gives the AI the title, genres and synopsis (and the episode synopsis) so names and tone come out right. Nothing is sent to TMDB except the title.',
     concurrency:

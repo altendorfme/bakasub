@@ -60,7 +60,7 @@ afterEach(cleanup)
 describe('App shell', () => {
   it('opens on Translate, inside the sidebar layout', async () => {
     setup('/')
-    expect(await screen.findByRole('heading', { name: 'Translate a file' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^One file/ })).toBeTruthy()
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(within(nav).getByRole('link', { name: 'Translate' }).getAttribute('aria-current')).toBe(
       'page'

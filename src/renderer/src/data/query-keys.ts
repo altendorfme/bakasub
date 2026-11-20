@@ -33,6 +33,11 @@ export const qk = {
   memory: {
     stats: () => ['memory', 'stats'] as const
   },
+  batches: {
+    plan: (kind: string, source: unknown) => ['batches', 'plan', kind, source] as const,
+    /** `jobs`: the statuses of its jobs, so the counts and totals refetch as they change. */
+    detail: (id: string, jobs: string) => ['batches', 'detail', id, jobs] as const
+  },
   jobs: {
     all: ['jobs'] as const,
     list: () => ['jobs', 'list'] as const,

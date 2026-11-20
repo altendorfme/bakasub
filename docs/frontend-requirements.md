@@ -138,4 +138,4 @@ Priority = shortest path to a full translation through the UI, then whatever unb
 
 **P3, needs a decision or is polish**
 
-11. Batch (needs its own prototype and per-file media identification). 12. Parser diagnostics and encoding confidence (gap: not exposed through IPC). 13. ~~Full pt-BR UI locale, native notifications, accessibility review, bundle splitting~~ (done, see [`renderer.md`](./renderer.md#polish)); language picker also on the first onboarding screen.
+11. ~~Batch~~ (done after a prototype, inside Translate as "Several files or a folder": works with per-work context and settings; see [`renderer.md`](./renderer.md#translate-several-files-batch)). 12. Parser diagnostics and encoding confidence (gap: not exposed through IPC). 13. ~~Full pt-BR UI locale, native notifications, accessibility review, bundle splitting~~ (done, see [`renderer.md`](./renderer.md#polish)); language picker also on the first onboarding screen.

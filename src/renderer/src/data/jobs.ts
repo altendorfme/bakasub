@@ -135,6 +135,19 @@ export function useRemoveJob(): UseMutationResult<{ removed: true }, Error, stri
   })
 }
 
+/** Completed + cancelled, in one call (the Main deletes them in a single statement). */
+export function useClearCompletedJobs(): UseMutationResult<{ removed: string[] }, Error, void> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => unwrap(window.api.jobs.clearCompleted()),
+    onSuccess: ({ removed }) => {
+      const gone = new Set(removed)
+      qc.setQueryData<Job[]>(qk.jobs.list(), (list) => list?.filter((j) => !gone.has(j.id)))
+      for (const id of removed) qc.removeQueries({ queryKey: qk.jobs.detail(id) })
+    }
+  })
+}
+
 export const ACTIVE_STATUSES: ReadonlySet<Job['status']> = new Set(['queued', 'running'])
 export const RETRYABLE_STATUSES: ReadonlySet<Job['status']> = new Set([
   'failed',

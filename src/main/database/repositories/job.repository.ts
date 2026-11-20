@@ -82,4 +82,19 @@ export class JobRepository {
   async delete(id: string): Promise<void> {
     await this.db.delete(jobs).where(eq(jobs.id, id))
   }
+
+  /** Ids dos jobs nos status dados (sem limite: a limpeza da fila não pode deixar sobras). */
+  async idsByStatus(statuses: readonly JobRow['status'][]): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: jobs.id })
+      .from(jobs)
+      .where(inArray(jobs.status, [...statuses]))
+    return rows.map((r) => r.id)
+  }
+
+  /** Um único DELETE (atômico). */
+  async deleteMany(ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) return
+    await this.db.delete(jobs).where(inArray(jobs.id, [...ids]))
+  }
 }

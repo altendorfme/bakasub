@@ -31,16 +31,18 @@ export function ModelsPage(): React.JSX.Element {
           <h1 className="text-xl font-semibold tracking-tight">{t('pages.models.title')}</h1>
           <p className="max-w-[65ch] text-sm text-muted-foreground">{t('modelsPage.body')}</p>
         </div>
-        <GuideDialog id="choosing-models" label={t('guides.choosing-models')} />
-        <Button
-          disabled={refresh.isPending}
-          onClick={() =>
-            refresh.mutate(undefined, { onError: (e) => toast.error(errorMessage(e)) })
-          }
-        >
-          <RefreshCw className={refresh.isPending ? 'animate-spin' : ''} />
-          {t('modelsPage.refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <GuideDialog id="choosing-models" label={t('guides.choosing-models')} />
+          <Button
+            disabled={refresh.isPending}
+            onClick={() =>
+              refresh.mutate(undefined, { onError: (e) => toast.error(errorMessage(e)) })
+            }
+          >
+            <RefreshCw className={refresh.isPending ? 'animate-spin' : ''} />
+            {t('modelsPage.refresh')}
+          </Button>
+        </div>
       </div>
 
       <p className="flex flex-wrap gap-x-4 text-xs text-muted-foreground">

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelSummary } from '@shared/ipc-contract'
-import {
-  defaultModelListOptions,
-  families,
-  filterAndSortModels,
-  inPriceRange,
-  priceStops
-} from './model-list'
+import { defaultModelListOptions, families, filterAndSortModels, inPriceRange } from './model-list'
 
 const m = (id: string, over: Partial<ModelSummary> = {}): ModelSummary => ({
   id,
@@ -73,9 +67,5 @@ describe('price range', () => {
     expect(ids(filterAndSortModels(list, { ...o, priceMin: 0, priceMax: 0 }, []))).toEqual([
       'meta/c:free'
     ])
-  })
-  it('stops go up to the most expensive model', () => {
-    expect(priceStops(list)).toEqual([0, 0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 15])
-    expect(priceStops([])).toEqual([0, 0.05])
   })
 })

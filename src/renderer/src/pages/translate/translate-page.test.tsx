@@ -178,12 +178,17 @@ function setup(
 
 afterEach(cleanup)
 
+/** Translate opens on the "one file / several" choice. */
+const openSingle = async (): Promise<void> =>
+  userEvent.click(await screen.findByRole('button', { name: /^One file/ }))
+
 const next = async (): Promise<void> =>
   userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
 
 describe('Translate a file', () => {
   it('subtitle: no track step, defaults prefilled, preflight review, confirm, live progress', async () => {
     const { fake, create, confirm } = setup('/subs/ep01.en.srt')
+    await openSingle()
     await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
     expect((await screen.findAllByText('ep01.en.srt')).length).toBeGreaterThan(0)
     const steps = screen.getByRole('list', { name: 'Steps' })
@@ -232,6 +237,7 @@ describe('Translate a file', () => {
 
   it('video: track step preselects a translatable track; image tracks are disabled', async () => {
     const { create } = setup('/v/ep01.mkv')
+    await openSingle()
     await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
     await next()
     const group = await screen.findByRole('radiogroup')
@@ -273,6 +279,7 @@ describe('Translate a file', () => {
         forced: false
       }
     ])
+    await openSingle()
     await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
     await next()
     await next()
@@ -288,6 +295,7 @@ describe('Translate a file', () => {
 
   it('reached steps can be revisited from the step bar without Continue', async () => {
     setup('/subs/ep01.en.srt')
+    await openSingle()
     await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
     await next()
     await next()

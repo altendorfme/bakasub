@@ -67,7 +67,6 @@ const pageRoutes = PAGES.map((page) =>
   createRoute({
     getParentRoute: () => shellRoute,
     path: `/${page}`,
-    // Only the queue has a search param (`?job=` selects a job); the rest ignore it.
     // `?job=` selects a job (queue, logs); `?tab=` opens a Settings tab. Others ignore them.
     validateSearch: (search: Record<string, unknown>): { job?: string; tab?: string } => ({
       ...(typeof search.job === 'string' ? { job: search.job } : {}),

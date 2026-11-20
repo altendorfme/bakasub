@@ -119,8 +119,9 @@ describe('Models: guard and price range', () => {
     expect(await screen.findByText('Model AB')).toBeTruthy()
     const max = screen.getByRole('slider', { name: 'Maximum price' })
     max.focus()
-    // Stops: 0, 0.05, 0.1, 0.25, 0.5, 1, 2 → down to $1: Model AB ($1 in, $2 out) leaves.
-    await userEvent.keyboard('{ArrowLeft}')
+    // Fixed stops …, 1, 3, 5, 10+ → down to $1: Model AB ($1 in, $2 out) leaves.
+    expect(screen.getByText('$0 – $10+')).toBeTruthy()
+    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}')
     expect(screen.queryByText('Model AB')).toBeNull()
     expect(screen.getByText('$0 – $1')).toBeTruthy()
   })

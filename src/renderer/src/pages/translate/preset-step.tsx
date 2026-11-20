@@ -14,17 +14,28 @@ import { usePresets } from '@renderer/data/presets'
 import { useSettings } from '@renderer/data/settings'
 import { languageName } from '@renderer/lib/languages'
 import { mediaTypeLabel, presetLabel } from '@renderer/lib/preset-labels'
-import { NOTES_MAX, type WizardState } from './wizard-state'
+import { NOTES_MAX } from './wizard-state'
 
-type Patch = Partial<Pick<WizardState, 'presetId' | 'model' | 'targetLang' | 'notes'>>
+/** `null` = the default from Settings (shown prefilled). */
+export interface PresetChoice {
+  presetId: string | null
+  model: string | null
+  targetLang: string | null
+  notes: string
+}
 
-/** Preset (with its details), model (favorites only) and language, prefilled from the defaults. */
+/**
+ * Preset (with its details), model (favorites only) and language, prefilled from the defaults.
+ * Used by the single-file wizard and, per work, by the batch wizard.
+ */
 export function PresetStep({
-  state,
-  onChange
+  value: state,
+  onChange,
+  notesLabel
 }: {
-  state: WizardState
-  onChange: (patch: Patch) => void
+  value: PresetChoice
+  onChange: (patch: Partial<PresetChoice>) => void
+  notesLabel?: string
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const settings = useSettings().data
@@ -116,7 +127,7 @@ export function PresetStep({
       </div>
 
       <Field
-        label={t('translate.preset.notes')}
+        label={notesLabel ?? t('translate.preset.notes')}
         help={t('help.notes')}
         hint={t('translate.preset.notesHint', { count: state.notes.length, max: NOTES_MAX })}
         error={

@@ -1,19 +1,27 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { BrushCleaning, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import type { Job } from '@shared/ipc-contract'
 import { WaitLabel } from '@renderer/components/common/wait-label'
 import { ResizableAside } from '@renderer/components/common/resizable-aside'
 import { JobDetail } from '@renderer/components/jobs/job-detail'
 import { Backdrop } from '@renderer/components/media/backdrop'
 import { Button } from '@renderer/components/ui/button'
+import { Tooltip } from '@renderer/components/ui/popover'
 import { Progress } from '@renderer/components/ui/tabs'
-import { matchesFilter, useJobs, type QueueFilter } from '@renderer/data/jobs'
+import {
+  matchesFilter,
+  useClearCompletedJobs,
+  useJobs,
+  type QueueFilter
+} from '@renderer/data/jobs'
+import { errorMessage } from '@renderer/i18n/error-message'
 import { episodeCode } from '@renderer/lib/episode'
 import { formatUsd } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/utils'
-import { StatusPill } from './status-pill'
+import { StatusPill } from '@renderer/components/jobs/status-pill'
 
 const FILTERS: readonly QueueFilter[] = ['all', 'active', 'attention', 'done']
 
@@ -30,17 +38,41 @@ export function QueuePage(): React.JSX.Element {
   const current = jobs.find((j) => j.id === selected)
   const select = (id: string | undefined): void =>
     void navigate({ search: { job: id }, replace: true })
+  const clear = useClearCompletedJobs()
+  const doneCount = jobs.filter((j) => matchesFilter(j, 'done')).length
+  const clearDone = (): void =>
+    clear.mutate(undefined, {
+      onSuccess: ({ removed }) => {
+        if (current && removed.includes(current.id)) select(undefined)
+        toast.success(t('queue.cleared', { count: removed.length }))
+      },
+      onError: (e) => toast.error(errorMessage(e))
+    })
 
   return (
     <div className="flex h-full min-h-0">
       <ResizableAside storageKey="queue.listWidth">
         <div className="grid gap-3 border-b p-3">
-          <Button variant="default" asChild>
-            <Link to="/translate">
-              <Plus />
-              {t('queue.new')}
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="default" className="flex-1" asChild>
+              <Link to="/translate">
+                <Plus />
+                {t('queue.new')}
+              </Link>
+            </Button>
+            <Tooltip content={t('queue.clearDoneHint')}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-9"
+                aria-label={t('queue.clearDone')}
+                disabled={doneCount === 0 || clear.isPending}
+                onClick={clearDone}
+              >
+                <BrushCleaning />
+              </Button>
+            </Tooltip>
+          </div>
           <div className="flex flex-wrap gap-1 text-xs" role="tablist" aria-label={t('queue.list')}>
             {FILTERS.map((f) => {
               const count = jobs.filter((j) => matchesFilter(j, f)).length

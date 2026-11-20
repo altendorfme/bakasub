@@ -33,7 +33,7 @@ import {
   defaultModelListOptions,
   families,
   filterAndSortModels,
-  priceStops,
+  PRICE_STOPS,
   type ModelListOptions,
   type ModelSort
 } from '@renderer/lib/model-list'
@@ -62,7 +62,6 @@ export function ModelPicker({
   const set = (patch: Partial<ModelListOptions>): void => setOpts((o) => ({ ...o, ...patch }))
   const all = useMemo(() => models.data?.models ?? [], [models.data])
   const familyList = useMemo(() => families(all), [all])
-  const stops = useMemo(() => priceStops(all), [all])
   // Favorites first (in the chosen order), so starred models stay at hand.
   const rows = useMemo(() => filterAndSortModels(all, opts, value.list), [all, opts, value.list])
 
@@ -118,12 +117,8 @@ export function ModelPicker({
             {t(`models.filter.${flag}`)}
           </label>
         ))}
-        <span className="ml-auto text-muted-foreground">
-          {t('models.shown', { shown: rows.length, total: all.length })} ·{' '}
-          {t('models.favoritesCount', { count: value.list.length })}
-        </span>
       </div>
-      <PriceRange stops={stops} opts={opts} onChange={set} />
+      <PriceRange stops={PRICE_STOPS} opts={opts} onChange={set} />
       {models.data.offline ? (
         <p className="flex items-center gap-2 text-xs text-warning">
           <WifiOff className="size-3.5" />
@@ -147,6 +142,10 @@ export function ModelPicker({
           ))}
         </CommandList>
       </Command>
+      <p className="justify-self-end text-xs text-muted-foreground tabular-nums">
+        {t('models.shown', { shown: rows.length, total: all.length })} ·{' '}
+        {t('models.favoritesCount', { count: value.list.length })}
+      </p>
     </div>
   )
 }

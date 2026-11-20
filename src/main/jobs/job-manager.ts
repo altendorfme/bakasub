@@ -26,6 +26,8 @@ const TERMINAL: ReadonlySet<JobStatus> = new Set([
   'cancelled',
   'interrupted'
 ])
+/** "Concluídos" da fila: terminais que não pedem ação (falhas/interrompidos ficam). */
+const FINISHED: readonly JobStatus[] = ['completed', 'completed-with-warnings', 'cancelled']
 const RETRYABLE: ReadonlySet<JobStatus> = new Set(['failed', 'cancelled', 'interrupted'])
 const PROGRESS_THROTTLE_MS = 250
 const WORKDIR_RETENTION_MS = 7 * 86_400_000
@@ -196,6 +198,19 @@ export class JobManager {
       throw new AppError('JOB_INVALID_STATE', `Job ${id} is ${row.status}`)
     await rm(this.workDir(id), { recursive: true, force: true })
     await this.deps.repo.delete(id)
+  }
+
+  /**
+   * Remove de uma vez os jobs concluídos/cancelados: um único DELETE, depois os workdirs.
+   * Os diretórios que falharem ao apagar são recolhidos pelo `collectWorkDirs` (sem job = órfão).
+   */
+  async clearFinished(): Promise<string[]> {
+    const ids = (await this.deps.repo.idsByStatus(FINISHED)).filter((id) => !this.running.has(id))
+    await this.deps.repo.deleteMany(ids)
+    await Promise.allSettled(
+      ids.map((id) => rm(this.workDir(id), { recursive: true, force: true }))
+    )
+    return ids
   }
 
   /** Jobs inseridos por fora (batch): começa a consumi-los. */

@@ -64,6 +64,26 @@ Tests: `test/setup-dom.ts` adds the jsdom gaps cmdk/Radix need (`ResizeObserver`
 
 The wizard state is local to the page: leaving the page resets it (the job keeps running and shows in the queue).
 
+## Translate several files (batch)
+
+Translate opens on a choice (`translate-entry.tsx`): **One file** (the wizard above, whose first step's "Back" returns to the choice) or **Several files or a folder** (`pages/translate/batch/`). There is no separate Batch page in the sidebar. The batch wizard keeps the single-file look: the same `StepBar` (generic over the step type), card, footer and summary aside.
+
+Steps: Files → Tracks (videos only) → Works → Preset & context → Output, then `BatchDetail`.
+
+- **Files** (`files-step.tsx`): a folder (native dialog, "Include subfolders", re-scanned when toggled) or several files (dialog or drag & drop). `useBatchPlans` (`data/batches.ts`) asks `batches:plan` for both kinds, `pipeline` (videos) and `translate` (subtitle files): loose files are split by extension, a folder is scanned twice. When both have files, the user picks which to translate. `truncated` and `rejected` are shown. Every file then goes through `media:identify` (`useIdentifyAll`, same cache as the single-file panel); rows exist only once all are settled, since the grouping depends on them. A status line counts ready / need you / left out / works.
+- **Rows** (`batch-rows.ts`): `seedRows` (plan + identification; skipped files start out and cannot be included back; absolute anime numbering `Show - 28` is read as season 1) plus user `edits` per path (`include`, `trackId`, `season`, `episode`), so a late identification never overwrites a change. Tracks are compared by signature (language + name + format), since ids differ between releases. `rowProblem`: `no-subtitle-track` / `no-supported-track` / `probe-failed` (skipped), `no-track` (blocking), `odd-track` (not the work's majority track), `no-episode` (series without numbers).
+- **Tracks** (`tracks-step.tsx`): "Need you" first (the fix inline, or "Leave out"), then one card per work with the work's track (applied by signature to every file that has it) and the per-file override; left-out files at the end.
+- **Works** (`works.ts`, `works-step.tsx`): the unit of context. `autoGroup` groups by TMDB match (`tmdb:<id>`), else by the parsed title (`name:<title>`); skipped files belong to no work. The grouping stays automatic (`grouping: null`) until the user edits it: rename, re-match on TMDB (`TitleSearch`, synopsis below), "Merge with…", "Move to…" per file (or "New work", `manual:<n>`), "Group automatically again". Episode numbers are edited here.
+- **Preset & context** (`settings-step.tsx`): the batch defaults (the same `PresetStep` as the wizard, now fed with a `PresetChoice`), then one card per work: "Use the batch defaults" or "Customize this work" (preset, model, language and notes of its own, starting from the defaults), and "Send the title, genres and synopsis" for works with a TMDB match. Never per file.
+- **Output** (`batch-output-step.tsx`): the shared `OutputStep` (folder, mux options for videos; with a folder and an output dir the structure is mirrored), "Show the total cost and wait for my confirmation", and a review per work.
+- **Request** (`buildBatchRequest` in `batch-state.ts`): included files in plan order, each with `group` (index into `groups`), `trackIds` and, for a series whose media goes to the AI, `season`/`episode`. Each work becomes a `BatchGroup` (`name`, `media` when included, and all its settings when customized); unset defaults are left to the Main.
+- **Backdrop** (`batch-backdrop.tsx`): from Works on, the artwork of one work (with media included), drawn again on every step change (`draw` in the state, generated in the click handler). A mosaic was tried and rejected: under the gradient and the 92% panels it reads as texture.
+- **After creating** (`batch-detail.tsx`): overall progress (derived from the live jobs list), the batch's preflight total with "Confirm all" (`batches:confirm`), "Cancel all", the files (links to `?job=` in the queue). `useBatch` refetches `batches:get` whenever a job of the batch changes status.
+
+Not yet: batches of `extract` (the planner supports them; there is no screen), a batch view after leaving the page (the jobs show one by one in the queue, with the "Batch" badge; `batches:list` is unused), and removing a whole batch.
+
+The decision came from a prototype (variants A–D, D chosen); it is kept out of `src/` in `prototype-archive/batch-flow/` until archived on a branch.
+
 ## Media context panel
 
 `components/media/`, shown above the preset step of the wizard. `MediaChoice` (`media-choice.ts`) lives in the wizard state: `ref`, `auto` (recognized from the file name), `season`/`episode`, `include`, `seeded`.
@@ -134,7 +154,7 @@ Single-form pages that create one job and then show it with `JobDetail` (like th
 - Queue: the job list is resizable with the mouse or arrow keys (`ResizableAside`, width kept in localStorage), names truncate with an ellipsis (full name on hover), and jobs with TMDB context show the title and episode below.
 - Sidebar: the logo (`assets/logo.svg`), Translate on its own at the top (larger, highlighted by colour and a gradient when active), then the Work and Manage groups with more spacing.
 - Status bar: queue counts and progress, the lane cooldown, the session cost, the installed tool versions (link to Settings → Video tools), the OpenRouter and TMDB key status (link to Settings → Keys), and the app version with an update hint (link to Settings → About). Settings keeps its tab in the URL (`?tab=`).
-- Models: one price range (USD per 1M tokens) that both the input and the output price must fit (`inPriceRange`, `priceStops` in `lib/model-list.ts`); with the upper end at the top, dynamic-price models stay listed. Rows never truncate: names, ids and prices wrap. On the Models and Languages pages the last favorite/language cannot be removed (the app needs a default; the onboarding still allows it while choosing).
+- Models: one price range (USD per 1M tokens) that both the input and the output price must fit (`inPriceRange`, `PRICE_STOPS` in `lib/model-list.ts`). The stops are fixed (0, 0.1 … 0.5, 1, 3, 5, 10+): fine-grained where most of the catalog sits, the last one meaning "and above"; with the upper end at the top, dynamic-price models stay listed. The "N of M · K favorites" count sits below the list, right-aligned. Rows never truncate: names, ids and prices wrap. On the Models and Languages pages the last favorite/language cannot be removed (the app needs a default; the onboarding still allows it while choosing).
 - Everything clickable shows the pointer cursor (Tailwind v4 removed it for buttons; restored in `styles/main.css`). Guides take the full width of their container.
 - About: version, author, "Check for updates", repository and "Buy me a coffee" (both hosts are in the Main's external-link allowlist).
 

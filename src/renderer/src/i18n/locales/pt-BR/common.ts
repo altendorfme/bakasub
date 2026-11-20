@@ -9,7 +9,6 @@ export const common: LocaleShape<typeof en> = {
     translate: 'Traduzir',
     extract: 'Extrair',
     mux: 'Mux',
-    batch: 'Lote',
     queue: 'Fila',
     presets: 'Presets',
     models: 'Modelos',
@@ -43,7 +42,6 @@ export const common: LocaleShape<typeof en> = {
     translate: { title: 'Traduzir um arquivo' },
     extract: { title: 'Extrair legendas' },
     mux: { title: 'Mux de legendas' },
-    batch: { title: 'Lote' },
     queue: { title: 'Fila' },
     presets: { title: 'Presets' },
     models: { title: 'Modelos' },
@@ -284,6 +282,154 @@ export const common: LocaleShape<typeof en> = {
         'O BakaSub primeiro estima o custo e pede sua confirmação antes de enviar qualquer coisa para a IA.'
     }
   },
+  choose: {
+    heading: 'O que você quer traduzir?',
+    single: 'Um arquivo',
+    singleBody:
+      'Um vídeo (.mkv) ou um arquivo de legenda. Você escolhe a faixa, o preset e o contexto.',
+    many: 'Vários arquivos ou uma pasta',
+    manyBody:
+      'Uma temporada inteira, uma pasta de filmes ou vários arquivos de uma vez. As obras são reconhecidas e agrupadas para você.',
+    back: 'Um arquivo ou vários'
+  },
+  batch: {
+    title: 'Traduzir vários arquivos',
+    steps: {
+      files: 'Arquivos',
+      tracks: 'Faixas',
+      works: 'Obras',
+      preset: 'Preset e contexto',
+      output: 'Saída'
+    },
+    files: {
+      heading: 'Escolha os arquivos',
+      body: 'Uma pasta (com ou sem subpastas) ou vários arquivos: vídeos (.mkv) ou legendas (.srt, .ass, .ssa, .vtt).',
+      drop: 'Arraste os arquivos para cá ou escolha uma pasta',
+      folder: 'Escolher pasta',
+      files: 'Escolher arquivos',
+      recursive: 'Incluir subpastas',
+      fromFolder: 'Pasta {{path}}',
+      fromFolderRecursive: 'Pasta {{path}}, com subpastas',
+      fromFiles_one: '{{count}} arquivo',
+      fromFiles_other: '{{count}} arquivos',
+      reading: 'Lendo os arquivos…',
+      identifying: 'Reconhecendo as obras no TMDB…',
+      none: 'Nenhum vídeo (.mkv) ou legenda foi encontrado.',
+      truncated: 'A pasta tem mais de 2.000 arquivos: só os primeiros foram listados.',
+      rejected_one: '{{count}} arquivo foi recusado:',
+      rejected_other: '{{count}} arquivos foram recusados:',
+      both: 'Esta pasta tem vídeos e legendas. Traduzir:',
+      videos: 'Vídeos ({{count}})',
+      subtitles: 'Legendas ({{count}})'
+    },
+    status: {
+      ready: '{{count}} prontos',
+      attention: '{{count}} precisam de você',
+      out: '{{count}} ficam de fora',
+      works_one: '{{count}} obra reconhecida',
+      works_other: '{{count}} obras reconhecidas'
+    },
+    problem: {
+      'no-subtitle-track': 'Sem legendas',
+      'no-supported-track': 'Só legendas em imagem (PGS, VobSub)',
+      'probe-failed': 'Não foi possível ler o arquivo',
+      'no-track': 'Escolha uma faixa',
+      'odd-track': 'Faixa diferente das outras da obra',
+      'no-episode': 'Episódio não reconhecido'
+    },
+    issues: {
+      title: 'Precisam de você ({{count}})',
+      leaveOut: 'Deixar de fora',
+      include: 'Incluir',
+      out_one: '{{count}} fica de fora',
+      out_other: '{{count}} ficam de fora',
+      byYou: 'Deixado de fora por você'
+    },
+    tracks: {
+      heading: 'Confira as faixas de legenda',
+      body: 'Escolhidas pelo seu idioma de origem preferido. Troque a faixa de uma obra inteira ou de um arquivo só.',
+      workTrack: 'Faixa da obra inteira',
+      pick: 'Escolha a faixa',
+      different_one: '{{count}} diferente',
+      different_other: '{{count}} diferentes',
+      noLanguage: 'Sem idioma',
+      image: 'imagem'
+    },
+    works: {
+      heading: 'Confira as obras',
+      body: 'Os arquivos foram agrupados pela obra reconhecida no nome. Cada obra tem o próprio contexto (sinopse, preset, notas). Mova arquivos, junte ou separe obras quando o agrupamento errar.',
+      regroup: 'Reagrupar automaticamente',
+      name: 'Nome da obra',
+      manual: 'Manual',
+      tmdb: 'Obra no TMDB',
+      series: 'Série',
+      movie: 'Filme',
+      notFound: 'Não encontrada no TMDB',
+      mergeInto: 'Juntar com…',
+      moveTo: 'Mover para…',
+      newWork: 'Nova obra',
+      season: 'Temporada',
+      episode: 'Episódio',
+      files_one: '{{count}} arquivo',
+      files_other: '{{count}} arquivos'
+    },
+    preset: {
+      heading: 'Como traduzir cada obra',
+      body: 'O padrão do lote vale para todas as obras. Personalize uma obra quando ela pedir outro preset, modelo, idioma ou notas.',
+      defaults: 'Padrão do lote',
+      defaultsHint: 'Usado pelas obras não personalizadas',
+      useDefaults: 'Usar o padrão do lote',
+      customize: 'Personalizar esta obra',
+      customized: 'Personalizada',
+      usesDefaults: 'Padrão do lote',
+      notes: 'Notas desta obra (opcional)',
+      includeMedia: 'Enviar título, gêneros e sinopse (e a do episódio) para a IA',
+      withMedia: 'com sinopse',
+      withoutMedia: 'sem sinopse',
+      noMedia: 'Sem obra do TMDB: só as notas vão como contexto. Escolha a obra em Obras.'
+    },
+    output: {
+      heading: 'Onde salvar',
+      mirror: 'As subpastas de {{root}} são recriadas dentro da pasta de saída.',
+      confirm: 'Mostrar o custo total e esperar minha confirmação antes de traduzir',
+      confirmOff:
+        'Cada arquivo começa assim que o custo é estimado (as Configurações ainda podem pedir confirmação acima de um limite).',
+      review: 'Revisão'
+    },
+    summary: {
+      title: 'Resumo',
+      source: 'Origem',
+      files: 'Arquivos',
+      tracks: 'Faixas',
+      tracksValue: 'Por obra, pelo seu idioma preferido',
+      works: 'Obras',
+      preset: 'Preset',
+      customized_one: '{{preset}} · {{count}} obra personalizada',
+      customized_other: '{{preset}} · {{count}} obras personalizadas',
+      model: 'Modelo',
+      language: 'Para',
+      output: 'Saída',
+      nextToEach: 'Ao lado de cada arquivo',
+      included: '{{count}} incluídos',
+      includedOut: '{{count}} incluídos · {{out}} de fora',
+      none: '—'
+    },
+    start_one: 'Traduzir {{count}} arquivo',
+    start_other: 'Traduzir {{count}} arquivos',
+    starting: 'Criando…',
+    detail: {
+      progress: '{{done}} de {{total}} concluídos',
+      awaiting_one: '{{count}} arquivo aguarda sua confirmação.',
+      awaiting_other: '{{count}} arquivos aguardam sua confirmação.',
+      cost: 'Total estimado: US$ {{low}} – {{high}}',
+      costUnknown: 'Alguns arquivos usam um modelo com preço dinâmico: o total não é conhecido.',
+      confirmAll: 'Confirmar todos',
+      cancelAll: 'Cancelar todos',
+      openQueue: 'Abrir na fila',
+      another: 'Traduzir outros arquivos',
+      files: 'Arquivos'
+    }
+  },
   jobs: {
     step: {
       probe: 'Lendo o vídeo',
@@ -342,6 +488,11 @@ export const common: LocaleShape<typeof en> = {
   },
   queue: {
     new: 'Nova tradução',
+    clearDone: 'Limpar concluídos',
+    clearDoneHint:
+      'Remove da fila os jobs concluídos e cancelados. Os que falharam ou foram interrompidos ficam.',
+    cleared_one: '{{count}} job removido',
+    cleared_other: '{{count}} jobs removidos',
     filters: { all: 'Todos', active: 'Ativos', attention: 'Precisam de você', done: 'Concluídos' },
     empty: {
       all: 'Nenhum job ainda. Traduza um arquivo para vê-lo aqui.',
@@ -584,7 +735,7 @@ export const common: LocaleShape<typeof en> = {
     prompt:
       'Instruções de tom e registro (formal, casual, manter piadas, adaptar expressões…). As regras fixas que protegem tempo e formatação são adicionadas pelo BakaSub.',
     glossary:
-      'Termos que a IA deve traduzir sempre do mesmo jeito (nomes, lugares, técnicas). Use uma regra para coisas como “manter honoríficos”.',
+      'Termos que a IA deve traduzir sempre do mesmo jeito (nomes, lugares, técnicas). Use uma regra para coisas como “manter honoríficos”. Presets prontos não têm glossário: para criar um, duplique um preset existente ou crie um novo.',
     include:
       'Passa para a IA o título, os gêneros e a sinopse (e a do episódio) para nomes e tom saírem certos. Só o título é enviado ao TMDB.',
     concurrency:

@@ -26,4 +26,7 @@ export function registerJobHandlers(deps: { jobs: JobManager }): void {
       return { removed: true as const }
     }
   })
+  createHandler('jobs:clear-completed', {
+    handle: async () => ({ removed: await deps.jobs.clearFinished() })
+  })
 }

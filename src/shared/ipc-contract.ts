@@ -478,13 +478,42 @@ export interface BatchPlan {
   truncated: boolean
 }
 
+/**
+ * Obra de um batch (`translate`/`pipeline`): a unidade de contexto. Os arquivos da obra
+ * compartilham a mídia do TMDB e, quando definidos, preset, modelo, idioma e notas, que
+ * substituem os padrões do batch. Sem `media`, os jobs da obra não levam contexto de mídia.
+ */
+export interface BatchGroup {
+  /** Rótulo da obra na UI. */
+  name?: string
+  media?: MediaRef
+  presetId?: string
+  model?: string
+  targetLang?: string
+  notes?: string
+}
+
+export interface BatchCreateItem {
+  path: string
+  trackIds?: number[]
+  /** Índice em `groups`. */
+  group?: number
+  /** Episódio da obra (série), quando a obra tem `media`. */
+  season?: number
+  episode?: number
+}
+
 export interface BatchCreateRequest {
   kind: BatchKind
   name?: string
   /** `plan.root`: revalidado; base do espelhamento quando há `outputDir`. */
   root: string | null
-  items: { path: string; trackIds?: number[] }[]
+  items: BatchCreateItem[]
+  /** Só `translate`/`pipeline`. */
+  groups?: BatchGroup[]
+  /** Padrões do batch (cada um cai no padrão das configurações quando omitido). */
   presetId?: string
+  model?: string
   notes?: string
   targetLang?: string
   sourceLang?: string
@@ -669,6 +698,8 @@ export interface IpcInvokeContract {
   'jobs:cancel': { req: { id: string }; res: Job }
   'jobs:retry': { req: { id: string }; res: Job }
   'jobs:remove': { req: { id: string }; res: { removed: true } }
+  /** Remove todos os concluídos/cancelados (falhas e interrompidos ficam). */
+  'jobs:clear-completed': { req: void; res: { removed: string[] } }
   /** `awaiting-confirmation` -> fila; retoma na tradução, sem reextrair nem reestimar. */
   'jobs:confirm': { req: { id: string }; res: Job }
   /** Estimativa + cobertura completa (o que não será traduzido, onde e por quê). */
@@ -749,6 +780,7 @@ export const INVOKE_CHANNELS = [
   'jobs:cancel',
   'jobs:retry',
   'jobs:remove',
+  'jobs:clear-completed',
   'dialog:open-folder',
   'batches:plan',
   'batches:create',
@@ -845,6 +877,7 @@ export interface BakaSubApi {
     cancel(id: string): Promise<IpcResult<Job>>
     retry(id: string): Promise<IpcResult<Job>>
     remove(id: string): Promise<IpcResult<{ removed: true }>>
+    clearCompleted(): Promise<IpcResult<{ removed: string[] }>>
     confirm(id: string): Promise<IpcResult<Job>>
     preflight(
       id: string
