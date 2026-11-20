@@ -134,6 +134,23 @@ describe('Presets', () => {
     })
   })
 
+  it('recommends English prompts on editable presets without blocking a non-English one', async () => {
+    const { create } = setup()
+    // Read-only built-in: nothing to write, so no tip.
+    expect(await screen.findByText(/Built-in presets cannot be changed/)).toBeTruthy()
+    expect(screen.queryByText(/write these instructions in English/)).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New preset' }))
+    const tip = screen.getByText(/write these instructions in English/)
+    expect(tip.closest('.text-destructive')).toBeNull()
+    await userEvent.type(screen.getByLabelText('Name'), 'Anime')
+    await userEvent.type(screen.getByLabelText('Style instructions'), 'Mantenha os honoríficos.')
+    await userEvent.click(screen.getByRole('button', { name: 'Save preset' }))
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'Mantenha os honoríficos.' })
+    )
+  })
+
   it('deleting a preset in use explains why it was refused', async () => {
     const { remove } = setup()
     await userEvent.click(await screen.findByRole('button', { name: 'Duplicate' }))

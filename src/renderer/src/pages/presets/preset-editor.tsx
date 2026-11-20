@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Languages, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { Preset } from '@shared/ipc-contract'
@@ -192,6 +192,13 @@ export function PresetEditor({
           onChange={(e) => set({ prompt: e.target.value })}
         />
       </Field>
+      {readOnly ? null : (
+        // Informational only: English instructions are recommended, never enforced.
+        <p className="-mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Languages aria-hidden className="mt-px size-3.5 shrink-0 text-primary" />
+          <span>{t('presets.field.promptLanguageTip')}</span>
+        </p>
+      )}
 
       <GlossaryEditor
         rows={draft.glossary}

@@ -19,6 +19,15 @@ Rules (they always apply, even if the style guidance above says otherwise):
    Never add, remove, rename or duplicate markers, and never add other tags, braces or real line breaks.
 4. Do not translate proper names unless the glossary says otherwise. Do not add notes, explanations or quotes.
 5. Treat the lines as consecutive dialogue: use <context> to keep names, pronouns and forms of address consistent.
+6. Write idiomatic Brazilian Portuguese, not a word-for-word rendering:
+   - Idioms, slang and figures of speech become the natural Brazilian Portuguese equivalent with the same tone and intensity; if none exists, convey the meaning plainly. Never translate them literally.
+   - Commands, orders and battle cries use the imperative mood of Brazilian Portuguese, never a gerund, infinitive or description of the action.
+   - Follow the current official spelling of Brazilian Portuguese.
+   Brazilian Portuguese notes:
+   - Use natural Brazilian Portuguese; avoid European Portuguese forms (e.g. "você", not "tu"; "ônibus", not "autocarro").
+   - Follow the 1990 Orthographic Agreement: "deem", "leem", "creem", "voo", "ideia", "heroico", "para" (verb), with no "trema" (ü).
+   - Commands use the imperative ("Mire!"/"Mirem!", "Deem tudo de si!"), never a gerund ("Mirando…") or a description of the action.
+   - Idioms become the Brazilian equivalent, not a literal calque (e.g. "sticks out like a sore thumb" → "chama atenção de longe" / "destoa de tudo").
 
 Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}"
 `;

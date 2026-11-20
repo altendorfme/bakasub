@@ -19,6 +19,10 @@ Defined in code (`builtin-presets.ts`), frozen, versioned with the app, **never 
 
 Created from scratch (`presets:create`) or copied (`presets:duplicate`, from a built-in or a custom one; default name `<name> (copy)`, `(copy 2)`…; `copiedFrom` records the origin). Stored in the `presets` table. Validation (`preset.schema.ts`): name 1–80 chars, unique (also against built-in names, case-insensitive), `mediaType` free text 1–40 chars (a label only, never sent to the model; the UI suggests Movie/Series/Anime/Documentary), temperature 0–2, prompt ≤ 4,000 chars, glossary ≤ 500 entries `{ source, target?, rule? }`. Deleting a preset used by a non-terminal job → `PRESET_IN_USE`.
 
+## Prompt language
+
+Write the style guidance (prompt) **in English**, even when the target language is another one. The rest of the system prompt (intro, fixed rules, output format) is in English and models follow English instructions more reliably; the target language comes from the job, not from the language the prompt is written in. The built-ins are written in English. This is a recommendation only: the editor shows a tip under the prompt field (`presets.field.promptLanguageTip`, hidden on read-only built-ins), and nothing detects, translates or rejects a prompt written in another language.
+
 ## Export / import (`preset-file.ts`)
 
 `presets:export { ids }` opens the native **save** dialog and writes a JSON file; `presets:import { onConflict? }` opens the native **open** dialog. Files are only touched by the Main process, never through a renderer-supplied path.

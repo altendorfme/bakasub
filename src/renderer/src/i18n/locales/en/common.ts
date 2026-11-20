@@ -957,7 +957,9 @@ export const common = {
       temperature: 'Temperature',
       temperatureHint: 'Lower stays closer to the original; higher is freer. 0 to 2.',
       prompt: 'Style instructions',
-      promptHint: 'Tone, register, what to keep or adapt. {{count}}/{{max}}'
+      promptHint: 'Tone, register, what to keep or adapt. {{count}}/{{max}}',
+      promptLanguageTip:
+        'Tip: write these instructions in English, even when translating into another language. Models follow English instructions more reliably; the target language is set by the job.'
     },
     error: {
       required: 'Required.',

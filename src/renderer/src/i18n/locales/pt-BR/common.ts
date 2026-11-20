@@ -969,7 +969,9 @@ export const common: LocaleShape<typeof en> = {
       temperature: 'Temperatura',
       temperatureHint: 'Mais baixa fica mais perto do original; mais alta é mais livre. De 0 a 2.',
       prompt: 'Instruções de estilo',
-      promptHint: 'Tom, registro, o que manter ou adaptar. {{count}}/{{max}}'
+      promptHint: 'Tom, registro, o que manter ou adaptar. {{count}}/{{max}}',
+      promptLanguageTip:
+        'Dica: escreva estas instruções em inglês, mesmo traduzindo para outro idioma. Os modelos seguem instruções em inglês com mais precisão; o idioma de destino é definido no job.'
     },
     error: {
       required: 'Obrigatório.',

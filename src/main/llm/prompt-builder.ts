@@ -1,6 +1,7 @@
 import { GlossaryEntrySchema } from '../presets/preset.schema'
 import type { Issue, TranslationUnit } from '../parsers'
 import type { ChunkContext } from './chunker'
+import { languageNotes } from './language-notes'
 
 export interface GlossaryEntry {
   readonly source: string
@@ -61,10 +62,11 @@ export function buildSystemPrompt(input: {
   media?: string
 }): string {
   const from = input.sourceLang ? `from ${languageName(input.sourceLang)} ` : ''
+  const target = languageName(input.targetLang)
   const style = input.stylePrompt?.trim()
     ? `\n\n<style>\n${input.stylePrompt.trim()}\n</style>`
     : ''
-  return `${glossaryBlock(input.glossary)}You are a professional subtitle translator. Translate subtitle lines ${from}to ${languageName(input.targetLang)}.${style}
+  return `${glossaryBlock(input.glossary)}You are a professional subtitle translator. Translate subtitle lines ${from}to ${target}.${style}
 
 Rules (they always apply, even if the style guidance above says otherwise):
 1. Translate only the lines inside <target>. Lines inside <context> are for reference only; never translate or return them.
@@ -76,8 +78,19 @@ Rules (they always apply, even if the style guidance above says otherwise):
    Never add, remove, rename or duplicate markers, and never add other tags, braces or real line breaks.
 4. Do not translate proper names unless the glossary says otherwise. Do not add notes, explanations or quotes.
 5. Treat the lines as consecutive dialogue: use <context> to keep names, pronouns and forms of address consistent.
+6. Write idiomatic ${target}, not a word-for-word rendering:
+   - Idioms, slang and figures of speech become the natural ${target} equivalent with the same tone and intensity; if none exists, convey the meaning plainly. Never translate them literally.
+   - Commands, orders and battle cries use the imperative mood of ${target}, never a gerund, infinitive or description of the action.
+   - Follow the current official spelling of ${target}.${languageNotesBlock(input.targetLang)}
 
 Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}${mediaSection(input.media)}`
+}
+
+function languageNotesBlock(tag: string): string {
+  const notes = languageNotes(tag)
+  return notes.length
+    ? `\n   ${languageName(tag)} notes:\n${notes.map((n) => `   - ${n}`).join('\n')}`
+    : ''
 }
 
 function mediaSection(media?: string): string {
