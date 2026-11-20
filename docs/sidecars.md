@@ -4,11 +4,18 @@ ffmpeg and mkvtoolnix are never bundled. Everything lives in `src/main/sidecars/
 
 ## Manifests
 
-Fetched by `ManifestClient` from `bakasub-manifests` (`src/main/config/remote.ts`), 10 s timeout, validated with Zod (`manifest.schema.ts`).
+Fetched by `ManifestClient` from `manifests/sidecar.json` in this repository, through `https://raw.githubusercontent.com/lsilvatti/bakasub/main/manifests` (`src/main/config/remote.ts`; the repo must stay public), 10 s timeout, validated with Zod (`manifest.schema.ts`). The old `bakasub-manifests` repository and `version.json` are gone: app updates now go through GitHub Releases (see [`release.md`](./release.md)).
 
-- `version.json`: `{ updatedAt, version }`, compared with `app.getVersion()` by `AppUpdateService` (notification only).
 - `sidecar.json`: `tools[]` with `name`, `version`, `executableName` and `artifacts[platform][arch] = { url (https), sha256, archiveType: zip|7z|appimage, binaryRelativePath }`.
 - Last valid manifest is cached in `userData/cache/manifests/`. The cache is used **only when the network fails**; an invalid remote manifest raises `INVALID_MANIFEST` instead of silently falling back.
+
+### Bumping a sidecar
+
+1. Edit `manifests/sidecar.json`: `version`, `url` and `sha256` (lowercase hex, `sha256sum` of the exact file at the URL) per platform; set `updatedAt`. Keep two-space indentation.
+2. `npx vitest run src/main/sidecars/manifest.schema.test.ts` (CI runs it too and rejects invalid manifests). Copy the file to `src/main/sidecars/__fixtures__/sidecar.json`, which a test keeps identical.
+3. Merge to `main`: running apps pick it up on the next `sidecars:check` (the manifest is not tied to an app release). Versions are pinned, so any change marks the tool `outdated` and asks for consent again.
+
+The ffmpeg URLs point to **versioned builds hosted by third parties** (martin-riedl.de, gyan.dev). The provider may remove old builds: when a URL starts returning 404, bump to the current build. A silently replaced file fails safely with `CHECKSUM_MISMATCH`.
 
 ## States
 
@@ -70,7 +77,7 @@ downloads/<sha256>.<ext>[.part|.part.json]
 
 ## Known limitations
 
-- Trust root is the manifest repository: whoever can change `sidecar.json` can change what is executed. Keep the branch protected; manifest signing is a possible future step.
+- Trust root is the `main` branch of this repository: whoever can change `manifests/sidecar.json` can change what is executed. Keep the branch protected; manifest signing is a possible future step.
 - Upstream links must be versioned. Rolling links (e.g. `ffmpeg-release-essentials.7z`) break the pinned SHA-256 on the next upstream release (safe failure: `CHECKSUM_MISMATCH`).
 - Windows execution was verified with the pruned binaries under wine; native Windows execution is covered by the CI smoke test only for the app itself, not for sidecar installation.
 

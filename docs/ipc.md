@@ -75,8 +75,40 @@ React hook ──► window.api.<domain>.<method>()          (preload, typed by 
 | `batches:confirm`                                                                                                                                         | `{ id }`                                                                     | `Batch` (confirms every waiting job)                                                                         |
 | event `jobs:progress`                                                                                                                                     | n/a                                                                          | `JobProgressEvent` (`{ id, status, progress }`, 250 ms throttle)                                             |
 | event `logs:entry`                                                                                                                                        | n/a                                                                          | `LogEntry[]` (batches every 250 ms, only while `logs:watch` is on)                                           |
+| event `app:update-state`                                                                                                                                  | n/a                                                                          | `AppUpdateStatus` (every updater transition; `downloading` throttled to 250 ms)                              |
 | event `sidecars:progress`                                                                                                                                 | n/a                                                                          | `SidecarProgress`                                                                                            |
 
 ## Error codes
 
-`NETWORK`, `INVALID_MANIFEST`, `CHECKSUM_MISMATCH`, `EXTRACT_FAILED`, `PROBE_FAILED`, `PROCESS_TIMEOUT`, `UNSUPPORTED_PLATFORM`, `SIDECAR_BUSY`, `SIDECAR_MISSING`, `UNKNOWN_TOOL`, `CANCELLED`, `MEMORY_BUSY` (prune while a job is running), `LLM_AUTH`, `LLM_CREDITS`, `LLM_BAD_REQUEST`, `LLM_UNAVAILABLE`, `LLM_UNKNOWN_MODEL`, `LLM_TOO_MANY_FAILURES` (translation layer, see [`llm.md`](./llm.md)), `INVALID_PATH`, `DISK_FULL`, `INVALID_INPUT`, `INVALID_SUBTITLE`, `MEDIA_TOOL_FAILED`, `PRESET_NOT_FOUND`, `PRESET_NAME_TAKEN`, `PRESET_IN_USE`, `PRESET_READ_ONLY`, `MODEL_NOT_SET`, `TARGET_LANG_NOT_SET`, `SETTINGS_CONFLICT`, `TMDB_AUTH`, `TMDB_KEY_MISSING`, `URL_NOT_ALLOWED`, `INVALID_PRESET_FILE`, `JOB_NOT_FOUND`, `JOB_INVALID_STATE`, `BATCH_NOT_FOUND` (jobs, see [`jobs.md`](./jobs.md)), plus `FORBIDDEN`, `INVALID_INPUT`, `INTERNAL` from `createHandler`.
+`NETWORK`, `INVALID_MANIFEST`, `CHECKSUM_MISMATCH`, `EXTRACT_FAILED`, `PROBE_FAILED`, `PROCESS_TIMEOUT`, `UNSUPPORTED_PLATFORM`, `SIDECAR_BUSY`, `SIDECAR_MISSING`, `UNKNOWN_TOOL`, `CANCELLED`, `MEMORY_BUSY` (prune while a job is running), `LLM_AUTH`, `LLM_CREDITS`, `LLM_BAD_REQUEST`, `LLM_UNAVAILABLE`, `LLM_UNKNOWN_MODEL`, `LLM_TOO_MANY_FAILURES` (translation layer, see [`llm.md`](./llm.md)), `INVALID_PATH`, `DISK_FULL`, `INVALID_INPUT`, `INVALID_SUBTITLE`, `MEDIA_TOOL_FAILED`, `PRESET_NOT_FOUND`, `PRESET_NAME_TAKEN`, `PRESET_IN_USE`, `PRESET_READ_ONLY`, `MODEL_NOT_SET`, `TARGET_LANG_NOT_SET`, `SETTINGS_CONFLICT`, `TMDB_AUTH`, `TMDB_KEY_MISSING`, `URL_NOT_ALLOWED`, `UPDATE_UNSUPPORTED`, `UPDATE_NOT_READY`, `UPDATE_JOBS_ACTIVE` (auto-update, see below), `INVALID_PRESET_FILE`, `JOB_NOT_FOUND`, `JOB_INVALID_STATE`, `BATCH_NOT_FOUND` (jobs, see [`jobs.md`](./jobs.md)), plus `FORBIDDEN`, `INVALID_INPUT`, `INTERNAL` from `createHandler`.
+
+## Auto-update contract (frozen)
+
+Types live in `src/shared/ipc-contract.ts`; the service is `src/main/services/app-updater.ts`.
+
+States (`AppUpdateState`): `idle | checking | available | not-available | downloading | downloaded | error | unsupported`.
+
+```ts
+interface AppUpdateStatus {
+  state: AppUpdateState
+  current: string
+  latest?: string // from `available` on
+  publishedAt?: string // ISO 8601
+  notes?: string // GitHub release body as HTML, max 20k chars; UNTRUSTED, sanitize before rendering
+  size?: number // bytes
+  progress?: { percent; transferred; total; bytesPerSecond } // only `downloading`
+  error?: { code; message } // only `error`; code is `NETWORK` (offline: true) or `INTERNAL`
+  offline?: boolean
+  fallbackUrl?: string // only `unsupported`; passes `isAllowedExternalUrl`
+}
+```
+
+Transitions: `idle → checking → available | not-available | error`; `available → downloading → downloaded | error`; `downloading → available` on cancel; `error` is not terminal (a new check works). `unsupported` is permanent for the process (dev build, Linux outside an AppImage, macOS) and never touches the network or logs an error.
+
+Rules the UI can rely on:
+
+- Nothing is downloaded without `app:download-update` and nothing is installed without `app:install-update`. `quitAndInstall` exists only inside `app:install-update`; a normal quit never installs.
+- `app:check-update` is a no-op in `downloading`/`downloaded`/`unsupported` (returns the current info) and coalesces concurrent calls.
+- `app:install-update` with running jobs: `UPDATE_JOBS_ACTIVE` unless `confirmJobs: true`. With confirmation the Main aborts jobs (marked `interrupted`, re-queued on the next boot), disposes sidecars/Job Memory/DB through the `ShutdownCoordinator`, then installs and relaunches.
+- A silent automatic check runs once ~30 s after boot when `updates.autoCheck` (default `true`) is on. It only emits `app:update-state`; it never downloads.
+- `AppUpdateInfo` (from `app:check-update`) keeps its old fields (`current`, `latest`, `updateAvailable`, `publishedAt`, `offline`) and adds optional `notes`, `size`, `state`, `fallbackUrl`, `error`.

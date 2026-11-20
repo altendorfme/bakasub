@@ -6,7 +6,7 @@
 
 Aplicação desktop para extrair, traduzir com IA e remuxar legendas de vídeos `.mkv`.
 
-> Status: **infraestrutura base, parsers SRT, ASS/SSA e WebVTT, cache Job Memory, camada de tradução LLM, Job Manager (com modo batch) e preflight de custo concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI ainda não foi implementada. Veja o [roadmap](#roadmap).
+> Status: **infraestrutura base, parsers SRT, ASS/SSA e WebVTT, cache Job Memory, camada de tradução LLM, Job Manager (com modo batch) e preflight de custo concluídos** (IPC, banco, sidecars, build/release, AST de legendas lossless). A UI está implementada, exceto diagnósticos do parser e confiança de encoding. Veja o [roadmap](#roadmap).
 
 ## Stack
 
@@ -102,10 +102,7 @@ bin/                  sidecars (ver abaixo)
 
 ## Sidecars
 
-ffmpeg e mkvtoolnix **não são empacotados**. O app lê dois manifests do repositório [`bakasub-manifests`](https://github.com/lsilvatti/bakasub-manifests):
-
-- `version.json` — versão mais recente do app (apenas notifica; não baixa nem instala nada);
-- `sidecar.json` — URL, SHA-256, tipo de arquivo e caminho do binário por `tool × plataforma × arquitetura`.
+ffmpeg e mkvtoolnix **não são empacotados**. O app lê o [`manifests/sidecar.json`](./manifests/sidecar.json) deste repositório (via `raw.githubusercontent.com`): URL, SHA-256, tipo de arquivo e caminho do binário por `tool × plataforma × arquitetura`. O procedimento para atualizar uma versão está em [`docs/sidecars.md`](./docs/sidecars.md).
 
 Regras de segurança e comportamento:
 
@@ -136,15 +133,18 @@ SQLite em modo WAL (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`
 
 O workflow `.github/workflows/release.yml` é disparado por tags `v*` (a tag precisa ser igual à versão do `package.json`) e gera, em runners nativos:
 
-| Artefato                                | Origem  |
-| --------------------------------------- | ------- |
-| `bakasub-<v>.AppImage`                  | Linux   |
-| `bakasub-<v>-linux-x64-unpacked.tar.gz` | Linux   |
-| `bakasub-<v>-setup.exe` (NSIS)          | Windows |
-| `bakasub-<v>-win-x64-unpacked.zip`      | Windows |
-| `SHA256SUMS.txt`                        | —       |
+| Artefato                                       | Origem               |
+| ---------------------------------------------- | -------------------- |
+| `bakasub-<v>.AppImage`                         | Linux                |
+| `bakasub-<v>-linux-x64-unpacked.tar.gz`        | Linux                |
+| `bakasub-<v>-setup.exe` (NSIS)                 | Windows              |
+| `bakasub-<v>-win-x64-unpacked.zip`             | Windows              |
+| `SHA256SUMS.txt`                               | —                    |
+| `latest.yml`, `latest-linux.yml`, `*.blockmap` | metadados do updater |
 
-Cada job executa lint, `db:check`, typecheck, build e um smoke test do binário desempacotado (o app precisa registrar `database ready`, validando libsql e migrations no SO real). A release é criada como **rascunho**.
+Cada job executa lint, `db:check`, typecheck, build e um smoke test do binário desempacotado (o app precisa registrar `database ready`, validando libsql e migrations no SO real). A release é criada como **rascunho**: publicá-la manualmente é o "go" do auto-update.
+
+**Auto-update** (electron-updater + GitHub Releases): o app checa silenciosamente uma vez após o boot (desligável) e só baixa e reinicia **quando o usuário pede**. Funciona no instalador do Windows e no AppImage do Linux; build de dev e `linux-unpacked` apontam para a página de releases. Detalhes em [`docs/release.md`](./docs/release.md).
 
 ```bash
 git tag v0.0.1 && git push origin v0.0.1
@@ -176,5 +176,5 @@ Regras de negócio definidas em [`AGENTS.md`](./AGENTS.md):
 - [x] **Preflight**: estimativa local de tokens (`js-tiktoken`, exata para GPT, faixa de ±20% para outros tokenizers) × taxa de acerto do Job Memory × preços de `/api/v1/models`, relatório de cobertura, confirmação antes de traduzir (limite de auto-confirmação), totais do batch (veja [`docs/preflight.md`](./docs/preflight.md))
 - [x] **Contexto de mídia** (backend): parse do nome do release, busca/detalhes/episódios no TMDB com identificação conservadora, cache das respostas, cache local de arte servido por `bakasub-media://`, detalhes congelados no job e enviados no `<media>` (veja [`docs/media-context.md`](./docs/media-context.md))
 - [x] **Limites e retries**: limitador único no processo por faixa (free/pago), cooldown da faixa após 429, cota diária de modelos free via `GET /key` com aviso no preflight, rodadas extras por chunk, tudo ajustável nas configurações avançadas (ver [`docs/rate-limits.md`](./docs/rate-limits.md))
-- [x] **Frontend** (todas as telas menos Lote): onboarding, wizard de tradução com contexto do TMDB, fila, Extrair, Mux, Presets, Modelos, Idiomas, Logs, Configurações; inglês e português do Brasil (ver [`docs/renderer.md`](./docs/renderer.md))
-- [ ] **Frontend, restante**: tela de Lote (precisa de protótipo próprio e de identificação de mídia por arquivo), diagnósticos do parser e confiança de encoding (precisam antes de um canal IPC); ver [`docs/frontend-requirements.md`](./docs/frontend-requirements.md)
+- [x] **Frontend**: onboarding, wizard de tradução com contexto do TMDB (arquivo único ou lote de arquivos/pasta), fila, Extrair, Mux, Presets, Modelos, Idiomas, Logs, Configurações; inglês e português do Brasil (ver [`docs/renderer.md`](./docs/renderer.md))
+- [ ] **Diagnósticos do parser e confiança de encoding na UI**: precisam antes de um canal IPC; ver [`docs/frontend-requirements.md`](./docs/frontend-requirements.md)

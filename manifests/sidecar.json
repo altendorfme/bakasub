@@ -1,0 +1,74 @@
+{
+  "updatedAt": "2026-11-17T20:01:00.000Z",
+  "tools": [
+    {
+      "name": "ffmpeg",
+      "version": "9.0.2",
+      "executableName": "ffmpeg",
+      "artifacts": {
+        "linux": {
+          "x64": {
+            "url": "https://ffmpeg.martin-riedl.de/download/linux/amd64/1789931100_9.0.2/ffmpeg.zip",
+            "sha256": "fa8ecf4abbd290d98f7d188b8649cc6b391ae209a98452be955a15aab1909d7f",
+            "archiveType": "zip",
+            "binaryRelativePath": "/ffmpeg"
+          }
+        },
+        "win32": {
+          "x64": {
+            "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.7z",
+            "sha256": "4705843ccaaf54257c16ad90f3e952ece33c17df964ecf7bfdbb0f49c7171077",
+            "archiveType": "7z",
+            "binaryRelativePath": "/ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe"
+          }
+        }
+      }
+    },
+    {
+      "name": "mkvextract",
+      "version": "103.0",
+      "executableName": "mkvextract",
+      "artifacts": {
+        "linux": {
+          "x64": {
+            "url": "https://mkvtoolnix.download/appimage/MKVToolNix_GUI-103.0-x86_64.AppImage",
+            "sha256": "fefc571382f090d65b1038ba36383222167d248ff9c9a54f6678aa21182a03ee",
+            "archiveType": "appimage",
+            "binaryRelativePath": "/usr/bin/mkvextract"
+          }
+        },
+        "win32": {
+          "x64": {
+            "url": "https://mkvtoolnix.download/windows/releases/103.0/mkvtoolnix-64-bit-103.0.zip",
+            "sha256": "c860a10c707cb1ee587d1464f6171842f2ada3bb6f031dfff55fec75542f0417",
+            "archiveType": "zip",
+            "binaryRelativePath": "/mkvtoolnix/mkvextract.exe"
+          }
+        }
+      }
+    },
+    {
+      "name": "mkvmerge",
+      "version": "103.0",
+      "executableName": "mkvmerge",
+      "artifacts": {
+        "linux": {
+          "x64": {
+            "url": "https://mkvtoolnix.download/appimage/MKVToolNix_GUI-103.0-x86_64.AppImage",
+            "sha256": "fefc571382f090d65b1038ba36383222167d248ff9c9a54f6678aa21182a03ee",
+            "archiveType": "appimage",
+            "binaryRelativePath": "/usr/bin/mkvmerge"
+          }
+        },
+        "win32": {
+          "x64": {
+            "url": "https://mkvtoolnix.download/windows/releases/103.0/mkvtoolnix-64-bit-103.0.zip",
+            "sha256": "c860a10c707cb1ee587d1464f6171842f2ada3bb6f031dfff55fec75542f0417",
+            "archiveType": "zip",
+            "binaryRelativePath": "/mkvtoolnix/mkvmerge.exe"
+          }
+        }
+      }
+    }
+  ]
+}

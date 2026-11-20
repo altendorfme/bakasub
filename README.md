@@ -6,7 +6,7 @@
 
 Desktop application for extracting, AI-translating and re-muxing subtitles from `.mkv` videos.
 
-> Status: **base infrastructure, the SRT, ASS/SSA and WebVTT parsers, the Job Memory cache, the LLM translation layer, the Job Manager (with batch mode) and the cost preflight are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI is not implemented yet. See the [roadmap](#roadmap).
+> Status: **base infrastructure, the SRT, ASS/SSA and WebVTT parsers, the Job Memory cache, the LLM translation layer, the Job Manager (with batch mode) and the cost preflight are done** (IPC, database, sidecars, build/release, lossless subtitle AST). The UI is implemented except parser diagnostics and encoding confidence. See the [roadmap](#roadmap).
 
 ## Stack
 
@@ -97,10 +97,7 @@ bin/                  sidecars
 
 ## Sidecars
 
-ffmpeg and mkvtoolnix are **not bundled**. The app reads two manifests from [`bakasub-manifests`](https://github.com/lsilvatti/bakasub-manifests):
-
-- `version.json`: latest app version (notification only; nothing is downloaded or installed);
-- `sidecar.json`: URL, SHA-256, archive type and binary path per `tool × platform × arch`.
+ffmpeg and mkvtoolnix are **not bundled**. The app reads [`manifests/sidecar.json`](./manifests/sidecar.json) from this repository (via `raw.githubusercontent.com`): URL, SHA-256, archive type and binary path per `tool × platform × arch`. Procedure to bump a version in [`docs/sidecars.md`](./docs/sidecars.md).
 
 - **Never downloads automatically.** `sidecars:check` only reads metadata. `sidecars:install` requires a native dialog in the Main Process (default button: Cancel), which a compromised renderer cannot approve.
 - Streaming download with on-the-fly SHA-256, **HTTP Range resume** (`If-Range` with ETag/Last-Modified) and exponential-backoff retry. The `.part` survives failures, cancellations and restarts; a hash mismatch discards it.
@@ -127,15 +124,18 @@ SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`
 
 `.github/workflows/release.yml` runs on `v*` tags (the tag must equal the `package.json` version) and produces, on native runners:
 
-| Artifact                                | Built on |
-| --------------------------------------- | -------- |
-| `bakasub-<v>.AppImage`                  | Linux    |
-| `bakasub-<v>-linux-x64-unpacked.tar.gz` | Linux    |
-| `bakasub-<v>-setup.exe` (NSIS)          | Windows  |
-| `bakasub-<v>-win-x64-unpacked.zip`      | Windows  |
-| `SHA256SUMS.txt`                        | n/a      |
+| Artifact                                       | Built on         |
+| ---------------------------------------------- | ---------------- |
+| `bakasub-<v>.AppImage`                         | Linux            |
+| `bakasub-<v>-linux-x64-unpacked.tar.gz`        | Linux            |
+| `bakasub-<v>-setup.exe` (NSIS)                 | Windows          |
+| `bakasub-<v>-win-x64-unpacked.zip`             | Windows          |
+| `SHA256SUMS.txt`                               | n/a              |
+| `latest.yml`, `latest-linux.yml`, `*.blockmap` | updater metadata |
 
-Each job runs lint, `db:check`, typecheck, build and a smoke test of the unpacked binary (the app must log `database ready`, validating libsql and migrations on the real OS). The release is created as a **draft**.
+Each job runs lint, `db:check`, typecheck, build and a smoke test of the unpacked binary (the app must log `database ready`, validating libsql and migrations on the real OS). The release is created as a **draft**: publishing it by hand is the "go" of the auto-update.
+
+**Auto-update** (electron-updater + GitHub Releases): the app checks silently once after boot (can be turned off), and downloads and restarts **only when the user asks**. Works on the Windows installer and on the Linux AppImage; dev builds and `linux-unpacked` link to the releases page. Details in [`docs/release.md`](./docs/release.md).
 
 ```bash
 git tag v0.0.1 && git push origin v0.0.1
@@ -165,5 +165,5 @@ Business rules defined in [`AGENTS.md`](./AGENTS.md):
 - [x] **Preflight**: local token estimate (`js-tiktoken`, exact for GPT, ±20% range for other tokenizers) × Job Memory hit rate × `/api/v1/models` pricing, coverage report, confirmation before translating (auto-confirm threshold), batch totals (see [`docs/preflight.md`](./docs/preflight.md))
 - [x] **Media context** (backend): scene-release filename parsing, TMDB search/details/episodes with a conservative auto-match, response cache, local artwork cache served through `bakasub-media://`, details frozen in the job and sent in `<media>` (see [`docs/media-context.md`](./docs/media-context.md))
 - [x] **Rate limits and retries**: process-wide limiter per lane (free/paid), lane cooldown after a 429, free-model daily quota from `GET /key` with preflight warning, extra chunk rounds, all tunable in advanced settings (see [`docs/rate-limits.md`](./docs/rate-limits.md))
-- [x] **Frontend** (all screens except Batch): onboarding, Translate wizard with TMDB context, queue, Extract, Mux, Presets, Models, Languages, Logs, Settings; English and Brazilian Portuguese (see [`docs/renderer.md`](./docs/renderer.md))
-- [ ] **Frontend, rest**: Batch screen (needs its own prototype and per-file media identification), parser diagnostics and encoding confidence (need an IPC channel first); see [`docs/frontend-requirements.md`](./docs/frontend-requirements.md)
+- [x] **Frontend**: onboarding, Translate wizard with TMDB context (single file or batch of files/folder), queue, Extract, Mux, Presets, Models, Languages, Logs, Settings; English and Brazilian Portuguese (see [`docs/renderer.md`](./docs/renderer.md))
+- [ ] **Parser diagnostics and encoding confidence in the UI**: needs an IPC channel first; see [`docs/frontend-requirements.md`](./docs/frontend-requirements.md)
