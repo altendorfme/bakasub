@@ -37,6 +37,7 @@ describe('PreferencesService', () => {
       'preflight.autoConfirmBelowUsd': null,
       'tracks.preferredSourceLangs': ['en'],
       'logs.level': 'info',
+      'ui.language': null,
       'llm.rateLimit.freeRpm': 20,
       'llm.rateLimit.paidRpm': null,
       'llm.rateLimit.freeTier': 'auto',

@@ -8,7 +8,8 @@ import type { LlmLog } from '../llm/llm-session'
 import { ModelCatalog } from '../llm/model-catalog'
 import { FreeQuota } from '../llm/free-quota'
 import { realSleep } from '../llm/llm-session'
-import { OpenRouterClient } from '../llm/openrouter-client'
+import { OpenRouterClient, type KeyInfo } from '../llm/openrouter-client'
+import { validateOpenRouterKey } from '../llm/validate-key'
 import { RateLimiter } from '../llm/rate-limiter'
 import { translateDocument, type RetrySettings } from '../llm/translate-document'
 import { MkvToolnix, type CommandRunner, type ToolResolver } from '../media/mkvtoolnix-service'
@@ -60,6 +61,7 @@ export function createJobModule(o: JobModuleOptions): {
   preferences: PreferencesService
   batches: BatchService
   freeQuota: FreeQuota
+  validateApiKey: (key: string) => Promise<KeyInfo>
 } {
   const settings = new SettingsService(new SettingsRepository(o.db), (key, err) =>
     o.log.jobs.warn(`invalid setting ${key}: ${String(err)}`)
@@ -169,5 +171,7 @@ export function createJobModule(o: JobModuleOptions): {
       o.onSettingsChanged?.(keys)
     }
   })
-  return { jobs, presets, mkv, models, settings, preferences, batches, freeQuota }
+  const validateApiKey = (key: string): Promise<KeyInfo> =>
+    validateOpenRouterKey((signal, k) => client.keyInfo(signal, k), key)
+  return { jobs, presets, mkv, models, settings, preferences, batches, freeQuota, validateApiKey }
 }

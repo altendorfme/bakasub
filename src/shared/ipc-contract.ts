@@ -87,6 +87,8 @@ export interface PublicSettings {
   'preflight.autoConfirmBelowUsd': number | null
   'tracks.preferredSourceLangs': string[]
   'logs.level': 'info' | 'debug'
+  /** `null` = idioma do sistema (`navigator.language`). */
+  'ui.language': AppLanguage | null
   /** Avançado (Settings → Advanced). Ver docs/rate-limits.md. */
   'llm.rateLimit.freeRpm': number
   'llm.rateLimit.paidRpm': number | null
@@ -97,6 +99,10 @@ export interface PublicSettings {
   'llm.retry.maxDelayMs': number
   'llm.retry.chunkRounds': number
 }
+
+/** Idiomas da interface (os guias seguem o mesmo idioma). */
+export const APP_LANGUAGES = ['en', 'pt-BR'] as const
+export type AppLanguage = (typeof APP_LANGUAGES)[number]
 
 export type FreeTierSetting = 'auto' | 'under-10' | 'over-10'
 
@@ -543,7 +549,7 @@ export interface IpcInvokeContract {
   'memory:stats': { req: void; res: MemoryStats }
   /** Recusado com `MEMORY_BUSY` enquanto houver job ativo. */
   'memory:prune': { req: { olderThanDays: MemoryPruneScope }; res: MemoryPruneResult }
-  /** Somente escrita: a chave nunca volta ao renderer. */
+  /** Somente escrita: a chave nunca volta ao renderer. Conferida em `GET /key` antes (`LLM_AUTH`). */
   'settings:set-api-key': { req: { apiKey: string }; res: ApiKeyStatus }
   'settings:clear-api-key': { req: void; res: ApiKeyStatus }
   /** Validada no TMDB (`GET /configuration`) antes de ir para o vault: `TMDB_AUTH` se recusada. */

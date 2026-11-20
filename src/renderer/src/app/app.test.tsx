@@ -5,6 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Job, SidecarReport } from '@shared/ipc-contract'
+import { onboardedSettings } from '@renderer/test/fixtures'
 import { installFakeApi, ok, type FakeApi } from '@renderer/test/fake-api'
 import { App } from './app'
 import { createAppRouter } from './router'
@@ -40,7 +41,10 @@ function setup(path = '/', jobs: Job[] = []): FakeApi {
   const fake = installFakeApi({
     jobs: { list: () => ok(jobs) },
     sidecars: { check: () => ok(report(true)) },
-    settings: { apiKeyStatus: () => ok({ present: true, protection: 'os' as const }) }
+    settings: {
+      apiKeyStatus: () => ok({ present: true, protection: 'os' as const }),
+      get: () => ok(onboardedSettings)
+    }
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const router = createAppRouter({

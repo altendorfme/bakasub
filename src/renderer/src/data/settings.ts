@@ -1,10 +1,94 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
-import type { ApiKeyStatus } from '@shared/ipc-contract'
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult
+} from '@tanstack/react-query'
+import type { ApiKeyStatus, PublicSettings, TmdbKeyStatus } from '@shared/ipc-contract'
 import { unwrap } from '@renderer/lib/ipc'
 import { qk } from './query-keys'
 
-export const useApiKeyStatus = (): UseQueryResult<ApiKeyStatus> =>
-  useQuery({
-    queryKey: qk.settings.apiKey(),
-    queryFn: () => unwrap(window.api.settings.apiKeyStatus())
+/** Shared with the router guard (`ensureQueryData`). */
+export const settingsQuery = {
+  queryKey: qk.settings.all(),
+  queryFn: (): Promise<PublicSettings> => unwrap(window.api.settings.get())
+}
+export const apiKeyStatusQuery = {
+  queryKey: qk.settings.apiKey(),
+  queryFn: (): Promise<ApiKeyStatus> => unwrap(window.api.settings.apiKeyStatus())
+}
+
+export const useSettings = (): UseQueryResult<PublicSettings> => useQuery(settingsQuery)
+
+/** What the app needs before translating: a key, a default model and a default language. */
+export const isOnboarded = (
+  key: ApiKeyStatus | undefined,
+  s: PublicSettings | undefined
+): boolean =>
+  !!key?.present && !!s?.['translation.defaultModel'] && !!s['translation.defaultTargetLang']
+
+/** The Main answers with the full snapshot (rules applied): it replaces the cache as is. */
+export function useUpdateSettings(): UseMutationResult<
+  PublicSettings,
+  Error,
+  Partial<PublicSettings>
+> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (patch) => unwrap(window.api.settings.update(patch)),
+    onSuccess: (s) => {
+      qc.setQueryData(qk.settings.all(), s)
+      // Tier override changes the quota the Main reports.
+      void qc.invalidateQueries({ queryKey: qk.models.freeQuota() })
+    }
   })
+}
+
+export function useResetSettings(): UseMutationResult<
+  PublicSettings,
+  Error,
+  (keyof PublicSettings)[]
+> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (keys) => unwrap(window.api.settings.reset(keys)),
+    onSuccess: (s) => {
+      qc.setQueryData(qk.settings.all(), s)
+      void qc.invalidateQueries({ queryKey: qk.models.freeQuota() })
+    }
+  })
+}
+
+export const useApiKeyStatus = (): UseQueryResult<ApiKeyStatus> => useQuery(apiKeyStatusQuery)
+
+/** Write only: the key never comes back. A new key changes the catalog auth and the free quota. */
+export function useSetApiKey(): UseMutationResult<ApiKeyStatus, Error, string | null> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key) =>
+      unwrap(key === null ? window.api.settings.clearApiKey() : window.api.settings.setApiKey(key)),
+    onSuccess: (s) => {
+      qc.setQueryData(qk.settings.apiKey(), s)
+      void qc.invalidateQueries({ queryKey: qk.models.all })
+    }
+  })
+}
+
+export const useTmdbKeyStatus = (): UseQueryResult<TmdbKeyStatus> =>
+  useQuery({
+    queryKey: qk.settings.tmdbKey(),
+    queryFn: () => unwrap(window.api.settings.tmdbKeyStatus())
+  })
+
+/** Validated against TMDB before saving (`TMDB_AUTH` when rejected). `null` removes it. */
+export function useSetTmdbKey(): UseMutationResult<TmdbKeyStatus, Error, string | null> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key) =>
+      unwrap(
+        key === null ? window.api.settings.clearTmdbKey() : window.api.settings.setTmdbKey(key)
+      ),
+    onSuccess: (s) => qc.setQueryData(qk.settings.tmdbKey(), s)
+  })
+}

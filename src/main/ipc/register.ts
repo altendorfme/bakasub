@@ -38,6 +38,7 @@ export interface IpcDependencies {
   tmdb: TmdbClient
   mediaContext: MediaContextService
   freeQuota: FreeQuota
+  validateApiKey: (key: string) => Promise<unknown>
 }
 
 /** Composition root dos handlers IPC. Um arquivo por domínio em ./handlers. */

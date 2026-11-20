@@ -16,6 +16,7 @@ export default defineConfig({
     // no topo de cada arquivo de teste.
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
-    clearMocks: true
+    clearMocks: true,
+    setupFiles: ['src/renderer/src/test/setup-dom.ts']
   }
 })

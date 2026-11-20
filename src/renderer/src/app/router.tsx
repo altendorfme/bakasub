@@ -4,21 +4,54 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  Outlet,
   redirect,
   type RouterHistory
 } from '@tanstack/react-router'
 import { AppShell } from '@renderer/components/layout/app-shell'
+import { apiKeyStatusQuery, isOnboarded, settingsQuery } from '@renderer/data/settings'
 import { PlaceholderPage } from '@renderer/pages/placeholder-page'
+import { WelcomePage } from '@renderer/pages/welcome/welcome-page'
 import { PAGES } from './pages'
 
 export interface RouterContext {
   queryClient: QueryClient
 }
 
-const rootRoute = createRootRouteWithContext<RouterContext>()({ component: AppShell })
+const rootRoute = createRootRouteWithContext<RouterContext>()({ component: Outlet })
+
+/** Loads what the onboarding decision needs; an IPC failure never locks the user out. */
+async function onboarded(qc: QueryClient): Promise<boolean> {
+  try {
+    const [key, settings] = await Promise.all([
+      qc.ensureQueryData(apiKeyStatusQuery),
+      qc.ensureQueryData(settingsQuery)
+    ])
+    return isOnboarded(key, settings)
+  } catch {
+    return true
+  }
+}
+
+/** Everything with the sidebar. Until the key, default model and language exist: `/welcome`. */
+const shellRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'shell',
+  component: AppShell,
+  beforeLoad: async ({ context }) => {
+    if (!(await onboarded(context.queryClient))) throw redirect({ to: '/welcome' })
+  }
+})
+
+const welcomeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/welcome',
+  component: WelcomePage,
+  loader: ({ context }) => onboarded(context.queryClient)
+})
 
 const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => shellRoute,
   path: '/',
   beforeLoad: () => {
     throw redirect({ to: '/translate' })
@@ -27,13 +60,16 @@ const indexRoute = createRoute({
 
 const pageRoutes = PAGES.map((page) =>
   createRoute({
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => shellRoute,
     path: `/${page}`,
     component: () => <PlaceholderPage page={page} />
   })
 )
 
-const routeTree = rootRoute.addChildren([indexRoute, ...pageRoutes])
+const routeTree = rootRoute.addChildren([
+  shellRoute.addChildren([indexRoute, ...pageRoutes]),
+  welcomeRoute
+])
 
 /**
  * Hash history in the app: in production the renderer loads from `file://`, where path-based

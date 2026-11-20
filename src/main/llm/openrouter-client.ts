@@ -364,9 +364,12 @@ export class OpenRouterClient {
     }
   }
 
-  /** `GET /key`: patamar da conta e cota diária de modelos free. */
-  async keyInfo(signal?: AbortSignal): Promise<KeyInfo> {
-    const key = await this.options.apiKey()
+  /**
+   * `GET /key`: patamar da conta e cota diária de modelos free. `keyOverride` testa uma key
+   * candidata antes de salvá-la.
+   */
+  async keyInfo(signal?: AbortSignal, keyOverride?: string): Promise<KeyInfo> {
+    const key = keyOverride ?? (await this.options.apiKey())
     if (!key) throw new LlmError('auth', 'OpenRouter API key is not set')
     let res: Response
     try {

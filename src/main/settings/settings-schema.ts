@@ -35,6 +35,11 @@ export const SETTINGS_SCHEMA = {
   },
   /** Preset usado quando o job não escolhe um. */
   'translation.defaultPresetId': { schema: z.string().min(1).max(64), default: 'builtin:series' },
+  /** Idioma da interface e dos guias. `null` = seguir o idioma do sistema. */
+  'ui.language': {
+    schema: z.enum(['en', 'pt-BR']).nullable(),
+    default: null as 'en' | 'pt-BR' | null
+  },
   /** `debug` = log detalhado (tela Settings: "Verbose logging"). Vale na hora. */
   'logs.level': { schema: z.enum(['info', 'debug']), default: 'info' as 'info' | 'debug' },
   /** Jobs executados ao mesmo tempo. */

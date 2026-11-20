@@ -81,3 +81,35 @@
 @utility bg-brand {
   background-image: linear-gradient(135deg, var(--primary), var(--violet));
 }
+
+/* Bundled user guides (GuideView): markdown without a typography plugin. */
+@layer components {
+  .guide {
+    @apply grid max-w-[68ch] gap-3;
+  }
+  .guide h1 {
+    @apply text-lg font-semibold;
+  }
+  .guide h2 {
+    @apply mt-2 text-base font-semibold;
+  }
+  .guide ol {
+    @apply grid list-decimal gap-1.5 pl-5;
+  }
+  .guide ul {
+    @apply grid list-disc gap-1 pl-5;
+  }
+  .guide code {
+    @apply rounded bg-muted px-1 py-0.5 text-[0.85em];
+  }
+  .guide table {
+    @apply w-full border-collapse text-xs;
+  }
+  .guide th,
+  .guide td {
+    @apply border-b px-2 py-1.5 text-left align-top;
+  }
+  .guide th {
+    @apply font-medium text-muted-foreground;
+  }
+}

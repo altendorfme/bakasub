@@ -111,6 +111,7 @@ if (!app.requestSingleInstanceLock()) {
         models: jobModule.models,
         batches: jobModule.batches,
         freeQuota: jobModule.freeQuota,
+        validateApiKey: jobModule.validateApiKey,
         tmdb: mediaContext.tmdb,
         mediaContext: mediaContext.service
       })

@@ -35,6 +35,23 @@ i18next with **English as the default and source language**. Namespaces: `common
 - `src/shared/error-codes.ts` is the single list of codes (`APP_ERROR_CODES` from `AppError`, plus `FORBIDDEN`/`INTERNAL` from `createHandler`). `locales/en/errors.ts` `satisfies Record<ErrorCode, string>`: a new backend code without a message fails to compile, and a test checks every code at runtime.
 - Adding a language: a new `locales/<lang>/` folder with the same shape as `en`.
 
+## Foundation
+
+- **UI primitives** (`components/ui/`, shadcn style on our tokens, Radix underneath): `Button`, `Badge`, `Card`, `Input`/`Textarea`, `Field`/`Label` (wires `aria-describedby`/`aria-invalid`), `Select`, `Checkbox`, `Switch`, `Dialog`, `Popover`, `Tooltip` (needs the root `TooltipProvider`), `Command` (cmdk, for searchable pickers), `Tabs`, `Progress` (0..1, indeterminate without a value), `Toaster` (sonner; call `toast` from `sonner`).
+- **Common components** (`components/common/`): `ErrorBoundary` (one around the router, one per page keyed by the path; logs through `reportError(err, 'boundary')`), `GuideView` (bundled guide in the app language; guide links call `onNavigate`, other links go through `app:open-external`; no raw HTML), `WaitLabel` (`progress.waiting` with a live countdown, `lib/use-countdown.ts`).
+- **Data hooks** (`data/`): `useSettings` / `useUpdateSettings` / `useResetSettings` (the Main returns the full snapshot, which replaces the cache), `useApiKeyStatus` / `useSetApiKey` and `useTmdbKeyStatus` / `useSetTmdbKey` (`null` clears; a new OpenRouter key invalidates the catalog and the free quota), `useModels`, `useFreeQuota`, `isFreeModel` (same rule as the Main), `usePresets`, `useJobs`.
+- **Language**: setting `ui.language` (`en`, `pt-BR`, `null` = system). `useLanguageSync` (in the root `EventBridge`) switches i18next and `<html lang>`; `resolveAppLanguage` maps the request to a supported language (exact, base language, English). UI strings without a translation fall back to English.
+
+## Onboarding
+
+Route `/welcome`, outside the shell (no sidebar). The shell layout route (`id: 'shell'`) has a `beforeLoad` guard: while the API key, the default model or the default target language is missing (`isOnboarded`), every page redirects there. The guard uses `ensureQueryData` with the same query options as the hooks (`settingsQuery`, `apiKeyStatusQuery`); an IPC failure lets the user in rather than locking the app.
+
+Steps, saved as they go (no "submit at the end"): OpenRouter key (`KeyForm`, checked by the Main in `GET /key` before saving: `LLM_AUTH` / `NETWORK`), models (`ModelPicker`), languages (`LanguagePicker`), video tools (sidecar install, optional), TMDB key (optional). The page opens at the first required step that is not done; later required steps unlock in order. "Start translating" goes to `/translate`.
+
+Reusable pieces built here: `KeyForm` (write-only secret: saved / replace / remove, no-keyring warning, guide link), `GuideDialog` (guide in a dialog with back navigation between guides), `ModelPicker` (catalog search, favorites first, price per 1M tokens, free / reliable JSON / moderated badges, default), `LanguagePicker` (curated BCP-47 list in `lib/languages.ts`, names from `Intl.DisplayNames` in the UI language), `useListWithDefault` (favorites + default as one optimistic value; the same rule as `PreferencesService`, in `lib/favorites.ts`, so a patch never conflicts).
+
+Tests: `test/setup-dom.ts` adds the jsdom gaps cmdk/Radix need (`ResizeObserver`, `scrollIntoView`, pointer capture); `test/fixtures.ts` has the settings of an onboarded user.
+
 ## In-app guides
 
 User guides (OpenRouter key, limits and retries, TMDB key) live in `src/renderer/src/guides/<lang>/<id>.md`, outside `docs/` (which is for developers), with one file per language (`en`, `pt-BR`). `guides.ts` bundles them with `import.meta.glob('?raw')`; `useGuide(id)` returns the guide in the current i18next language (exact, then base language, then English). It uses `i18n.language`, not `resolvedLanguage`, so a guide can already be shown in a language the UI does not have yet. Links between guides are relative `.md` links (`guideIdFromHref` turns them into in-app navigation). `guides.test.ts` fails when a translation is missing or a cross-link is broken. Details: [`guides/README.md`](../src/renderer/src/guides/README.md).

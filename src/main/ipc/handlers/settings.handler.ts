@@ -21,6 +21,8 @@ export function registerSettingsHandlers(deps: {
   preferences: PreferencesService
   /** A cota free é da conta da key: trocar a key invalida o cache de `GET /key`. */
   freeQuota: Pick<FreeQuota, 'invalidate'>
+  /** Confere a key no OpenRouter antes de salvar (`LLM_AUTH`, `NETWORK`). */
+  validateApiKey: (key: string) => Promise<unknown>
 }): void {
   const status = async (): Promise<ApiKeyStatus> => ({
     present: await deps.vault.has('openrouter.apiKey'),
@@ -29,8 +31,10 @@ export function registerSettingsHandlers(deps: {
   createHandler('settings:set-api-key', {
     input: apiKeyInput,
     handle: async ({ apiKey }) => {
-      await deps.vault.set('openrouter.apiKey', apiKey)
+      // Redige antes da chamada: um erro de rede pode ecoar a key no log.
       redactor.add(apiKey)
+      await deps.validateApiKey(apiKey)
+      await deps.vault.set('openrouter.apiKey', apiKey)
       deps.freeQuota.invalidate()
       return status()
     }
