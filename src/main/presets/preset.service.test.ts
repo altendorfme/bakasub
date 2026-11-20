@@ -32,7 +32,7 @@ describe('presets embutidos', () => {
     expect(list.filter((p) => p.builtin).map((p) => [p.id, p.mediaType, p.temperature])).toEqual([
       ['builtin:movie', 'Movie', 0.35],
       ['builtin:series', 'Series', 0.35],
-      ['builtin:anime', 'Anime', 0.45],
+      ['builtin:anime', 'Anime', 0.4],
       ['builtin:documentary', 'Documentary', 0.2]
     ])
     for (const p of BUILTIN_PRESETS) {
@@ -48,6 +48,29 @@ describe('presets embutidos', () => {
       code: 'PRESET_READ_ONLY'
     })
     await expect(svc.delete('builtin:anime')).rejects.toMatchObject({ code: 'PRESET_READ_ONLY' })
+  })
+
+  it('regras comuns não divergem entre presets', () => {
+    const prompt = (id: string): string => BUILTIN_PRESETS.find((p) => p.id === id)!.prompt
+    const has = (re: RegExp): string[] =>
+      BUILTIN_PRESETS.filter((p) => re.test(p.prompt)).map((p) => p.id)
+    const all = BUILTIN_PRESETS.map((p) => p.id)
+    const fiction = ['builtin:movie', 'builtin:series', 'builtin:anime']
+    expect(has(/nicknames .*forms of address and recurring terms consistent/)).toEqual(all)
+    expect(has(/Keep lines short/)).toEqual(all)
+    expect(has(/Adapt wordplay, puns and jokes/)).toEqual(fiction)
+    // Idioms são regra fixa do system prompt (regra 6), não do preset: não duplicar.
+    expect(has(/Adapt slang|word for word/)).toEqual([])
+    expect(has(/Do not censor or soften profanity/)).toEqual(fiction)
+    expect(has(/voice and register consistent/)).toEqual(fiction)
+    // Anime ganha as regras comuns sem perder as específicas.
+    expect(prompt('builtin:anime')).toMatch(/honorifics/)
+    expect(prompt('builtin:anime')).toMatch(/culturally specific terms/)
+    // Cada regra aparece uma vez só (composição sem duplicar trechos).
+    for (const p of BUILTIN_PRESETS) {
+      const lines = p.prompt.split('\n')
+      expect(new Set(lines).size).toBe(lines.length)
+    }
   })
 
   it('prompts estáveis (mudanças são deliberadas)', () => {

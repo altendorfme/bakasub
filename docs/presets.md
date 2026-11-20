@@ -6,14 +6,32 @@ A preset is the **style** of a translation: media type, temperature, style guida
 
 Defined in code (`builtin-presets.ts`), frozen, versioned with the app, **never stored in the database**. They have no glossary. Their media types are `Movie`, `Series`, `Anime` and `Documentary`.
 
-| Id                    | Name        | Temperature | Style guidance (summary)                                                                                                                     |
-| --------------------- | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `builtin:movie`       | Movie       | 0.35        | natural theatrical dialogue, consistent register, adapted slang/jokes, short lines, no softened profanity                                    |
-| `builtin:series`      | Series      | 0.35        | same, plus consistency of names/forms of address across the episode and concise recaps                                                       |
-| `builtin:anime`       | Anime       | 0.45        | keep honorifics and untranslatable terms, attack/technique/place names, expressive tone and speech quirks, onomatopoeia only when meaningful |
-| `builtin:documentary` | Documentary | 0.2         | terminology accuracy, exact numbers/dates/units/names (no conversion), neutral formal narration                                              |
+| Id                    | Name        | Temperature | Media-specific guidance (summary)                                                                                                                                                                                                                 |
+| --------------------- | ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `builtin:movie`       | Movie       | 0.35        | natural theatrical dialogue                                                                                                                                                                                                                       |
+| `builtin:series`      | Series      | 0.35        | natural streaming dialogue, concise recaps/titles/on-screen text                                                                                                                                                                                  |
+| `builtin:anime`       | Anime       | 0.4         | keep honorifics and Japanese terms without equivalent (source-language idioms are not such terms), attack/technique/mecha names untranslated, in-world common nouns by plain meaning, expressive tone and speech quirks, signs as complete titles |
+| `builtin:documentary` | Documentary | 0.2         | terminology accuracy, exact numbers/dates/units/names (no conversion), neutral formal narration, faithful interviews, established titles                                                                                                          |
 
-`update`/`delete` on a built-in → `PRESET_READ_ONLY`. The exact texts are pinned by a snapshot test; improving them in a later release needs no migration, and jobs already created keep the copy they froze.
+### How a built-in prompt is composed
+
+Each prompt is `Media type: …` + its media-specific rules + shared blocks, so a rule never exists in one preset and silently goes missing in another:
+
+| Rule                                                           | Block     | Movie | Series | Anime |                        Documentary                        |
+| -------------------------------------------------------------- | --------- | :---: | :----: | :---: | :-------------------------------------------------------: |
+| Names, nicknames, forms of address, recurring terms consistent | `SHARED`  |   ✓   |   ✓    |   ✓   |                             ✓                             |
+| Short lines, easy to read                                      | `SHARED`  |   ✓   |   ✓    |   ✓   |                             ✓                             |
+| Each character's voice and register consistent                 | `FICTION` |   ✓   |   ✓    |   ✓   |                             –                             |
+| Adapt wordplay, puns and jokes                                 | `FICTION` |   ✓   |   ✓    |   ✓   |                             –                             |
+| Do not censor or soften profanity                              | `FICTION` |   ✓   |   ✓    |   ✓   | – (interviews stay faithful, "including strong language") |
+
+Documentary has no `FICTION` block on purpose: narration is neutral and formal, and accuracy wins over style.
+
+Not in any preset, because it is a **fixed system prompt rule** that applies to every style (see [`llm.md`](./llm.md#prompt)): idioms and slang adapted to the natural target-language equivalent, imperative mood for commands, current official spelling. Keeping it in one place avoids duplicated (and drifting) instructions; the presets only add what is specific to a kind of media.
+
+Prompt size (o200k_base): Movie 140, Series 158, Anime 353, Documentary 151 tokens (was 96 / 100 / 159 / 101). It is part of the system prompt, which is the same for every chunk of a job and is reused by provider prompt caching; the preflight counts it per chunk.
+
+`update`/`delete` on a built-in → `PRESET_READ_ONLY`. The exact texts are pinned by a snapshot test, and a second test checks that the shared rules are present in every preset that should have them; improving them in a later release needs no migration, jobs already created keep the copy they froze and custom presets copied from a built-in keep their own text. Changing a built-in text changes its `prompt_hash`, so lines cached with the old text are not reused by the new one (see Cache key below).
 
 ## Custom presets
 
