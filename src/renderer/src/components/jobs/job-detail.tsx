@@ -53,7 +53,8 @@ export function JobDetail({
   showQueueLink?: boolean
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const job = useJob(id).data
+  const query = useJob(id)
+  const job = query.data
   const waiting = job?.status === 'awaiting-confirmation'
   const preflight = usePreflight(id, waiting)
   const action = useJobAction()
@@ -61,6 +62,21 @@ export function JobDetail({
   const act = (a: JobAction): void =>
     action.mutate({ id, action: a }, { onError: (err) => toast.error(errorMessage(err)) })
 
+  if (!job && query.isError) {
+    const leave = onRemoved ?? onAnother
+    return (
+      <div className="grid gap-3" role="alert">
+        <p className="text-sm text-muted-foreground">{errorMessage(query.error)}</p>
+        {leave ? (
+          <div>
+            <Button variant="outline" onClick={leave}>
+              {t('actions.back')}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
   if (!job) return <p className="text-sm text-muted-foreground">{t('translate.starting')}</p>
   const active = ACTIVE_STATUSES.has(job.status)
   const busy = action.isPending || remove.isPending

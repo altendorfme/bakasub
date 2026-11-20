@@ -14,7 +14,7 @@ import type {
   JobProgressEvent,
   PreflightEstimate
 } from '@shared/ipc-contract'
-import { unwrap } from '@renderer/lib/ipc'
+import { IpcCallError, unwrap } from '@renderer/lib/ipc'
 import { notifyJob } from '@renderer/lib/notify'
 import { qk } from './query-keys'
 
@@ -26,7 +26,9 @@ export const useJob = (id: string | null): UseQueryResult<Job> =>
   useQuery({
     queryKey: qk.jobs.detail(id ?? ''),
     queryFn: () => unwrap(window.api.jobs.get(id!)),
-    enabled: id !== null
+    enabled: id !== null,
+    // A job that no longer exists will not come back: no retries, the screen shows it.
+    retry: (count, err) => !(err instanceof IpcCallError && err.code === 'JOB_NOT_FOUND') && count < 3
   })
 
 /** Estimate + full coverage of a job waiting for confirmation. */
