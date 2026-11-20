@@ -153,7 +153,9 @@ function setup(): {
     preflight: { awaiting: 3, toTranslate: 900, cost: { low: 0.1, high: 0.12 }, approximate: false }
   }
   const create = vi.fn(async (req: BatchCreateRequest) => {
-    jobs = req.items.map((it, i) => batchJob(`j${i}`, it.path, 'awaiting-confirmation'))
+    jobs = req.items.map((it, i) =>
+      batchJob(`j${i}`, 'path' in it ? it.path : it.video, 'awaiting-confirmation')
+    )
     return { ok: true as const, data: batch }
   })
   const confirm = vi.fn(async () => ok({ ...batch, preflight: undefined, counts: { queued: 3 } }))
@@ -162,7 +164,7 @@ function setup(): {
   )
   installFakeApi({
     jobs: { list: () => ok(jobs) },
-    batches: { plan: planCall, create, get: () => ok(batch), confirm },
+    batches: { plan: planCall as never, create, get: () => ok(batch), confirm },
     dialog: { openFolder: () => ok({ path: '/anime' }) },
     media: {
       identify: (name: string) => ok(identify(name)),

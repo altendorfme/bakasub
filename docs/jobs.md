@@ -79,7 +79,7 @@ Paths only come from the native dialogs (`dialog:open-files`, `dialog:choose-out
 
 ## Batch mode (`src/main/batch/`)
 
-A batch groups independent jobs created together; it executes nothing itself. Kinds: `extract`, `translate`, `pipeline` (mux batches would need pairing MKVs with subtitles, not designed yet).
+A batch groups independent jobs created together; it executes nothing itself. Kinds: `extract`, `translate`, `pipeline`, `mux` (one `mux` job per MKV, with its paired subtitles).
 
 ```
 dialog:open-folder | dialog:open-files (multiple) | drag & drop
@@ -95,6 +95,13 @@ dialog:open-folder | dialog:open-files (multiple) | drag & drop
   - Files without a usable track stay in the plan with `skipped` (`no-subtitle-track`, `no-supported-track`, `probe-failed` + `error`).
 - **Create** (`batch-service.ts`): all items are resolved (`resolveJobSpec`, 4 in parallel) before anything is written; one bad item rejects the whole batch (`INVALID_INPUT`, message `item N: …`, always the first failing item in plan order). `translate`/`pipeline` take batch defaults `presetId`, `model`, `targetLang`, `notes` (each falls back to Settings: `translation.defaultPresetId` / `defaultModel` / `defaultTargetLang`; missing → `MODEL_NOT_SET` / `TARGET_LANG_NOT_SET`).
 - **Works** (`groups`): the unit of context of a translate batch. `groups[]` (`BatchGroup`: `name?`, `media?` TMDB ref, `presetId?`, `model?`, `targetLang?`, `notes?`) and `items[].group` (index), with `items[].season`/`episode` for series. A group's settings replace the batch defaults for its files (notes too: an empty string means no notes); `media` comes only from the group, so files without a group, or in a group without `media`, carry no media context. The TMDB lookup goes through the same `MediaLookupSource` as single jobs (a lookup failure is logged and the job runs without it). Unknown group index or `groups` on an `extract` batch → `INVALID_INPUT`. The groups are kept in the batch's `options` JSON.
+- **Mux batches** (`kind: 'mux'`, `mux-pairing.ts`): `batches:plan` scans MKVs **and** subtitles (`.srt .ass .ssa .vtt`) from a folder or loose files, without probing, and returns `BatchMuxPlan`: `items[]` = `{ video, subtitles[] }` (1..32, natural order, each with `language` and `matchedBy`), `unmatchedVideos`, `unmatchedSubtitles`, `rejected`, `truncated`. Pairing is deterministic (no edit-distance guessing):
+  1. Same folder and same base name, case-insensitive, ignoring language/flag suffixes on the subtitle (`X.mkv` ↔ `X.pt-BR.srt`, `X.en.forced.ass`, `X.srt`). A `Subs/` or `Subtitles/` folder next to the video counts as the video's folder.
+  2. Otherwise, same folder and same season/episode taken from the file names with the release-name parser of the media context (`S01E05`, `1x05`, or absolute anime numbering `Show - 28`).
+  3. More than one candidate video (two files with the same base name or the same episode) is **ambiguous**: never resolved here, the subtitle goes to `unmatchedSubtitles` for the UI to place. A subtitle beyond the 32nd of a video also lands there.
+  - Language comes from the filename suffix (`.pt-BR`, `.en`), `und` without one; the user edits it before `create`. `und` is a valid language for the mux job.
+  - `batches:create` takes `items: { video, subtitles: { path, language, name?, default? }[] }[]` plus the batch-level `options` (`setDefault`, `keepOriginalSubtitles`; `alsoWriteSubtitle` is ignored). Every item is resolved before the transaction (same `resolveJobSpec` as the single mux job); a bad item, a repeated video, an item of the wrong shape for the kind, or `groups` → `INVALID_INPUT` (`item N: …`). Subtitle parsing is validated in the job (`validate` step, `INVALID_SUBTITLE`), as in the single mux. Preset/model/language/notes/media settings do not apply.
+  - Output `<base>.<lang>.mkv` (first subtitle's language) next to the source, mirrored under `outputDir` for a folder batch; collisions get ` (2)`. FIFO, cancel and remove behave as in the other kinds.
 - **Output**: without `outputDir`, next to each source. With `outputDir` and a folder batch, the relative structure is **mirrored** (subfolders created on demand); items must be inside the batch folder. Loose-file batches with `outputDir` are flat; name collisions get ` (2)`.
 - **Order**: jobs keep the plan order in the FIFO queue (staggered `created_at`).
 - **State**: `Batch.counts` per job status, `total`, `state: active | finished`.

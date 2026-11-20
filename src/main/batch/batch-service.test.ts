@@ -403,3 +403,135 @@ describe('BatchService: obras (groups)', () => {
     expect(await jobs.list()).toEqual([])
   })
 })
+
+describe('BatchService: mux', () => {
+  const show = (...p: string[]): string => join(root, 'show', ...p)
+  const sub = (path: string, language = 'en'): { path: string; language: string } => ({
+    path,
+    language
+  })
+
+  it('plan: pasta com MKVs e legendas pareados; sem probe; sobras listadas', async () => {
+    writeFileSync(show('ep2.pt-BR.srt'), 'x')
+    writeFileSync(show('orphan.en.srt'), 'x')
+    const plan = await svc.plan({ kind: 'mux', source: { type: 'folder', path: show() } })
+    expect(plan).toMatchObject({ kind: 'mux', root: show(), rejected: [], truncated: false })
+    expect(
+      plan.items.map((i) => [
+        i.video.relPath,
+        i.subtitles.map((s) => [s.relPath, s.language, s.matchedBy])
+      ])
+    ).toEqual([
+      ['ep1.mkv', [['ep1.en.srt', 'en', 'name']]],
+      ['ep2.mkv', [['ep2.pt-BR.srt', 'pt-BR', 'name']]]
+    ])
+    expect(plan.unmatchedVideos.map((v) => v.relPath)).toEqual(['broken.mkv'])
+    expect(plan.unmatchedSubtitles.map((s) => s.relPath)).toEqual(['orphan.en.srt'])
+    expect(probe).not.toHaveBeenCalled()
+  })
+
+  it('plan: arquivos avulsos; extensão inválida vai em rejected', async () => {
+    writeFileSync(show('notes.txt'), 'x')
+    const plan = await svc.plan({
+      kind: 'mux',
+      source: { type: 'files', paths: [show('ep1.mkv'), show('ep1.en.srt'), show('notes.txt')] }
+    })
+    expect(plan.root).toBeNull()
+    expect(plan.items).toHaveLength(1)
+    expect(plan.rejected).toEqual([{ path: show('notes.txt'), reason: 'extension' }])
+  })
+
+  it('create: um job mux por MKV, opções do batch, FIFO, `und` aceito, estrutura espelhada', async () => {
+    const b = await svc.create({
+      kind: 'mux',
+      root: join(root, 'show'),
+      items: [
+        {
+          video: show('ep1.mkv'),
+          subtitles: [sub(show('ep1.en.srt')), sub(show('ep1.en.srt'), 'und')]
+        },
+        {
+          video: show('S02', 'ep1.mkv'),
+          subtitles: [{ ...sub(show('ep1.en.srt'), 'pt-BR'), name: 'PT', default: true }]
+        }
+      ],
+      options: { keepOriginalSubtitles: false, setDefault: false },
+      outputDir: out
+    })
+    expect(b).toMatchObject({ kind: 'mux', total: 2, state: 'active', name: 'show' })
+    await until(() => runs.length === 1)
+    expect(runs[0].spec).toMatchObject({
+      kind: 'mux',
+      outputDir: out,
+      keepOriginalSubtitles: false,
+      setDefault: false,
+      subtitles: [
+        { language: 'en', default: false },
+        { language: 'und', default: false }
+      ]
+    })
+    runs[0].resolve({ status: 'completed', result: { outputs: [], warnings: [] } })
+    await until(() => runs.length === 2)
+    expect(runs[1].spec).toMatchObject({
+      outputDir: join(out, 'S02'),
+      subtitles: [{ language: 'pt-BR', name: 'PT', default: true }]
+    })
+  })
+
+  it('create: um item inválido recusa o batch inteiro com "item N"', async () => {
+    const good = { video: show('ep1.mkv'), subtitles: [sub(show('ep1.en.srt'))] }
+    await expect(
+      svc.create({
+        kind: 'mux',
+        root: null,
+        items: [good, { video: show('ep2.mkv'), subtitles: [sub(show('missing.srt'))] }]
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', message: expect.stringMatching(/^item 1: /) })
+    await expect(
+      svc.create({
+        kind: 'mux',
+        root: null,
+        items: [good, { video: show('ep2.mkv'), subtitles: [sub(show('ep1.en.srt'), 'xx_??')] }]
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', message: expect.stringMatching(/^item 1: /) })
+    await expect(
+      svc.create({ kind: 'mux', root: null, items: [good, { ...good }] })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', message: expect.stringMatching(/^item 1: /) })
+    expect(await svc.list()).toEqual([])
+    expect(await jobs.list()).toEqual([])
+  })
+
+  it('groups em batch mux e itens do formato errado são INVALID_INPUT', async () => {
+    const item = { video: show('ep1.mkv'), subtitles: [sub(show('ep1.en.srt'))] }
+    await expect(
+      svc.create({ kind: 'mux', root: null, items: [item], groups: [{ name: 'x' }] })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(
+      svc.create({ kind: 'mux', root: null, items: [{ path: show('ep1.mkv') }] })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    await expect(svc.create({ kind: 'extract', root: null, items: [item] })).rejects.toMatchObject({
+      code: 'INVALID_INPUT'
+    })
+    await expect(
+      svc.create({ kind: 'mux', root: null, items: [{ video: show('ep1.mkv'), subtitles: [] }] })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    expect(await svc.list()).toEqual([])
+  })
+
+  it('cancelar e remover como nos outros kinds', async () => {
+    const b = await svc.create({
+      kind: 'mux',
+      root: null,
+      items: [
+        { video: show('ep1.mkv'), subtitles: [sub(show('ep1.en.srt'))] },
+        { video: show('ep2.mkv'), subtitles: [sub(show('ep1.en.srt'))] }
+      ]
+    })
+    await until(() => runs.length === 1)
+    const c = await svc.cancel(b.id)
+    expect(c.counts).toEqual({ cancelled: 2 })
+    await until(async () => (await svc.get(b.id)).state === 'finished')
+    await svc.remove(b.id)
+    expect(await svc.list()).toEqual([])
+  })
+})

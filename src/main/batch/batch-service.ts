@@ -6,6 +6,8 @@ import type {
   Batch,
   BatchCreateRequest,
   BatchGroup,
+  BatchMuxPlan,
+  BatchMuxPlanRequest,
   BatchPlan,
   BatchPlanRequest,
   Job,
@@ -30,7 +32,7 @@ import {
   validateInputFile,
   validateOutputDir
 } from '../media/path-guard'
-import { planBatch } from './batch-planner'
+import { planBatch, planMuxBatch } from './batch-planner'
 import { mapPool } from './pool'
 
 /** Resolução dos itens (validação de caminho + lookup do TMDB por episódio) em paralelo. */
@@ -46,7 +48,7 @@ const TERMINAL: ReadonlySet<JobStatus> = new Set([
 const MAX_ITEMS = 2000
 
 const path = z.string().min(1).max(4096)
-const kind = z.enum(['extract', 'translate', 'pipeline'])
+const kind = z.enum(['extract', 'translate', 'pipeline', 'mux'])
 
 export const BatchPlanRequestSchema = z.object({
   kind,
@@ -54,7 +56,7 @@ export const BatchPlanRequestSchema = z.object({
     z.object({ type: z.literal('folder'), path, recursive: z.boolean().optional() }),
     z.object({ type: z.literal('files'), paths: z.array(path).min(1).max(MAX_ITEMS) })
   ])
-}) satisfies z.ZodType<BatchPlanRequest>
+})
 
 const episodeNumber = z.number().int().min(0).max(9999)
 const optionalText = (max: number): z.ZodOptional<z.ZodString> =>
@@ -75,6 +77,21 @@ const BatchGroupSchema = z.object({
   notes: z.string().max(MAX_USER_NOTES).optional()
 }) satisfies z.ZodType<BatchGroup>
 
+const MuxCreateItemSchema = z.object({
+  video: path,
+  subtitles: z
+    .array(
+      z.object({
+        path,
+        language: z.string().min(1).max(64),
+        name: optionalText(200),
+        default: z.boolean().optional()
+      })
+    )
+    .min(1)
+    .max(32)
+})
+
 export const BatchCreateRequestSchema = z
   .object({
     kind,
@@ -82,13 +99,16 @@ export const BatchCreateRequestSchema = z
     root: path.nullable(),
     items: z
       .array(
-        z.object({
-          path,
-          trackIds: z.array(z.number().int().min(0).max(10_000)).max(64).optional(),
-          group: z.number().int().min(0).max(MAX_ITEMS).optional(),
-          season: episodeNumber.optional(),
-          episode: episodeNumber.optional()
-        })
+        z.union([
+          MuxCreateItemSchema,
+          z.object({
+            path,
+            trackIds: z.array(z.number().int().min(0).max(10_000)).max(64).optional(),
+            group: z.number().int().min(0).max(MAX_ITEMS).optional(),
+            season: episodeNumber.optional(),
+            episode: episodeNumber.optional()
+          })
+        ])
       )
       .min(1)
       .max(MAX_ITEMS),
@@ -109,10 +129,20 @@ export const BatchCreateRequestSchema = z
     confirmBeforeTranslate: z.boolean().optional()
   })
   .superRefine((req, ctx) => {
-    if (req.groups && req.kind === 'extract')
-      ctx.addIssue({ code: 'custom', path: ['groups'], message: 'extract batches have no groups' })
+    if (req.groups && (req.kind === 'extract' || req.kind === 'mux'))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['groups'],
+        message: `${req.kind} batches have no groups`
+      })
     req.items.forEach((item, i) => {
-      if (item.group !== undefined && item.group >= (req.groups?.length ?? 0))
+      if (isMuxItem(item) !== (req.kind === 'mux'))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['items', i],
+          message: `item ${i}: ${req.kind === 'mux' ? 'expected video + subtitles' : 'expected path'}`
+        })
+      if (!isMuxItem(item) && item.group !== undefined && item.group >= (req.groups?.length ?? 0))
         ctx.addIssue({
           code: 'custom',
           path: ['items', i, 'group'],
@@ -123,6 +153,10 @@ export const BatchCreateRequestSchema = z
 
 type ParsedCreate = z.output<typeof BatchCreateRequestSchema>
 type ParsedItem = ParsedCreate['items'][number]
+type ParsedPathItem = Exclude<ParsedItem, { video: string }>
+
+const isMuxItem = (item: ParsedItem): item is Extract<ParsedItem, { video: string }> =>
+  'video' in item
 
 export interface BatchServiceDeps {
   readonly batches: BatchRepository
@@ -145,9 +179,14 @@ export class BatchService {
     this.newId = deps.newId ?? randomUUID
   }
 
-  async plan(raw: BatchPlanRequest): Promise<BatchPlan> {
+  plan(raw: BatchMuxPlanRequest): Promise<BatchMuxPlan>
+  plan(raw: BatchPlanRequest): Promise<BatchPlan>
+  plan(raw: BatchPlanRequest | BatchMuxPlanRequest): Promise<BatchPlan | BatchMuxPlan>
+  async plan(raw: BatchPlanRequest | BatchMuxPlanRequest): Promise<BatchPlan | BatchMuxPlan> {
     const req = parse(BatchPlanRequestSchema, raw)
-    return planBatch(req, this.deps)
+    return req.kind === 'mux'
+      ? planMuxBatch({ kind: req.kind, source: req.source })
+      : planBatch({ kind: req.kind, source: req.source }, this.deps)
   }
 
   async create(raw: BatchCreateRequest): Promise<Batch> {
@@ -156,6 +195,14 @@ export class BatchService {
     const realRoot = req.root ? await directory(req.root) : null
     const outRoot = req.outputDir ? await validateOutputDir(req.outputDir) : null
     const exts = req.kind === 'translate' ? SUBTITLE_EXTENSIONS : MEDIA_EXTENSIONS
+    const videos = new Set<string>()
+    if (req.kind === 'mux')
+      req.items.forEach((item, i) => {
+        const video = isMuxItem(item) ? item.video : ''
+        if (videos.has(video))
+          throw new AppError('INVALID_INPUT', `item ${i}: video already in the batch`)
+        videos.add(video)
+      })
 
     // Tudo é resolvido e validado ANTES de inserir: um item ruim recusa o batch inteiro (o
     // erro reportado é o do primeiro item, em ordem, independente do paralelismo).
@@ -257,9 +304,11 @@ export class BatchService {
     realRoot: string | null,
     outRoot: string | null
   ): Promise<JobSpec> {
-    const src = await validateInputFile(item.path, exts).catch((err: AppError) => {
-      throw new AppError('INVALID_INPUT', `item ${i}: ${err.message}`)
-    })
+    const src = await validateInputFile(isMuxItem(item) ? item.video : item.path, exts).catch(
+      (err: AppError) => {
+        throw new AppError('INVALID_INPUT', `item ${i}: ${err.message}`)
+      }
+    )
     let outputDir: string | undefined
     if (outRoot) {
       const relDir = realRoot ? relative(realRoot, dirname(src.path)) : ''
@@ -282,7 +331,7 @@ export class BatchService {
   /** Padrões do batch, substituídos pelos da obra do item; a mídia vem só da obra. */
   private translation(
     req: ParsedCreate,
-    item: ParsedItem
+    item: ParsedPathItem
   ): Omit<Extract<JobCreateRequest, { kind: 'translate' }>, 'kind' | 'source' | 'outputDir'> {
     const g = item.group === undefined ? undefined : req.groups?.[item.group]
     return {
@@ -312,7 +361,19 @@ export class BatchService {
     index: number
   ): JobCreateRequest {
     const common = { source, ...(outputDir ? { outputDir } : {}) }
+    if (isMuxItem(item))
+      return {
+        kind: 'mux',
+        ...common,
+        subtitles: item.subtitles,
+        options: {
+          setDefault: req.options?.setDefault,
+          keepOriginalSubtitles: req.options?.keepOriginalSubtitles
+        }
+      }
     switch (req.kind) {
+      case 'mux':
+        throw new AppError('INVALID_INPUT', `item ${index}: expected video + subtitles`)
       case 'extract':
         return { kind: 'extract', ...common, trackIds: item.trackIds ?? [] }
       case 'translate':

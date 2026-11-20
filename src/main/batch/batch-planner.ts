@@ -1,12 +1,56 @@
-import type { BatchPlan, BatchPlanItem, BatchPlanRequest } from '../../shared/ipc-contract'
+import { extname } from 'node:path'
+import type {
+  BatchMuxPlan,
+  BatchMuxPlanRequest,
+  BatchPlan,
+  BatchPlanItem,
+  BatchPlanRequest
+} from '../../shared/ipc-contract'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import { MEDIA_EXTENSIONS, SUBTITLE_EXTENSIONS } from '../media/path-guard'
 import { mapPool } from './pool'
+import { pairMux } from './mux-pairing'
 import { collectFiles, scanFolder, type ScannedFile } from './scan-files'
 import { selectExtractTracks, selectTranslationTrack } from './track-selection'
 
 /** `mkvmerge -J` é leve: alguns em paralelo, sem saturar o disco. */
 const PROBE_CONCURRENCY = 4
+
+/** Enumera pasta ou arquivos avulsos, com as extensões aceitas pelo `kind`. */
+async function enumerate(
+  source: BatchPlanRequest['source'],
+  extensions: readonly string[]
+): Promise<{
+  files: ScannedFile[]
+  rejected: BatchPlan['rejected']
+  truncated: boolean
+  root: string | null
+}> {
+  if (source.type === 'folder') {
+    const r = await scanFolder(source.path, { recursive: source.recursive ?? false, extensions })
+    return { files: r.files, rejected: [], truncated: r.truncated, root: r.root }
+  }
+  const r = await collectFiles(source.paths, extensions)
+  return { files: r.files, rejected: r.rejected, truncated: false, root: null }
+}
+
+/**
+ * Plano de `mux`: vídeos e legendas varridos juntos e pareados (`mux-pairing.ts`). Sem probe:
+ * o job valida as legendas (parse) e o MKV.
+ */
+export async function planMuxBatch(req: BatchMuxPlanRequest): Promise<BatchMuxPlan> {
+  const { files, rejected, truncated, root } = await enumerate(req.source, [
+    ...MEDIA_EXTENSIONS,
+    ...SUBTITLE_EXTENSIONS
+  ])
+  const isSubtitle = (f: ScannedFile): boolean =>
+    (SUBTITLE_EXTENSIONS as readonly string[]).includes(extname(f.path).toLowerCase())
+  const pairing = pairMux(
+    files.filter((f) => !isSubtitle(f)),
+    files.filter(isSubtitle)
+  )
+  return { kind: 'mux', root, ...pairing, rejected, truncated }
+}
 
 /**
  * Plano de um batch: enumera (pasta ou arquivos avulsos), faz o probe dos MKV e pré-seleciona
@@ -17,23 +61,7 @@ export async function planBatch(
   deps: { mkv: Pick<MkvToolnix, 'probe'>; preferredSourceLangs: () => Promise<string[]> }
 ): Promise<BatchPlan> {
   const extensions = req.kind === 'translate' ? SUBTITLE_EXTENSIONS : MEDIA_EXTENSIONS
-  let files: ScannedFile[]
-  let rejected: BatchPlan['rejected'] = []
-  let truncated = false
-  let root: string | null = null
-  if (req.source.type === 'folder') {
-    const r = await scanFolder(req.source.path, {
-      recursive: req.source.recursive ?? false,
-      extensions
-    })
-    files = r.files
-    truncated = r.truncated
-    root = r.root
-  } else {
-    const r = await collectFiles(req.source.paths, extensions)
-    files = r.files
-    rejected = r.rejected
-  }
+  const { files, rejected, truncated, root } = await enumerate(req.source, extensions)
 
   if (req.kind === 'translate') {
     const items = files.map((f): BatchPlanItem => ({

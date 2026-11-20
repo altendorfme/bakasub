@@ -3,6 +3,8 @@ import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
   type BakaSubApi,
+  type BatchMuxPlanRequest,
+  type BatchPlanRequest,
   type EventChannel,
   type InvokeChannel,
   type IpcInvokeContract,
@@ -85,7 +87,8 @@ const api: BakaSubApi = {
     openFolder: () => invoke('dialog:open-folder')
   },
   batches: {
-    plan: (request) => invoke('batches:plan', request),
+    plan: ((request: BatchPlanRequest | BatchMuxPlanRequest) =>
+      invoke('batches:plan', request)) as BakaSubApi['batches']['plan'],
     create: (request) => invoke('batches:create', request),
     list: () => invoke('batches:list'),
     get: (id) => invoke('batches:get', { id }),

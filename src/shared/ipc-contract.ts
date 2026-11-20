@@ -599,13 +599,19 @@ export interface ModelList {
 
 export type OpenDialogKind = 'media' | 'subtitle' | 'any'
 
-export type BatchKind = 'extract' | 'translate' | 'pipeline'
+export type BatchKind = 'extract' | 'translate' | 'pipeline' | 'mux'
 
 export type BatchSource =
   { type: 'folder'; path: string; recursive?: boolean } | { type: 'files'; paths: string[] }
 
 export interface BatchPlanRequest {
-  kind: BatchKind
+  kind: Exclude<BatchKind, 'mux'>
+  source: BatchSource
+}
+
+/** Plano do batch `mux`: pasta ou arquivos soltos com MKVs e legendas misturados. */
+export interface BatchMuxPlanRequest {
+  kind: 'mux'
   source: BatchSource
 }
 
@@ -630,6 +636,38 @@ export interface BatchPlan {
   /** Caminhos recusados pelo validador (arquivos avulsos). */
   rejected: { path: string; reason: string }[]
   /** Pasta com mais arquivos que o limite. */
+  truncated: boolean
+}
+
+export interface BatchMuxPlanFile {
+  path: string
+  /** Relativo à pasta do batch (ou só o nome, para arquivos avulsos). */
+  relPath: string
+}
+
+export interface BatchMuxPlanSubtitle extends BatchMuxPlanFile {
+  /** Do sufixo do nome (`.pt-BR.srt`); `und` sem sufixo. Editável no `create`. */
+  language: string
+}
+
+export interface BatchMuxPlanItem {
+  video: BatchMuxPlanFile
+  /** 1..32, em ordem natural. `matchedBy`: nome-base igual (certo) ou temporada/episódio. */
+  subtitles: (BatchMuxPlanSubtitle & { matchedBy: 'name' | 'episode' })[]
+}
+
+/**
+ * Plano de `kind: 'mux'`. Pareamento determinístico (docs/jobs.md): ambiguidade nunca é
+ * resolvida sozinha, vai para `unmatched*` para o usuário decidir.
+ */
+export interface BatchMuxPlan {
+  kind: 'mux'
+  root: string | null
+  /** Só vídeos com ao menos uma legenda. */
+  items: BatchMuxPlanItem[]
+  unmatchedVideos: BatchMuxPlanFile[]
+  unmatchedSubtitles: BatchMuxPlanSubtitle[]
+  rejected: { path: string; reason: string }[]
   truncated: boolean
 }
 
@@ -658,13 +696,20 @@ export interface BatchCreateItem {
   episode?: number
 }
 
+/** Item de um batch `mux`: um MKV e 1..32 legendas externas (validadas e lidas no job). */
+export interface BatchMuxCreateItem {
+  video: string
+  subtitles: { path: string; language: string; name?: string; default?: boolean }[]
+}
+
 export interface BatchCreateRequest {
   kind: BatchKind
   name?: string
   /** `plan.root`: revalidado; base do espelhamento quando há `outputDir`. */
   root: string | null
-  items: BatchCreateItem[]
-  /** Só `translate`/`pipeline`. */
+  /** `BatchMuxCreateItem` se e somente se `kind: 'mux'`. */
+  items: (BatchCreateItem | BatchMuxCreateItem)[]
+  /** Só `translate`/`pipeline` (`mux` com `groups` é `INVALID_INPUT`). */
   groups?: BatchGroup[]
   /** Padrões do batch (cada um cai no padrão das configurações quando omitido). */
   presetId?: string
@@ -962,7 +1007,7 @@ export interface IpcInvokeContract {
   /** Pasta de entrada de um batch (legível). `null` se cancelado. */
   'dialog:open-folder': { req: void; res: { path: string | null } }
   /** Varre, faz o probe e pré-seleciona faixas; não cria nada. */
-  'batches:plan': { req: BatchPlanRequest; res: BatchPlan }
+  'batches:plan': { req: BatchPlanRequest | BatchMuxPlanRequest; res: BatchPlan | BatchMuxPlan }
   /** Cria o batch e todos os jobs numa transação (um item inválido recusa tudo). */
   'batches:create': { req: BatchCreateRequest; res: Batch }
   'batches:list': { req: void; res: Batch[] }
@@ -1125,6 +1170,7 @@ export interface BakaSubApi {
     openFolder(): Promise<IpcResult<{ path: string | null }>>
   }
   batches: {
+    plan(request: BatchMuxPlanRequest): Promise<IpcResult<BatchMuxPlan>>
     plan(request: BatchPlanRequest): Promise<IpcResult<BatchPlan>>
     create(request: BatchCreateRequest): Promise<IpcResult<Batch>>
     list(): Promise<IpcResult<Batch[]>>

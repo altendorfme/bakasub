@@ -279,7 +279,8 @@ export async function resolveJobSpec(
       const subtitles: MuxSubtitleSpec[] = []
       for (const s of req.subtitles) {
         const f = await validateInputFile(s.path, SUBTITLE_EXTENSIONS, MAX_SUBTITLE_BYTES)
-        const language = requiredLang(s.language)
+        // `und` (idioma desconhecido) é válido numa faixa de legenda; o padrão do batch mux.
+        const language = s.language.toLowerCase() === 'und' ? 'und' : requiredLang(s.language)
         subtitles.push({
           path: f.path,
           size: f.size,
