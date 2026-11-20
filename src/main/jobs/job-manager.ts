@@ -10,6 +10,7 @@ import type {
   JobStatus
 } from '../../shared/ipc-contract'
 import type { JobRepository, JobRow } from '../database/repositories/job.repository'
+import { mediaSummary } from './media-summary'
 import { AppError } from '../errors'
 import { TranslationCancelled } from '../llm/translate-document'
 import type { Artifacts } from './artifacts'
@@ -63,6 +64,7 @@ interface Running {
 
 function toDto(r: JobRow): Job {
   const spec = r.spec as { source?: string }
+  const media = mediaSummary(r.spec)
   return {
     id: r.id,
     kind: r.kind,
@@ -71,6 +73,7 @@ function toDto(r: JobRow): Job {
     step: r.step ?? null,
     source: spec.source ? basename(spec.source) : '',
     progress: r.progress,
+    ...(media ? { media } : {}),
     result: r.result ?? null,
     error: r.error ?? null,
     attempt: r.attempt,

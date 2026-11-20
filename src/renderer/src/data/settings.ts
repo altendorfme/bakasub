@@ -89,6 +89,10 @@ export function useSetTmdbKey(): UseMutationResult<TmdbKeyStatus, Error, string 
       unwrap(
         key === null ? window.api.settings.clearTmdbKey() : window.api.settings.setTmdbKey(key)
       ),
-    onSuccess: (s) => qc.setQueryData(qk.settings.tmdbKey(), s)
+    onSuccess: (s) => {
+      qc.setQueryData(qk.settings.tmdbKey(), s)
+      // Identification said `no-key` before: ask again.
+      void qc.invalidateQueries({ queryKey: ['media'] })
+    }
   })
 }

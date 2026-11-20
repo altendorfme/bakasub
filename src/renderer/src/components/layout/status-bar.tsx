@@ -4,7 +4,17 @@ import type { Job } from '@shared/ipc-contract'
 import { jobCounts, useJobs } from '@renderer/data/jobs'
 import { useApiKeyStatus } from '@renderer/data/settings'
 import { useSidecarReport } from '@renderer/data/sidecars'
+import { cooldownUntil, sessionCost } from '@renderer/data/jobs'
+import { formatUsd } from '@renderer/lib/format'
+import { useCountdown } from '@renderer/lib/use-countdown'
 import { cn } from '@renderer/lib/utils'
+
+function Cooldown({ until }: { until: number }): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const seconds = useCountdown(until)
+  if (!seconds) return null
+  return <span className="text-warning">{t('status.cooldown', { seconds })}</span>
+}
 
 /** 0..1 for a running job: translation lines when known, else the step fraction. */
 function jobFraction(j: Job): number {
@@ -33,6 +43,8 @@ export function StatusBar(): React.JSX.Element {
   const avg = running.length ? running.reduce((s, j) => s + jobFraction(j), 0) / running.length : 0
   const tools = useSidecarReport()
   const apiKey = useApiKeyStatus()
+  const cost = sessionCost(jobs)
+  const cooldown = cooldownUntil(jobs)
 
   return (
     <footer className="flex h-8 shrink-0 items-center gap-4 border-t bg-card px-3 text-xs text-muted-foreground">
@@ -63,6 +75,8 @@ export function StatusBar(): React.JSX.Element {
           <div className="bg-brand h-full transition-all" style={{ width: `${avg * 100}%` }} />
         </div>
       )}
+      {cooldown ? <Cooldown until={cooldown} /> : null}
+      {cost > 0 ? <span>{t('status.sessionCost', { value: formatUsd(cost) })}</span> : null}
       <span className="ml-auto flex items-center gap-1.5">
         <Dot tone={tools.data ? (tools.data.ready ? 'ok' : 'bad') : 'idle'} />
         {tools.data

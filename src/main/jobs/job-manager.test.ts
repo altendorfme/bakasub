@@ -257,7 +257,9 @@ describe('JobManager', () => {
       cost: null,
       decision: 'needs-confirmation' as const
     }
-    await pending[0].hooks.onArtifacts({ preflight: { estimate, coverage: { byReason: {} } } })
+    await pending[0].hooks.onArtifacts({
+      preflight: { estimate, coverage: { byReason: {} } as never }
+    })
     pending[0].resolve({
       status: 'awaiting-confirmation',
       result: { outputs: [], warnings: [], preflight: estimate }

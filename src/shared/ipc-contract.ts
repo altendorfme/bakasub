@@ -367,6 +367,16 @@ export interface JobResult {
   preflight?: PreflightEstimate
 }
 
+/** Mídia congelada no job, para a fila (título, arte, episódio). Sem sinopse. */
+export interface JobMediaSummary {
+  title: string
+  kind: MediaKind
+  year?: number
+  posterUrl?: string
+  backdropUrl?: string
+  episode?: { season: number; episode: number; title: string }
+}
+
 export interface Job {
   id: string
   kind: JobKind
@@ -377,6 +387,8 @@ export interface Job {
   /** Nome do arquivo de origem (para listar sem expor o caminho completo à toa). */
   source: string
   progress: JobProgress
+  /** Só com contexto de mídia incluído. */
+  media?: JobMediaSummary
   result: JobResult | null
   error: { code: string; message: string } | null
   attempt: number
@@ -501,6 +513,51 @@ export interface Range {
   high: number
 }
 
+/** Por que um bloco não vai ao LLM (`skipped` benigno, `untranslated` fica no original). */
+export type CoverageReason =
+  | 'SKIPPED_NO_LETTERS'
+  | 'SKIPPED_EMPTY_BLOCK'
+  | 'SKIPPED_DRAWING'
+  | 'UNTRANSLATED_ORPHAN_TEXT'
+  | 'UNTRANSLATED_BAD_TIMING'
+  | 'UNTRANSLATED_MARKER_COLLISION'
+  | 'UNTRANSLATED_KARAOKE'
+  | 'UNTRANSLATED_BAD_EVENT'
+  | 'UNTRANSLATED_VALIDATION_FAILED'
+  | 'UNTRANSLATED_CONTENT_FILTERED'
+
+/** Espelho serializável do `CoverageReport` do parser (o Main checa a compatibilidade no tipo). */
+export interface CoverageEntry {
+  ref: { kind: 'cue'; cueId: number } | { kind: 'block'; blockIndex: number }
+  status: 'skipped' | 'untranslated'
+  severity: 'info' | 'warn'
+  reason: CoverageReason
+  /** Para a UI localizar a mensagem; o Main nunca manda texto. */
+  params: Readonly<Record<string, string | number>>
+  location: { line: number; endLine: number; startMs?: number; endMs?: number }
+  /** ≤ 120 caracteres, controles visíveis. */
+  excerpt: string
+  outcome: 'kept-original' | 'omitted'
+  /** Código do diagnóstico do parser que causou o bloco, quando houver. */
+  cause?: string
+  actions: readonly ('edit-raw' | 'ignore')[]
+}
+
+export interface CoverageReport {
+  totals: {
+    cues: number
+    blocks: number
+    translatable: number
+    skipped: number
+    untranslated: number
+  }
+  byReason: Readonly<Partial<Record<CoverageReason, number>>>
+  /** `untranslated` primeiro, depois `skipped`; ordem do documento. */
+  entries: readonly CoverageEntry[]
+  /** `entries` cortado (totais completos). */
+  truncated: boolean
+}
+
 /** Estimativa do preflight (antes de qualquer chamada ao LLM). */
 export interface PreflightEstimate {
   model: {
@@ -617,7 +674,7 @@ export interface IpcInvokeContract {
   /** Estimativa + cobertura completa (o que não será traduzido, onde e por quê). */
   'jobs:preflight': {
     req: { id: string }
-    res: { estimate: PreflightEstimate; coverage: unknown } | null
+    res: { estimate: PreflightEstimate; coverage: CoverageReport } | null
   }
   /** Pasta de entrada de um batch (legível). `null` se cancelado. */
   'dialog:open-folder': { req: void; res: { path: string | null } }
@@ -791,7 +848,7 @@ export interface BakaSubApi {
     confirm(id: string): Promise<IpcResult<Job>>
     preflight(
       id: string
-    ): Promise<IpcResult<{ estimate: PreflightEstimate; coverage: unknown } | null>>
+    ): Promise<IpcResult<{ estimate: PreflightEstimate; coverage: CoverageReport } | null>>
   }
   files: {
     /** Drag & drop: caminho real de um `File` (`webUtils.getPathForFile`). Revalidado no Main. */

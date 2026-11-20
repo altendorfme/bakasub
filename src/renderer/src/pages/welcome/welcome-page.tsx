@@ -13,7 +13,7 @@ import { KeyStep } from './key-step'
 import { LanguagesStep } from './languages-step'
 import { ModelsStep } from './models-step'
 import { TmdbStep } from './tmdb-step'
-import { ToolsStep } from './tools-step'
+import { ToolsPanel } from '@renderer/components/sidecars/tools-panel'
 
 type StepId = 'key' | 'models' | 'languages' | 'tools' | 'tmdb'
 
@@ -28,7 +28,7 @@ const STEPS: readonly StepDef[] = [
   { id: 'key', required: true, body: () => <KeyStep /> },
   { id: 'models', required: true, body: () => <ModelsStep /> },
   { id: 'languages', required: true, body: () => <LanguagesStep /> },
-  { id: 'tools', required: false, body: () => <ToolsStep /> },
+  { id: 'tools', required: false, body: () => <ToolsPanel /> },
   { id: 'tmdb', required: false, body: () => <TmdbStep /> }
 ]
 

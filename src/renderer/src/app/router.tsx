@@ -13,6 +13,7 @@ import { apiKeyStatusQuery, isOnboarded, settingsQuery } from '@renderer/data/se
 import { PlaceholderPage } from '@renderer/pages/placeholder-page'
 import { WelcomePage } from '@renderer/pages/welcome/welcome-page'
 import { PAGES } from './pages'
+import { SCREENS } from './screens'
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -62,7 +63,10 @@ const pageRoutes = PAGES.map((page) =>
   createRoute({
     getParentRoute: () => shellRoute,
     path: `/${page}`,
-    component: () => <PlaceholderPage page={page} />
+    // Only the queue has a search param (`?job=` selects a job); the rest ignore it.
+    validateSearch: (search: Record<string, unknown>): { job?: string } =>
+      typeof search.job === 'string' ? { job: search.job } : {},
+    component: SCREENS[page] ?? ((): React.JSX.Element => <PlaceholderPage page={page} />)
   })
 )
 

@@ -3,8 +3,9 @@ import { access, realpath, stat, statfs } from 'node:fs/promises'
 import { extname, isAbsolute } from 'node:path'
 import { AppError } from '../errors'
 
-export const MEDIA_EXTENSIONS = ['.mkv'] as const
-export const SUBTITLE_EXTENSIONS = ['.srt', '.ass', '.ssa', '.vtt'] as const
+import { MEDIA_EXTENSIONS, SUBTITLE_EXTENSIONS } from '../../shared/file-types'
+
+export { MEDIA_EXTENSIONS, SUBTITLE_EXTENSIONS }
 /** Legendas maiores que isto não são legendas. */
 export const MAX_SUBTITLE_BYTES = 50 * 1024 * 1024
 

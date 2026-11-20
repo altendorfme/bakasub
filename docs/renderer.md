@@ -52,6 +52,58 @@ Reusable pieces built here: `KeyForm` (write-only secret: saved / replace / remo
 
 Tests: `test/setup-dom.ts` adds the jsdom gaps cmdk/Radix need (`ResizeObserver`, `scrollIntoView`, pointer capture); `test/fixtures.ts` has the settings of an onboarded user.
 
+## Translate a file
+
+`pages/translate/`. The flow is a pure reducer (`wizard-state.ts`: steps, validation, automatic track choice, `buildJobRequest`), tested without React; the page only renders the current step.
+
+- **File**: drop zone (`window.api.files.pathFor`) or the native dialog; the type comes from the extension (`sourceKindOf`, `src/shared/file-types.ts`, shared with the Main's path guard). A subtitle file goes through `translate` and has no track step and no mux options; a video goes through `pipeline`.
+- **Track** (video): `media:probe`; image-based and unsupported tracks are listed but disabled with the reason; a track is preselected (`pickTrack`: first preferred source language, full over forced). Attached fonts are mentioned.
+- **Preset & context**: preset with its details (media type, temperature, style, glossary size), model from the favorites only, target language from `translation.targetLangs`, both prefilled with the defaults (left unset in the request so the Main applies them), notes (≤ 4,000).
+- **Output**: folder (default next to the source) and, for videos, `setDefault` / `keepOriginalSubtitles` / `alsoWriteSubtitle`.
+- **Job**: created with `confirmBeforeTranslate: true`. `JobDetail` follows it through `useJob` (patched by `jobs:progress`): `awaiting-confirmation` shows `PreflightReview` (lines, requests, tokens, cost range or "free"/dynamic price, approximate tokenizer, model and catalog date, free-quota warning, `CoverageList`), then `JobProgress` (step, lines, part, cached, cost, `WaitLabel`), then `JobResult` (outputs, cost, untranslated lines, warnings, or the localized error). These live in `components/jobs/` and are shared with the queue through `JobDetail`.
+
+The wizard state is local to the page: leaving the page resets it (the job keeps running and shows in the queue).
+
+## Media context panel
+
+`components/media/`, shown above the preset step of the wizard. `MediaChoice` (`media-choice.ts`) lives in the wizard state: `ref`, `auto` (recognized from the file name), `season`/`episode`, `include`, `seeded`.
+
+- `media:identify` (file name only) seeds the choice once per file; a user change is never overwritten. States: identifying, `matched` ("Recognized from the file name"), `not-found` (search above), `offline` or an IPC error (continue without context), `no-key` (one line, the TMDB guide and `KeyForm` on demand; saving the key invalidates the media queries).
+- Title field (`TitleSearch`): TMDB search debounced 350 ms in a popover (cmdk without client filtering), poster thumbnails, Enter picks the first result.
+- Details from `media:lookup` (a cache hit in the Main): poster, year, kind, runtime, genres, synopsis. A movie picked for a file with `SxxEyy` shows a warning.
+- Series: editable season/episode (`EpisodeFields`) pre-filled from the file name; "From the file name" uses the same violet as "Recognized from the file name"; a changed number says what the file name had; absolute anime numbering asks for season/episode; the episode title and synopsis load for the numbers.
+- "Include these details" (dims the details when off). The request carries `media` only when included, with the episode only for a series with both numbers (`buildJobRequest`).
+- "Metadata and images from TMDB" in the panel (TMDB terms).
+
+Artwork backdrop (`Backdrop`): the chosen title's `backdropUrl` behind the wizard, and the job's frozen media behind the queue inspector. `Job.media` (`JobMediaSummary`: title, kind, year, poster, backdrop, episode, no synopsis) is derived by the Main from the persisted spec (`src/main/jobs/media-summary.ts`), so the queue never calls TMDB. The image fades in at 55% under a gradient; panels on top stay `bg-card/92`.
+
+## Queue and status bar
+
+`pages/queue/`. Workspace layout (prototype variant D): the job list on the left (tabs All / Active / Needs you / Done with counts, `matchesFilter` in `data/jobs.ts`; "Needs you" = awaiting confirmation, failed, interrupted), the selected job on the right. The selection is the `?job=` search param, so the wizard's "Open in Queue" lands on the job and the browser history keeps it.
+
+The inspector is `JobDetail` (`components/jobs/`), the same component the wizard shows after creating a job: header (kind, batch, status, attempt, dates), preflight review / live progress / result, and the actions that apply to the state (cancel with the billing hint, confirm, retry for failed/cancelled/interrupted, remove for terminal jobs). `JobError` turns error codes into actions: `LLM_DAILY_LIMIT` shows the local time of 00:00 UTC, `LLM_CREDITS` opens OpenRouter's credits page, `SIDECAR_MISSING` installs the missing tools; `interrupted` explains that a retry resumes from the step that stopped. Only codes are used, never the Main's message.
+
+Status bar: running/queued/awaiting counts and average progress, the lane cooldown countdown (latest `waiting.reason === 'cooldown'` among jobs, `cooldownUntil`), the cost of this session (`sessionCost`: jobs created since the renderer started; final cost when finished, cost so far when running), tools and API key.
+
+## Settings
+
+`pages/settings/`, one tab per section, every field saving on its own (`useSetting(key)` → `[value, set]`, errors from the Main as a toast). `NumberSetting` saves on blur/Enter only when the value is in range (otherwise it keeps the text and shows the range); `nullable` fields save `null` when cleared ("Always ask", "No limit").
+
+- **General**: app language (system / each language in its own name), default preset, jobs at the same time, auto-confirm threshold, preferred source languages (ordered chips: move up, remove, add), detailed logs.
+- **Keys**: `KeyForm` for OpenRouter (cannot be removed: the app needs it) and TMDB (removable), each with its guide.
+- **Translation cache**: size on disk, line count, least recently used date; prune by age or clear all, disabled with an explanation while a job is active (`MEMORY_BUSY` never reaches the user).
+- **Video tools**: `ToolsPanel` (`components/sidecars/`, shared with the onboarding) and a re-check.
+- **Advanced**: free-model quota today and the detected tier, tier override, requests per minute (free / paid), attempts, waits in seconds (stored in ms), extra chunk rounds, "Restore defaults" (`settings:reset` with the advanced keys only), and the limits guide.
+- **About**: version, platform, update check, data folder, the full TMDB notice.
+
+## Models and Languages
+
+Thin pages over the onboarding pickers (`ModelPicker`, `LanguagePicker`, `useListWithDefault`). Models adds "Refresh list" (`models:list { force: true }`, bypassing the Main's 24 h cache), the catalog date, the free-model requests left today, and a warning listing favorites that are no longer in the OpenRouter catalog (the picker cannot show them) with a "Remove" each; removing the default promotes the next favorite.
+
+## Presets
+
+`pages/presets/`. Built-in and custom presets on the left (checkbox per preset to export), the editor on the right. Built-ins are read-only with "Duplicate" (the copy opens selected, "Copied from …"). The form keeps text drafts (`preset-draft.ts`: same limits as the Main's `PresetInputSchema`, validated before sending, errors shown after the first save attempt), trims on save and drops empty optional glossary fields. Media type is free text with suggestions; temperature 0 to 2. The glossary editor needs a term plus a translation or a rule per row (≤ 500 rows). Delete asks first; `PRESET_IN_USE` and `PRESET_NAME_TAKEN` come back as toasts. Import asks the name-conflict policy (rename / skip), opens the native dialog and lists what was imported and what was skipped with the reason.
+
 ## In-app guides
 
 User guides (OpenRouter key, limits and retries, TMDB key) live in `src/renderer/src/guides/<lang>/<id>.md`, outside `docs/` (which is for developers), with one file per language (`en`, `pt-BR`). `guides.ts` bundles them with `import.meta.glob('?raw')`; `useGuide(id)` returns the guide in the current i18next language (exact, then base language, then English). It uses `i18n.language`, not `resolvedLanguage`, so a guide can already be shown in a language the UI does not have yet. Links between guides are relative `.md` links (`guideIdFromHref` turns them into in-app navigation). `guides.test.ts` fails when a translation is missing or a cross-link is broken. Details: [`guides/README.md`](../src/renderer/src/guides/README.md).

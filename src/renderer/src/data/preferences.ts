@@ -41,3 +41,19 @@ export function useListWithDefault(
   }
   return { value, onChange, ready: !!s }
 }
+
+/**
+ * One public setting as `[value, set]`. Saves at once; an error from the Main (range, conflict)
+ * shows a toast and the cache keeps the last valid snapshot.
+ */
+export function useSetting<K extends keyof PublicSettings>(
+  key: K
+): [PublicSettings[K] | undefined, (value: PublicSettings[K]) => void] {
+  const settings = useSettings()
+  const update = useUpdateSettings()
+  const set = (value: PublicSettings[K]): void =>
+    update.mutate({ [key]: value } as Partial<PublicSettings>, {
+      onError: (err) => toast.error(errorMessage(err))
+    })
+  return [settings.data?.[key], set]
+}

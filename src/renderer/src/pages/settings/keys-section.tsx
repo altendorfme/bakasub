@@ -1,0 +1,49 @@
+import { useTranslation } from 'react-i18next'
+import { GuideDialog } from '@renderer/components/common/guide-dialog'
+import { KeyForm } from '@renderer/components/forms/key-form'
+import {
+  useApiKeyStatus,
+  useSetApiKey,
+  useSetTmdbKey,
+  useTmdbKeyStatus
+} from '@renderer/data/settings'
+
+/** The OpenRouter key cannot be removed here: the app needs it (onboarding would open again). */
+export function KeysSection(): React.JSX.Element {
+  const { t } = useTranslation()
+  const or = useApiKeyStatus()
+  const setOr = useSetApiKey()
+  const tmdb = useTmdbKeyStatus()
+  const setTmdb = useSetTmdbKey()
+  return (
+    <div className="grid gap-6">
+      <section className="grid gap-2">
+        <h3 className="text-sm font-semibold">{t('settings.keys.openrouter')}</h3>
+        <p className="text-xs text-muted-foreground">{t('settings.keys.openrouterHint')}</p>
+        <KeyForm
+          label={t('welcome.key.label')}
+          placeholder="sk-or-v1-…"
+          present={!!or.data?.present}
+          noKeyring={or.data?.protection === 'none'}
+          saving={setOr.isPending}
+          error={setOr.error}
+          onSave={(key) => setOr.mutateAsync(key)}
+          guide={<GuideDialog id="openrouter-key" />}
+        />
+      </section>
+      <section className="grid gap-2">
+        <h3 className="text-sm font-semibold">{t('settings.keys.tmdb')}</h3>
+        <p className="text-xs text-muted-foreground">{t('settings.keys.tmdbHint')}</p>
+        <KeyForm
+          label={t('welcome.tmdb.label')}
+          present={!!tmdb.data?.present}
+          saving={setTmdb.isPending}
+          error={setTmdb.error}
+          onSave={(key) => setTmdb.mutateAsync(key)}
+          onRemove={() => setTmdb.mutate(null)}
+          guide={<GuideDialog id="tmdb-key" />}
+        />
+      </section>
+    </div>
+  )
+}

@@ -1,4 +1,10 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult
+} from '@tanstack/react-query'
 import type { FreeQuotaStatus, ModelList, ModelSummary } from '@shared/ipc-contract'
 import { unwrap } from '@renderer/lib/ipc'
 import { qk } from './query-keys'
@@ -23,3 +29,12 @@ export const useFreeQuota = (enabled = true): UseQueryResult<FreeQuotaStatus> =>
 export const isFreeModel = (m: Pick<ModelSummary, 'id' | 'pricing'>): boolean =>
   m.id.endsWith(':free') ||
   (m.pricing !== null && m.pricing.prompt === 0 && m.pricing.completion === 0)
+
+/** Bypasses the Main's 24 h cache (`models:list { force }`). */
+export function useRefreshModels(): UseMutationResult<ModelList, Error, void> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => unwrap(window.api.models.list(true)),
+    onSuccess: (list) => qc.setQueryData(qk.models.list(), list)
+  })
+}

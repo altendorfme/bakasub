@@ -6,7 +6,8 @@ import { Progress } from '@renderer/components/ui/tabs'
 import { useInstallSidecars, useSidecarProgress, useSidecarReport } from '@renderer/data/sidecars'
 import { errorMessage } from '@renderer/i18n/error-message'
 
-export function ToolsStep(): React.JSX.Element {
+/** Tool list with state, installer (native consent in the Main) and progress. */
+export function ToolsPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const report = useSidecarReport()
   const install = useInstallSidecars()

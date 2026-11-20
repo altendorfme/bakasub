@@ -264,7 +264,7 @@ describe('BatchService: estado agregado, cancel e remove', () => {
     for (const high of [0.1, 0.3]) {
       await until(() => runs.length >= (high === 0.1 ? 1 : 2))
       const r = runs.at(-1)!
-      await r.hooks.onArtifacts({ preflight: { estimate: est(high), coverage: {} } })
+      await r.hooks.onArtifacts({ preflight: { estimate: est(high), coverage: {} as never } })
       r.resolve({
         status: 'awaiting-confirmation',
         result: { outputs: [], warnings: [], preflight: est(high) }

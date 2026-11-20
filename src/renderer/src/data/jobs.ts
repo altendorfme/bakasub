@@ -1,11 +1,70 @@
 import { useEffect } from 'react'
-import { useQuery, type QueryClient, type UseQueryResult } from '@tanstack/react-query'
-import type { Job, JobProgressEvent } from '@shared/ipc-contract'
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type UseMutationResult,
+  type UseQueryResult
+} from '@tanstack/react-query'
+import type {
+  CoverageReport,
+  Job,
+  JobCreateRequest,
+  JobProgressEvent,
+  PreflightEstimate
+} from '@shared/ipc-contract'
 import { unwrap } from '@renderer/lib/ipc'
 import { qk } from './query-keys'
 
 export const useJobs = (): UseQueryResult<Job[]> =>
   useQuery({ queryKey: qk.jobs.list(), queryFn: () => unwrap(window.api.jobs.list()) })
+
+/** Live through `jobs:progress` (patched into this cache by `useJobEvents`). */
+export const useJob = (id: string | null): UseQueryResult<Job> =>
+  useQuery({
+    queryKey: qk.jobs.detail(id ?? ''),
+    queryFn: () => unwrap(window.api.jobs.get(id!)),
+    enabled: id !== null
+  })
+
+/** Estimate + full coverage of a job waiting for confirmation. */
+export const usePreflight = (
+  id: string,
+  enabled: boolean
+): UseQueryResult<{ estimate: PreflightEstimate; coverage: CoverageReport } | null> =>
+  useQuery({
+    queryKey: qk.jobs.preflight(id),
+    queryFn: () => unwrap(window.api.jobs.preflight(id)),
+    enabled
+  })
+
+export function useCreateJob(): UseMutationResult<Job, Error, JobCreateRequest> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req) => unwrap(window.api.jobs.create(req)),
+    onSuccess: (job) => {
+      qc.setQueryData(qk.jobs.detail(job.id), job)
+      qc.setQueryData<Job[]>(qk.jobs.list(), (list) => (list ? [job, ...list] : list))
+    }
+  })
+}
+
+export type JobAction = 'confirm' | 'cancel' | 'retry'
+
+/** Confirm / cancel / retry: the Main answers with the updated job. */
+export function useJobAction(): UseMutationResult<Job, Error, { id: string; action: JobAction }> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action }) => unwrap(window.api.jobs[action](id)),
+    onSuccess: (job) => {
+      qc.setQueryData(qk.jobs.detail(job.id), job)
+      qc.setQueryData<Job[]>(qk.jobs.list(), (list) =>
+        list?.map((j) => (j.id === job.id ? job : j))
+      )
+    }
+  })
+}
 
 /**
  * Patches a `jobs:progress` event into the cache (list + detail). Returns `false` when the job
@@ -59,4 +118,65 @@ export function jobCounts(jobs: readonly Job[] | undefined): {
     else if (j.status === 'awaiting-confirmation') c.awaiting++
   }
   return c
+}
+
+/** Terminal jobs only (the Main refuses the rest with `JOB_INVALID_STATE`). */
+export function useRemoveJob(): UseMutationResult<{ removed: true }, Error, string> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => unwrap(window.api.jobs.remove(id)),
+    onSuccess: (_r, id) => {
+      qc.setQueryData<Job[]>(qk.jobs.list(), (list) => list?.filter((j) => j.id !== id))
+      qc.removeQueries({ queryKey: qk.jobs.detail(id) })
+    }
+  })
+}
+
+export const ACTIVE_STATUSES: ReadonlySet<Job['status']> = new Set(['queued', 'running'])
+export const RETRYABLE_STATUSES: ReadonlySet<Job['status']> = new Set([
+  'failed',
+  'cancelled',
+  'interrupted'
+])
+export const isTerminal = (s: Job['status']): boolean =>
+  !ACTIVE_STATUSES.has(s) && s !== 'awaiting-confirmation'
+
+export type QueueFilter = 'all' | 'active' | 'attention' | 'done'
+
+/** Queue tabs. "Needs you": waiting for confirmation, failed or interrupted. */
+export function matchesFilter(j: Job, f: QueueFilter): boolean {
+  switch (f) {
+    case 'all':
+      return true
+    case 'active':
+      return ACTIVE_STATUSES.has(j.status)
+    case 'attention':
+      return (
+        j.status === 'awaiting-confirmation' || j.status === 'failed' || j.status === 'interrupted'
+      )
+    case 'done':
+      return (
+        j.status === 'completed' ||
+        j.status === 'completed-with-warnings' ||
+        j.status === 'cancelled'
+      )
+  }
+}
+
+/** Renderer start: "this session" = jobs created since BakaSub opened. */
+const SESSION_START = Date.now()
+
+/** Spent in this session: final cost of finished jobs, cost so far of running ones. */
+export function sessionCost(jobs: readonly Job[] | undefined, since = SESSION_START): number {
+  return (jobs ?? [])
+    .filter((j) => Date.parse(j.createdAt) >= since)
+    .reduce((sum, j) => sum + (j.result?.usage?.cost ?? j.progress.cost ?? 0), 0)
+}
+
+/** Latest lane cooldown among running jobs (a 429 pauses every job on that lane). */
+export function cooldownUntil(jobs: readonly Job[] | undefined): number | undefined {
+  const until = (jobs ?? [])
+    .map((j) => (j.progress.waiting?.reason === 'cooldown' ? j.progress.waiting.untilMs : 0))
+    .reduce((a, b) => Math.max(a, b), 0)
+  return until > Date.now() ? until : undefined
 }

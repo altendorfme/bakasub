@@ -113,7 +113,7 @@ The approved design (prototype variant D, see [`renderer.md`](./renderer.md)) ne
 
 - ~~Settings read/write, favorite models, target languages~~: done (`settings:get`/`settings:update`, `models.favorites`, `translation.targetLangs`, see [`database.md`](./database.md)). The request carries `model?`; presets no longer have a model or target language.
 - ~~Logs~~: done (JSON lines, `jobId` via async context, 5 rotated files, `logs.level`, `logs:tail`/`watch`/`entry`/`open-folder`/`export`/`report`; see [`logging.md`](./logging.md)).
-- ~~Media context~~: backend done with **TMDB** (see [`media-context.md`](./media-context.md)). UI still to build: media panel (title search popover, read-only details, season/episode fields, movie-vs-`SxxEyy` warning, "Include" checkbox), artwork backdrop through `bakasub-media://` URLs, "Metadata and images from TMDB" in the panel and the full TMDB notice in Settings → About, and the key guides rendered in-app (`useGuide('tmdb-key' | 'openrouter-key')`, see [`renderer.md`](./renderer.md#in-app-guides); external links through `app:open-external`).
+- ~~Media context~~: done with **TMDB** (backend: [`media-context.md`](./media-context.md); UI: [`renderer.md`](./renderer.md#media-context-panel)). Still open from this list: media panel (title search popover, read-only details, season/episode fields, movie-vs-`SxxEyy` warning, "Include" checkbox), artwork backdrop through `bakasub-media://` URLs, "Metadata and images from TMDB" in the panel and the full TMDB notice in Settings → About, and the key guides rendered in-app (`useGuide('tmdb-key' | 'openrouter-key')`, see [`renderer.md`](./renderer.md#in-app-guides); external links through `app:open-external`).
 - ~~Rate limits and retries~~: backend done (see [`rate-limits.md`](./rate-limits.md)). UI still to build: Settings → Advanced with the `llm.rateLimit.*`/`llm.retry.*` fields and "Restore defaults" (`settings:reset`), the free-model quota from `models:free-quota` (tier, used/remaining today), the preflight `freeQuota` warning (`enough: false` → "needs ~N requests, M left today"), `JobProgress.waiting` in the queue and status bar as a countdown ("Waiting for the rate limit", "Paused after a rate limit", "Retrying"), `LLM_DAILY_LIMIT` with the reset time, and the user guide rendered in-app (`useGuide('openrouter-limits')`).
 - **Translate a file**: a subtitle file goes through `translate` (no track step, no mux options); a video goes through `pipeline`.
 
@@ -128,13 +128,13 @@ Priority = shortest path to a full translation through the UI, then whatever unb
 
 **P1, main path**
 
-3. **"Translate a file" wizard** (without the media panel): file → track (video only) → preset & context → output → preflight confirmation (cost, coverage, `freeQuota`). Gap: type `CoverageReport` in the contract (`jobs:preflight` returns `coverage: unknown`).
-4. **Queue + status bar**: live progress, `waiting` countdown, confirm / cancel / retry / remove, detail panel with warnings, untranslated lines, usage and actionable errors.
-5. **Media context panel** (TMDB): identification, search, season/episode, warnings, "Include", artwork backdrop, attribution.
+3. ~~**"Translate a file" wizard**~~ (done without the media panel, see [`renderer.md`](./renderer.md#translate-a-file)): file → track (video only) → preset & context → output → preflight confirmation (cost, coverage, `freeQuota`). Gap: type `CoverageReport` in the contract (`jobs:preflight` returns `coverage: unknown`).
+4. ~~**Queue + status bar**~~ (done, see [`renderer.md`](./renderer.md#queue-and-status-bar)): live progress, `waiting` countdown, confirm / cancel / retry / remove, detail panel with warnings, untranslated lines, usage and actionable errors.
+5. ~~**Media context panel** (TMDB)~~ (done, see [`renderer.md`](./renderer.md#media-context-panel)): identification, search, season/episode, warnings, "Include", artwork backdrop, attribution.
 
 **P2, management screens**
 
-6. Settings (general, keys, cache, sidecars, advanced limits, About). 7. Models and Languages. 8. Presets (glossary, import/export). 9. Extract and Mux on their own. 10. Logs.
+6. ~~Settings~~ (done, see [`renderer.md`](./renderer.md#settings)): general, keys, cache, sidecars, advanced limits, About. 7. ~~Models and Languages~~ (done, see [`renderer.md`](./renderer.md#models-and-languages)). 8. ~~Presets~~ (done, see [`renderer.md`](./renderer.md#presets)): glossary, import/export. 9. Extract and Mux on their own. 10. Logs.
 
 **P3, needs a decision or is polish**
 

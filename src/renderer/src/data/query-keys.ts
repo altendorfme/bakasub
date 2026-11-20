@@ -23,12 +23,20 @@ export const qk = {
   presets: {
     list: () => ['presets', 'list'] as const
   },
+  media: {
+    probe: (path: string) => ['media', 'probe', path] as const,
+    identify: (name: string) => ['media', 'identify', name] as const,
+    search: (q: string) => ['media', 'search', q.trim().toLowerCase()] as const,
+    lookup: (kind: string, id: number, season: number, episode: number) =>
+      ['media', 'lookup', kind, id, season, episode] as const
+  },
   memory: {
     stats: () => ['memory', 'stats'] as const
   },
   jobs: {
     all: ['jobs'] as const,
     list: () => ['jobs', 'list'] as const,
-    detail: (id: string) => ['jobs', 'detail', id] as const
+    detail: (id: string) => ['jobs', 'detail', id] as const,
+    preflight: (id: string) => ['jobs', 'preflight', id] as const
   }
 }

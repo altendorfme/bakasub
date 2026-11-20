@@ -44,6 +44,7 @@ The renderer never touches the network. Media DTOs carry `bakasub-media://tmdb/<
 - `JobCreateRequest.media?: { ref, season?, episode? }` (`translate` and `pipeline`), sent only when the user keeps "Include these details". The Main looks the details up (normally a cache hit, since the UI just showed them) and freezes them in `spec.media`, so a retry uses the same context even offline. If the lookup fails, the job is created without context and a warning is logged.
 - `buildMediaContext` writes plain labeled lines (title, year, kind, original title, genres, synopsis, episode code/title/synopsis) followed by `Notes from the user:` and the notes. Artwork URLs never reach the prompt.
 - Like the notes, the media context is **not** part of the Job Memory key.
+- `Job.media` (`JobMediaSummary`) exposes title, kind, year, artwork URLs and the episode code/title of the frozen context to the queue (`src/main/jobs/media-summary.ts`); the synopsis stays in the spec.
 - Batch mode: identification per file is planned with the batch prototype.
 
 ## IPC
