@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { FileDrop } from '@renderer/components/files/file-drop'
@@ -8,16 +8,17 @@ import { TrackPicker } from '@renderer/components/media/track-picker'
 import { Button } from '@renderer/components/ui/button'
 import { useCreateJob } from '@renderer/data/jobs'
 import { errorMessage } from '@renderer/i18n/error-message'
+import { usePageState } from '@renderer/lib/page-state'
 
 /** Extract subtitle tracks from a video, no translation. Then follows the job. */
 export function ExtractPage(): React.JSX.Element {
   const { t } = useTranslation()
-  const [source, setSource] = useState<string | null>(null)
-  const [tracks, setTracks] = useState<number[]>([])
-  const [outputDir, setOutputDir] = useState<string | null>(null)
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [source, setSource] = usePageState<string | null>('extract.source', null)
+  const [tracks, setTracks] = usePageState<number[]>('extract.tracks', [])
+  const [outputDir, setOutputDir] = usePageState<string | null>('extract.outputDir', null)
+  const [jobId, setJobId] = usePageState<string | null>('extract.jobId', null)
   const create = useCreateJob()
-  const onTracks = useCallback((ids: number[]) => setTracks(ids), [])
+  const onTracks = useCallback((ids: number[]) => setTracks(ids), [setTracks])
 
   const start = (): void => {
     if (!source) return

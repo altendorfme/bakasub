@@ -8,7 +8,7 @@ export interface WizardState {
   step: WizardStep
   file: { path: string; name: string; kind: SourceKind } | null
   trackId: number | null
-  /** `null` = the default from Settings (shown prefilled). */
+  /** `null` = the TMDB suggestion for the work, else the default from Settings. */
   presetId: string | null
   model: string | null
   targetLang: string | null
@@ -149,12 +149,19 @@ export function canGo(s: WizardState, target: WizardStep, defaults?: Defaults): 
   return t <= s.furthest && steps.slice(0, t).every((st) => stepValid(s, st, defaults))
 }
 
-/** The `jobs:create` request. Unset model/language/preset are left to the Main's defaults. */
-export function buildJobRequest(s: WizardState): JobCreateRequest {
+/**
+ * The `jobs:create` request. `suggestedPresetId`: the TMDB suggestion, used when the user kept
+ * it. Unset model/language/preset are left to the Main's defaults.
+ */
+export function buildJobRequest(
+  s: WizardState,
+  suggestedPresetId?: string | null
+): JobCreateRequest {
   if (!s.file) throw new Error('No file selected')
+  const presetId = s.presetId ?? suggestedPresetId
   const common = {
     source: s.file.path,
-    ...(s.presetId ? { presetId: s.presetId } : {}),
+    ...(presetId ? { presetId } : {}),
     ...(s.model ? { model: s.model } : {}),
     ...(s.targetLang ? { targetLang: s.targetLang } : {}),
     ...(s.notes.trim() ? { notes: s.notes.trim() } : {}),

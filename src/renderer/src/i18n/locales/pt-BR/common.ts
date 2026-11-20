@@ -253,6 +253,14 @@ export const common: LocaleShape<typeof en> = {
     },
     preset: {
       heading: 'Como traduzir',
+      suggested: {
+        anime: 'Sugerido: animação japonesa no TMDB',
+        movie: 'Sugerido: filme no TMDB',
+        series: 'Sugerido: série no TMDB',
+        documentary: 'Sugerido: documentário no TMDB'
+      },
+      useSuggestion: 'Voltar à sugestão ({{preset}})',
+      noSuggestion: 'Sem obra do TMDB: vale o preset padrão das configurações.',
       preset: 'Preset',
       builtin: 'Embutido',
       temperature: 'Temperatura',
@@ -397,14 +405,6 @@ export const common: LocaleShape<typeof en> = {
       defaults: 'Modelo, idioma e notas do lote',
       defaultsHint: 'Usados pelas obras não personalizadas',
       modelLang: 'Modelo, idioma e notas',
-      suggested: {
-        anime: 'Sugerido: animação japonesa no TMDB',
-        movie: 'Sugerido: filme no TMDB',
-        series: 'Sugerido: série no TMDB',
-        documentary: 'Sugerido: documentário no TMDB'
-      },
-      useSuggestion: 'Voltar à sugestão ({{preset}})',
-      noSuggestion: 'Sem obra do TMDB: vale o preset padrão das configurações.',
       useDefaults: 'Usar o padrão do lote',
       customize: 'Personalizar esta obra',
       customized: 'Personalizada',

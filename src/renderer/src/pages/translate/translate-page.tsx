@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useState } from 'react'
+import { useCallback } from 'react'
 import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -17,8 +17,12 @@ import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { existingTarget } from '@renderer/lib/existing-subtitle'
 import { languageName } from '@renderer/lib/languages'
+import { usePageReducer, usePageState } from '@renderer/lib/page-state'
+import { presetLabel } from '@renderer/lib/preset-labels'
+import { suggestPreset } from '@renderer/lib/preset-suggestion'
 import { OutputStep } from './output-step'
 import { PresetStep } from './preset-step'
+import { suggestionHint } from './suggestion-hint'
 import { StepBar } from './step-bar'
 import { WizardSummary } from './wizard-summary'
 import {
@@ -38,19 +42,19 @@ import {
  */
 export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const [state, dispatch] = useReducer(wizardReducer, initialWizard)
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [confirmExisting, setConfirmExisting] = useState(false)
+  const [state, dispatch] = usePageReducer('translate.single', wizardReducer, initialWizard)
+  const [jobId, setJobId] = usePageState<string | null>('translate.single.job', null)
+  const [confirmExisting, setConfirmExisting] = usePageState('translate.single.confirm', false)
   const settings = useSettings().data
   const presets = usePresets().data ?? []
   const create = useCreateJob()
   const onTrack = useCallback(
     (ids: number[]) => ids[0] !== undefined && dispatch({ type: 'track', trackId: ids[0] }),
-    []
+    [dispatch]
   )
   const onMedia = useCallback(
     (patch: Partial<MediaChoice>) => dispatch({ type: 'media', patch }),
-    []
+    [dispatch]
   )
 
   const defaults = {
@@ -59,14 +63,25 @@ export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.J
   }
   const model = state.model ?? defaults.model
   const targetLang = state.targetLang ?? defaults.targetLang
-  const presetId = state.presetId ?? settings?.['translation.defaultPresetId']
-  const preset = presets.find((p) => p.id === presetId)
 
   // Cached queries: the same keys the steps already use.
   const video = state.file?.kind === 'video' ? state.file.path : null
   const probe = useProbe(video).data
   const track = probe?.subtitles.find((tr) => tr.id === state.trackId)
-  const chosen = useMediaLookup(state.media.include ? state.media.ref : null, null).data
+  const lookup = useMediaLookup(state.media.ref, null).data
+  const work = lookup && state.media.ref && lookup.details.id === state.media.ref.id ? lookup : null
+  // The details only reach the AI (and the backdrop) when included; the preset suggestion
+  // (like the batch's) follows the work either way.
+  const chosen = state.media.include ? (work ?? undefined) : undefined
+  const suggestion = work ? suggestPreset(work.details, presets) : null
+  // `presetId: null` = follow the TMDB suggestion, else the default from Settings.
+  const presetId =
+    state.presetId ?? suggestion?.presetId ?? settings?.['translation.defaultPresetId'] ?? null
+  const preset = presets.find((p) => p.id === presetId)
+  const presetName = (id: string): string => {
+    const p = presets.find((x) => x.id === id)
+    return p ? presetLabel(p, t) : id
+  }
   const created = useJob(jobId).data
   // Artwork: the chosen title while editing, the job's frozen media afterwards.
   const backdrop = jobId ? created?.media?.backdropUrl : chosen?.details.backdropUrl
@@ -87,7 +102,7 @@ export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.J
   const go = (s: WizardStep): void => dispatch({ type: 'go', step: s, defaults })
 
   const createJob = (): void =>
-    create.mutate(buildJobRequest(state), {
+    create.mutate(buildJobRequest(state, suggestion?.presetId), {
       onSuccess: (job) => {
         setConfirmExisting(false)
         setJobId(job.id)
@@ -168,8 +183,25 @@ export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.J
                   ) : null}
                   {state.step === 'preset' ? (
                     <PresetStep
-                      value={state}
-                      onChange={(patch) => dispatch({ type: 'set', patch })}
+                      value={{ ...state, presetId }}
+                      onChange={(patch) =>
+                        dispatch({
+                          type: 'set',
+                          // Picking the suggestion again goes back to following it.
+                          patch:
+                            suggestion && patch.presetId === suggestion.presetId
+                              ? { ...patch, presetId: null }
+                              : patch
+                        })
+                      }
+                      presetHint={suggestionHint({
+                        t,
+                        suggestion,
+                        presetId,
+                        hasWork: !!state.media.ref,
+                        presetName,
+                        onUseSuggestion: () => dispatch({ type: 'set', patch: { presetId: null } })
+                      })}
                     />
                   ) : null}
                   {state.step === 'output' ? (

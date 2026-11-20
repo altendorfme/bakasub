@@ -33,12 +33,15 @@ export function PresetStep({
   value: state,
   onChange,
   notesLabel,
-  withPreset = true
+  withPreset = true,
+  presetHint
 }: {
   value: Omit<PresetChoice, 'presetId'> & { presetId?: string | null }
   onChange: (patch: Partial<PresetChoice>) => void
   notesLabel?: string
   withPreset?: boolean
+  /** Under the preset select (e.g. where the preset came from). */
+  presetHint?: React.ReactNode
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const settings = useSettings().data
@@ -55,6 +58,7 @@ export function PresetStep({
         <PresetPicker
           value={state.presetId ?? null}
           onChange={(presetId) => onChange({ presetId })}
+          hint={presetHint}
         />
       ) : null}
 

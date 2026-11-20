@@ -1,9 +1,9 @@
-import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { PresetPicker, PresetStep } from '../preset-step'
+import { suggestionHint } from '../suggestion-hint'
 import type { BatchCtx } from './batch-ctx'
 import { Collapsible, KindBadge } from './batch-parts'
 import { defaultSettings } from './batch-state'
@@ -50,7 +50,6 @@ function WorkSettingsCard({ ctx, work: w }: { ctx: BatchCtx; work: Work }): Reac
   const n = rowsOf(ctx.grouping, ctx.rows, w.id).filter((i) => ctx.rows[i].include).length
   const suggestion = ctx.suggestions[w.id]
   const presetId = workPreset(w, ctx.suggestions)
-  const followsSuggestion = !!suggestion && presetId === suggestion.presetId
   const set = (patch: Partial<WorkSettings>): void =>
     ctx.setGrouping(patchWork(ctx.grouping, w.id, { custom: { ...s, ...patch } }))
   return (
@@ -83,24 +82,14 @@ function WorkSettingsCard({ ctx, work: w }: { ctx: BatchCtx; work: Work }): Reac
             })
           )
         }
-        hint={
-          followsSuggestion ? (
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-3.5 shrink-0 text-violet" />
-              {t(`batch.preset.suggested.${suggestion.flavor}`)}
-            </span>
-          ) : suggestion ? (
-            <button
-              type="button"
-              className="text-violet underline-offset-2 hover:underline"
-              onClick={() => ctx.setGrouping(patchWork(ctx.grouping, w.id, { presetId: null }))}
-            >
-              {t('batch.preset.useSuggestion', { preset: label.preset(suggestion.presetId) })}
-            </button>
-          ) : w.ref ? undefined : (
-            t('batch.preset.noSuggestion')
-          )
-        }
+        hint={suggestionHint({
+          t,
+          suggestion,
+          presetId,
+          hasWork: !!w.ref,
+          presetName: label.preset,
+          onUseSuggestion: () => ctx.setGrouping(patchWork(ctx.grouping, w.id, { presetId: null }))
+        })}
       />
 
       <div className="grid gap-2 border-t pt-3">

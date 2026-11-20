@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@renderer/components/ui/button'
@@ -8,6 +8,7 @@ import { usePresets } from '@renderer/data/presets'
 import { suggestPreset } from '@renderer/lib/preset-suggestion'
 import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
+import { usePageReducer, usePageState } from '@renderer/lib/page-state'
 import { StepBar } from '../step-bar'
 import { BatchBackdrop } from './batch-backdrop'
 import { BatchRun } from './batch-detail'
@@ -44,8 +45,12 @@ const newDraw = (): number => Math.random()
  */
 export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Element {
   const { t } = useTranslation()
-  const [state, dispatch] = useReducer(batchWizardReducer, initialBatchWizard)
-  const [batchId, setBatchId] = useState<string | null>(null)
+  const [state, dispatch] = usePageReducer(
+    'translate.batch',
+    batchWizardReducer,
+    initialBatchWizard
+  )
+  const [batchId, setBatchId] = usePageState<string | null>('translate.batch.id', null)
   const settings = useSettings().data
   const defaults = {
     model: settings?.['translation.defaultModel'] ?? null,

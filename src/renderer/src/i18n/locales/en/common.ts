@@ -247,6 +247,14 @@ export const common = {
     },
     preset: {
       heading: 'How to translate',
+      suggested: {
+        anime: 'Suggested: Japanese animation on TMDB',
+        movie: 'Suggested: a movie on TMDB',
+        series: 'Suggested: a series on TMDB',
+        documentary: 'Suggested: a documentary on TMDB'
+      },
+      useSuggestion: 'Back to the suggestion ({{preset}})',
+      noSuggestion: 'No TMDB work: the default preset from Settings applies.',
       preset: 'Preset',
       builtin: 'Built-in',
       temperature: 'Temperature',
@@ -391,14 +399,6 @@ export const common = {
       defaults: 'Batch model, language and notes',
       defaultsHint: 'Used by the works that are not customized',
       modelLang: 'Model, language and notes',
-      suggested: {
-        anime: 'Suggested: Japanese animation on TMDB',
-        movie: 'Suggested: a movie on TMDB',
-        series: 'Suggested: a series on TMDB',
-        documentary: 'Suggested: a documentary on TMDB'
-      },
-      useSuggestion: 'Back to the suggestion ({{preset}})',
-      noSuggestion: 'No TMDB work: the default preset from Settings applies.',
       useDefaults: 'Use the batch defaults',
       customize: 'Customize this work',
       customized: 'Customized',

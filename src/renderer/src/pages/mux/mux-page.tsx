@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -19,6 +18,7 @@ import {
 import { useCreateJob } from '@renderer/data/jobs'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { languageName, TARGET_LANGUAGES } from '@renderer/lib/languages'
+import { usePageState } from '@renderer/lib/page-state'
 import {
   addRows,
   buildMuxRequest,
@@ -31,12 +31,12 @@ import {
 /** Put existing subtitle files into a copy of a video. Then follows the job. */
 export function MuxPage(): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const [source, setSource] = useState<string | null>(null)
-  const [rows, setRows] = useState<MuxRow[]>([])
-  const [outputDir, setOutputDir] = useState<string | null>(null)
-  const [setDefault, setSetDefault] = useState(true)
-  const [keepOriginal, setKeepOriginal] = useState(true)
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [source, setSource] = usePageState<string | null>('mux.source', null)
+  const [rows, setRows] = usePageState<MuxRow[]>('mux.rows', [])
+  const [outputDir, setOutputDir] = usePageState<string | null>('mux.outputDir', null)
+  const [setDefault, setSetDefault] = usePageState('mux.setDefault', true)
+  const [keepOriginal, setKeepOriginal] = usePageState('mux.keepOriginal', true)
+  const [jobId, setJobId] = usePageState<string | null>('mux.jobId', null)
   const create = useCreateJob()
   const name = (tag: string): string => languageName(tag, i18n.language)
   const update = (path: string, patch: Partial<MuxRow>): void =>

@@ -8,6 +8,7 @@ import type {
   CoverageReport,
   Job,
   JobCreateRequest,
+  MediaIdentification,
   PreflightEstimate,
   Preset,
   SubtitleTrackInfo
@@ -79,9 +80,43 @@ const job = (over: Partial<Job>): Job => ({
   ...over
 })
 
+/** TMDB knows the show as Japanese animation (→ the Anime preset is suggested). */
+const animeMedia = {
+  identify: () =>
+    ok({
+      release: { title: 'Show' },
+      status: 'matched' as const,
+      match: {
+        provider: 'tmdb' as const,
+        id: 7,
+        kind: 'series' as const,
+        title: 'The Show',
+        genres: ['Animation'],
+        synopsis: 'Synopsis.'
+      },
+      episode: null
+    } satisfies MediaIdentification),
+  lookup: () =>
+    ok({
+      details: {
+        provider: 'tmdb' as const,
+        id: 7,
+        kind: 'series' as const,
+        title: 'The Show',
+        genres: ['Animation'],
+        genreIds: [16],
+        originalLanguage: 'ja',
+        synopsis: 'Synopsis.'
+      },
+      episode: null
+    }),
+  search: () => ok([])
+}
+
 function setup(
   path: string,
-  tracks?: SubtitleTrackInfo[]
+  tracks?: SubtitleTrackInfo[],
+  media?: typeof animeMedia
 ): {
   fake: FakeApi
   create: ReturnType<typeof vi.fn>
@@ -119,7 +154,10 @@ function setup(
       apiKeyStatus: () => ok({ present: true, protection: 'os' as const }),
       get: () => ok({ ...onboardedSettings, 'translation.targetLangs': ['pt-BR', 'es'] })
     },
-    presets: { list: () => ok([preset]) },
+    presets: {
+      list: () =>
+        ok([preset, { ...preset, id: 'builtin:anime', name: 'Anime', mediaType: 'anime' as const }])
+    },
     models: {
       list: () =>
         ok({
@@ -141,6 +179,7 @@ function setup(
     },
     dialog: { openFiles: () => ok({ paths: [path] }) },
     media: {
+      ...media,
       probe: () =>
         ok({
           attachments: 2,
@@ -310,5 +349,42 @@ describe('Translate a file', () => {
     expect(await screen.findByRole('heading', { name: 'Choose what to translate' })).toBeTruthy()
     await userEvent.click(within(steps).getByRole('button', { name: /Output/ }))
     expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
+  })
+
+  it('suggests the preset from TMDB; picking another and back follows the suggestion again', async () => {
+    const { create } = setup('/subs/Show - 01.en.srt', undefined, animeMedia)
+    await openSingle()
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await next()
+    expect(await screen.findByText('Suggested: Japanese animation on TMDB')).toBeTruthy()
+    const presetSelect = screen.getAllByRole('combobox')[0]
+    expect(within(presetSelect).getByText('Anime')).toBeTruthy()
+
+    await userEvent.click(presetSelect)
+    await userEvent.click(await screen.findByRole('option', { name: 'Series' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Back to the suggestion/ }))
+    expect(await screen.findByText('Suggested: Japanese animation on TMDB')).toBeTruthy()
+
+    await next()
+    await userEvent.click(await screen.findByRole('button', { name: 'Estimate cost' }))
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ presetId: 'builtin:anime' }))
+  })
+
+  it('keeps the wizard where it was after visiting another page', async () => {
+    setup('/subs/ep01.en.srt')
+    await openSingle()
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await next()
+    await userEvent.type(screen.getByLabelText('Notes for the translator (optional)'), 'Elf mage')
+
+    const nav = screen.getByRole('navigation')
+    await userEvent.click(within(nav).getByRole('link', { name: 'Extract' }))
+    expect(screen.queryByRole('heading', { name: 'How to translate' })).toBeNull()
+    await userEvent.click(within(nav).getByRole('link', { name: 'Translate' }))
+
+    expect(await screen.findByRole('heading', { name: 'How to translate' })).toBeTruthy()
+    expect(
+      (screen.getByLabelText('Notes for the translator (optional)') as HTMLTextAreaElement).value
+    ).toBe('Elf mage')
   })
 })

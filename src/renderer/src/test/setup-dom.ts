@@ -24,3 +24,8 @@ if (typeof window !== 'undefined') {
   Element.prototype.hasPointerCapture ??= (): boolean => false
   Element.prototype.releasePointerCapture ??= (): void => undefined
 }
+
+// Screens keep their state across unmounts (`usePageState`): every test starts clean.
+import { afterEach } from 'vitest'
+import { resetPageState } from '@renderer/lib/page-state'
+afterEach(() => resetPageState())

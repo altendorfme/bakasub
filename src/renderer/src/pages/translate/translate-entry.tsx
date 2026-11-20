@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { FileVideo, FolderTree } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { usePageState } from '@renderer/lib/page-state'
 import { BatchWizard } from './batch/batch-wizard'
 import { TranslatePage } from './translate-page'
 
@@ -9,7 +9,7 @@ type Mode = 'single' | 'many'
 /** Translate starts with a choice: one file (the wizard) or several files / a folder (batch). */
 export function TranslateEntry(): React.JSX.Element {
   const { t } = useTranslation()
-  const [mode, setMode] = useState<Mode | null>(null)
+  const [mode, setMode] = usePageState<Mode | null>('translate.mode', null)
   if (mode === 'single') return <TranslatePage onBack={() => setMode(null)} />
   if (mode === 'many') return <BatchWizard onBack={() => setMode(null)} />
   return (
