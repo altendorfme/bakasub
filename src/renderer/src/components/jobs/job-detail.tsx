@@ -21,6 +21,14 @@ import { JobProgress } from './job-progress'
 import { JobResult } from './job-result'
 import { PreflightReview } from './preflight-review'
 
+/** The "do it again" label of the wizard that created the job. */
+const ANOTHER_LABEL = {
+  extract: 'extractPage.another',
+  mux: 'muxPage.another',
+  translate: 'translate.another',
+  pipeline: 'translate.another'
+} as const satisfies Record<Job['kind'], string>
+
 const when = (iso: string, lang: string): string => {
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
@@ -39,7 +47,7 @@ export function JobDetail({
   showQueueLink = false
 }: {
   id: string
-  /** Wizard: "Translate another file" once the job is over. */
+  /** Wizard: "Translate/Extract/Mux another…" once the job is over (label follows `job.kind`). */
   onAnother?: () => void
   onRemoved?: () => void
   showQueueLink?: boolean
@@ -170,7 +178,7 @@ function JobActions({
       ) : null}
       {onAnother && isTerminal(job.status) ? (
         <Button variant="default" onClick={onAnother}>
-          {t('translate.another')}
+          {t(ANOTHER_LABEL[job.kind])}
         </Button>
       ) : null}
     </div>

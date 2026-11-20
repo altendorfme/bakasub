@@ -10,13 +10,15 @@ import { createAppRouter } from '@renderer/app/router'
 import { installFakeApi, ok } from '@renderer/test/fake-api'
 import { onboardedSettings } from '@renderer/test/fixtures'
 
-function setup(path: string): ReturnType<typeof vi.fn> {
+function setup(path: string, status: Job['status'] = 'queued'): ReturnType<typeof vi.fn> {
+  let lastKind: Job['kind'] = 'extract'
   const create = vi.fn(async (req: JobCreateRequest) => {
+    lastKind = req.kind
     const job: Job = {
       id: 'j',
       kind: req.kind,
       batchId: null,
-      status: 'queued',
+      status,
       step: null,
       source: 'ep01.mkv',
       progress: { step: null },
@@ -34,7 +36,7 @@ function setup(path: string): ReturnType<typeof vi.fn> {
     jobs: {
       list: () => ok([]),
       create,
-      get: () => create({ kind: 'extract' } as JobCreateRequest)
+      get: () => create({ kind: lastKind } as JobCreateRequest)
     },
     sidecars: {
       check: () =>
@@ -106,6 +108,15 @@ describe('Extract', () => {
       trackIds: [2, 3]
     })
   })
+
+  it('once done, the restart button speaks of extracting, not translating', async () => {
+    setup('/extract', 'completed')
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await screen.findByRole('group', { name: 'Pick the subtitle track' })
+    await userEvent.click(screen.getByRole('button', { name: 'Extract' }))
+    expect(await screen.findByRole('button', { name: 'Extract from another video' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Translate another file' })).toBeNull()
+  })
 })
 
 describe('Mux', () => {
@@ -131,5 +142,16 @@ describe('Mux', () => {
       ],
       options: { setDefault: true, keepOriginalSubtitles: true }
     })
+  })
+
+  it('once done, the restart button speaks of muxing, not translating', async () => {
+    setup('/mux', 'completed')
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add subtitle files' }))
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Language: ep01.srt' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Japanese' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Create video' }))
+    expect(await screen.findByRole('button', { name: 'Mux another video' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Translate another file' })).toBeNull()
   })
 })
