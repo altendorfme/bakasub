@@ -12,6 +12,7 @@ import { usePageReducer, usePageState } from '@renderer/lib/page-state'
 import { StepBar } from '../step-bar'
 import { BatchBackdrop } from './batch-backdrop'
 import { BatchRun } from './batch-detail'
+import { useOutputPrefs } from '@renderer/data/output-prefs'
 import { BatchOutputStep } from './batch-output-step'
 import type { BatchCtx } from './batch-ctx'
 import { applyEdits, seedRows } from './batch-rows'
@@ -58,6 +59,7 @@ export function BatchWizard({ onSwitchMode }: { onSwitchMode: () => void }): Rea
   }
   const create = useCreateBatch()
 
+  const prefs = useOutputPrefs()
   const plans = useBatchPlans(state.source)
   const available = FLAVORS.filter((k) => (plans[k]?.items.length ?? 0) > 0)
   const flavor =
@@ -132,8 +134,20 @@ export function BatchWizard({ onSwitchMode }: { onSwitchMode: () => void }): Rea
 
   const start = (): void => {
     if (!ctx) return
-    create.mutate(buildBatchRequest(ctx.plan, ctx.rows, grouping, state.options, suggestions), {
-      onSuccess: (b) => setBatchId(b.id),
+    const request = buildBatchRequest(
+      ctx.plan,
+      ctx.rows,
+      grouping,
+      state.options,
+      suggestions,
+      prefs.mode
+    )
+    create.mutate(request, {
+      onSuccess: (b) => {
+        if (ctx.flavor === 'pipeline')
+          prefs.remember({ mode: state.options.outputMode ?? prefs.mode })
+        setBatchId(b.id)
+      },
       onError: (err) => toast.error(errorMessage(err))
     })
   }

@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { OutputFolder } from '@renderer/components/files/output-folder'
+import { ExtractNamingChoice } from '@renderer/components/output/extract-naming'
 import { Button } from '@renderer/components/ui/button'
+import { useOutputPrefs } from '@renderer/data/output-prefs'
 import { useCreateBatch, useExtractPlan } from '@renderer/data/batches'
+import { extractedNames, outputFolder } from '@renderer/lib/output-names'
 import { IpcCallError } from '@renderer/lib/ipc'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { usePageReducer, usePageState } from '@renderer/lib/page-state'
@@ -11,6 +14,7 @@ import { StepBar } from '../../translate/step-bar'
 import { SimpleBatchRun } from '@renderer/components/jobs/simple-batch-run'
 import {
   EXTRACT_BATCH_STEPS,
+  ambiguousFiles,
   buildExtractRequest,
   buildRows,
   extractBatchReducer,
@@ -40,6 +44,8 @@ export function ExtractBatchWizard({
     null
   )
   const create = useCreateBatch()
+  const prefs = useOutputPrefs()
+  const naming = state.naming ?? prefs.naming
   const planQuery = useExtractPlan(state.source)
   const plan = planQuery.data ?? null
   const rows = useMemo(() => (plan ? buildRows(plan, state.edits) : null), [plan, state.edits])
@@ -51,12 +57,26 @@ export function ExtractBatchWizard({
   const valid = (s: ExtractBatchStep): boolean => extractStepValid(s, rows)
   const go = (s: ExtractBatchStep): void => dispatch({ type: 'go', step: s })
   const included = rows?.filter((r) => r.include).length ?? 0
+  // Preview: the first included file with the tracks chosen for it.
+  const first = rows?.find((r) => r.include)
+  const sample = first
+    ? extractedNames(
+        first.item.path,
+        first.item
+          .tracks!.filter((tr) => first.trackIds.includes(tr.id))
+          .flatMap((tr) => (tr.format ? [{ ...tr, format: tr.format }] : [])),
+        naming
+      )
+    : []
 
   const start = (): void => {
     if (!plan || !rows) return
     setFailure(null)
-    create.mutate(buildExtractRequest(plan, rows, state.outputDir), {
-      onSuccess: (b) => setBatchId(b.id),
+    create.mutate(buildExtractRequest(plan, rows, state.outputDir, naming, state.overwrite), {
+      onSuccess: (b) => {
+        prefs.remember({ naming })
+        setBatchId(b.id)
+      },
       onError: (err) => {
         const hit =
           err instanceof IpcCallError && err.code === 'INVALID_INPUT'
@@ -141,6 +161,18 @@ export function ExtractBatchWizard({
                 ) : (
                   <p className="text-xs text-muted-foreground">{t('extractBatch.output.next')}</p>
                 )}
+                {first ? (
+                  <ExtractNamingChoice
+                    naming={naming}
+                    onNaming={(n) => dispatch({ type: 'naming', naming: n })}
+                    overwrite={state.overwrite}
+                    onOverwrite={(v) => dispatch({ type: 'overwrite', overwrite: v })}
+                    names={sample}
+                    folder={outputFolder(first.item.path, state.outputDir)}
+                    example
+                    ambiguous={rows ? ambiguousFiles(rows) : 0}
+                  />
+                ) : null}
                 <p className="text-sm text-muted-foreground">
                   {t('extractBatch.output.review', {
                     files: included,

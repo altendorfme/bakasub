@@ -280,6 +280,36 @@ describe('Translate a file', () => {
     expect(screen.getByText(/Paused after a rate limit · \d s/)).toBeTruthy()
   })
 
+  it('video: subtitle-only output hides the mux options and previews the file name', async () => {
+    const { create } = setup('/v/ep01.mkv')
+    await openSingle()
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await next()
+    await screen.findByRole('radiogroup')
+    await next()
+    await next()
+    // Default: the MKV, with its mux options.
+    const preview = await screen.findByRole('region', { name: 'Files that will be written' })
+    expect(within(preview).getByText('ep01.pt-BR.mkv')).toBeTruthy()
+    expect(screen.getByText('Keep the original subtitles in the video')).toBeTruthy()
+    await userEvent.click(screen.getByRole('radio', { name: /Subtitle only/ }))
+    expect(screen.queryByText('Keep the original subtitles in the video')).toBeNull()
+    expect(screen.queryByText('Make the translated subtitle the default track')).toBeNull()
+    expect(within(preview).queryByText('ep01.pt-BR.mkv')).toBeNull()
+    expect(within(preview).getByText(/ep01\.pt-BR\.(ass|srt)/)).toBeTruthy()
+    expect(screen.getByText(/same name as the video/)).toBeTruthy()
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /Replace files that already exist/ })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Estimate cost' }))
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'pipeline',
+        options: { outputMode: 'subtitle', overwrite: true }
+      })
+    )
+  })
+
   it('video: track step preselects a translatable track; image tracks are disabled', async () => {
     const { create } = setup('/v/ep01.mkv')
     await openSingle()
@@ -299,7 +329,7 @@ describe('Translate a file', () => {
       expect.objectContaining({
         kind: 'pipeline',
         trackId: 2,
-        options: { setDefault: false, keepOriginalSubtitles: true, alsoWriteSubtitle: false }
+        options: { outputMode: 'mux', setDefault: false, keepOriginalSubtitles: true }
       })
     )
   })

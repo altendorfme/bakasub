@@ -218,7 +218,7 @@ describe('batch wizard state', () => {
         }
       ],
       notes: 'batch',
-      options: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
+      options: { outputMode: 'mux', setDefault: true, keepOriginalSubtitles: true },
       confirmBeforeTranslate: true
     })
     // Media context off: no media and no episode numbers.
@@ -231,6 +231,41 @@ describe('batch wizard state', () => {
     expect(off.groups?.[0]).toEqual({ name: 'TMDB Show' })
     expect(off.items[0]).toEqual({ path: '/a/s01.mkv', trackIds: [2], group: 0 })
     expect(groupingOf({ ...initialBatchWizard, grouping: g }, rows)).toBe(g)
+  })
+})
+
+describe('batch output mode', () => {
+  const rows = seedRows(plan, ids)
+  const g = autoGroup(rows)
+  const options = (
+    o: Partial<typeof initialBatchWizard.options>,
+    mode?: 'mux' | 'subtitle' | 'both'
+  ): unknown =>
+    buildBatchRequest(plan, rows, g, { ...initialBatchWizard.options, ...o }, {}, mode).options
+
+  it('uses the remembered mode until the user picks one', () => {
+    expect(options({})).toEqual({
+      outputMode: 'mux',
+      setDefault: true,
+      keepOriginalSubtitles: true
+    })
+    expect(options({}, 'subtitle')).toEqual({ outputMode: 'subtitle' })
+    expect(options({ outputMode: 'both' }, 'subtitle')).toMatchObject({ outputMode: 'both' })
+  })
+
+  it('subtitle only drops the mux options; overwrite is sent only when on', () => {
+    expect(options({ outputMode: 'subtitle', overwrite: true })).toEqual({
+      outputMode: 'subtitle',
+      overwrite: true
+    })
+  })
+
+  it('subtitle files have no mode, only overwrite', () => {
+    const sub: BatchPlan = { ...plan, kind: 'translate' }
+    const req = (overwrite: boolean): ReturnType<typeof buildBatchRequest> =>
+      buildBatchRequest(sub, rows, g, { ...initialBatchWizard.options, overwrite })
+    expect(req(false)).not.toHaveProperty('options')
+    expect(req(true).options).toEqual({ overwrite: true })
   })
 })
 

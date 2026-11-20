@@ -164,6 +164,9 @@ describe('Extract several files', () => {
 
     expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
     expect(screen.getByText('2 tracks from 2 files will be saved.')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Files that will be written' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('radio', { name: /With the track id/ }))
+    await userEvent.click(screen.getByRole('radio', { name: /Player-compatible/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Extract 2 files' }))
     expect(create).toHaveBeenCalledWith({
       kind: 'extract',
@@ -171,7 +174,8 @@ describe('Extract several files', () => {
       items: [
         { path: '/anime/Show - 01.mkv', trackIds: [2] },
         { path: '/anime/Show - 02.mkv', trackIds: [6] }
-      ]
+      ],
+      options: { extractNaming: 'player' }
     })
 
     // No cost step: straight to the progress.

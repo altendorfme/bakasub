@@ -105,7 +105,8 @@ describe('Extract', () => {
     expect(create).toHaveBeenCalledWith({
       kind: 'extract',
       source: '/v/ep01.mkv',
-      trackIds: [2, 3]
+      trackIds: [2, 3],
+      options: { naming: 'player' }
     })
   })
 

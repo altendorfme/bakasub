@@ -80,7 +80,51 @@ describe('wizard', () => {
       targetLang: 'es',
       outputDir: '/out',
       confirmBeforeTranslate: true,
-      options: { setDefault: false, keepOriginalSubtitles: true, alsoWriteSubtitle: false }
+      options: { outputMode: 'mux', setDefault: false, keepOriginalSubtitles: true }
+    })
+  })
+
+  describe('output mode', () => {
+    const video = run(
+      { type: 'file', path: '/a/x.mkv' },
+      { type: 'track', trackId: 4 },
+      { type: 'mux', patch: { setDefault: false } }
+    )
+    const options = (s: typeof video, mode?: 'mux' | 'subtitle' | 'both'): unknown =>
+      (buildJobRequest(s, null, mode) as { options?: unknown }).options
+
+    it('follows the remembered default until the user picks', () => {
+      expect(options(video)).toEqual({
+        outputMode: 'mux',
+        setDefault: false,
+        keepOriginalSubtitles: true
+      })
+      expect(options(video, 'subtitle')).toEqual({ outputMode: 'subtitle' })
+      const picked = wizardReducer(video, { type: 'set', patch: { outputMode: 'both' } })
+      expect(options(picked, 'subtitle')).toEqual({
+        outputMode: 'both',
+        setDefault: false,
+        keepOriginalSubtitles: true
+      })
+    })
+
+    it('subtitle only sends no mux options (the MKV is never touched)', () => {
+      const s = wizardReducer(video, { type: 'set', patch: { outputMode: 'subtitle' } })
+      expect(options(s)).toEqual({ outputMode: 'subtitle' })
+    })
+
+    it('overwrite goes in the options only when on, for videos and subtitle files', () => {
+      const on = wizardReducer(video, { type: 'set', patch: { overwrite: true } })
+      expect(options(on)).toMatchObject({ outputMode: 'mux', overwrite: true })
+      const srt = run(
+        { type: 'file', path: '/a/x.srt' },
+        { type: 'set', patch: { overwrite: true } }
+      )
+      expect(buildJobRequest(srt)).toMatchObject({
+        kind: 'translate',
+        options: { overwrite: true }
+      })
+      expect(buildJobRequest(run({ type: 'file', path: '/a/x.srt' }))).not.toHaveProperty('options')
     })
   })
 })

@@ -18,6 +18,8 @@ export const PUBLIC_SETTING_KEYS = [
   'logs.level',
   'updates.autoCheck',
   'ui.language',
+  'output.mode',
+  'output.extractNaming',
   'llm.rateLimit.freeRpm',
   'llm.rateLimit.paidRpm',
   'llm.rateLimit.freeTier',

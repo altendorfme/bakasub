@@ -312,7 +312,7 @@ describe('Translate several files', () => {
           notes: 'Body swap'
         }
       ],
-      options: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
+      options: { outputMode: 'mux', setDefault: true, keepOriginalSubtitles: true },
       confirmBeforeTranslate: true
     })
 

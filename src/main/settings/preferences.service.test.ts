@@ -39,6 +39,8 @@ describe('PreferencesService', () => {
       'logs.level': 'info',
       'updates.autoCheck': true,
       'ui.language': null,
+      'output.mode': 'mux',
+      'output.extractNaming': 'player',
       'llm.rateLimit.freeRpm': 20,
       'llm.rateLimit.paidRpm': null,
       'llm.rateLimit.freeTier': 'auto',

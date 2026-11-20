@@ -40,6 +40,16 @@ export const SETTINGS_SCHEMA = {
     schema: z.enum(['en', 'pt-BR']).nullable(),
     default: null as 'en' | 'pt-BR' | null
   },
+  /** Último modo de saída escolhido ao traduzir um vídeo (`mux` = MKV, `subtitle` = só legenda). */
+  'output.mode': {
+    schema: z.enum(['mux', 'subtitle', 'both']),
+    default: 'mux' as 'mux' | 'subtitle' | 'both'
+  },
+  /** Última nomeação escolhida ao extrair legendas (`player` = `<base>.<lang>.<ext>`). */
+  'output.extractNaming': {
+    schema: z.enum(['player', 'track']),
+    default: 'player' as 'player' | 'track'
+  },
   /** `debug` = log detalhado (tela Settings: "Verbose logging"). Vale na hora. */
   'logs.level': { schema: z.enum(['info', 'debug']), default: 'info' as 'info' | 'debug' },
   /** Checagem silenciosa de atualização após o boot (nunca baixa nem instala sozinha). */

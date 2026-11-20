@@ -13,10 +13,12 @@ import { Dialog, DialogClose, DialogContent, DialogFooter } from '@renderer/comp
 import { useCreateJob, useJob } from '@renderer/data/jobs'
 import { useMediaLookup, useProbe } from '@renderer/data/media'
 import { usePresets } from '@renderer/data/presets'
+import { useOutputPrefs } from '@renderer/data/output-prefs'
 import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { existingTarget } from '@renderer/lib/existing-subtitle'
 import { languageName } from '@renderer/lib/languages'
+import { outputFolder, translateOutputNames } from '@renderer/lib/output-names'
 import { usePageReducer, usePageState } from '@renderer/lib/page-state'
 import { presetLabel } from '@renderer/lib/preset-labels'
 import { suggestPreset } from '@renderer/lib/preset-suggestion'
@@ -50,6 +52,7 @@ export function TranslatePage({
   const settings = useSettings().data
   const presets = usePresets().data ?? []
   const create = useCreateJob()
+  const prefs = useOutputPrefs()
   const onTrack = useCallback(
     (ids: number[]) => ids[0] !== undefined && dispatch({ type: 'track', trackId: ids[0] }),
     [dispatch]
@@ -103,9 +106,28 @@ export function TranslatePage({
   const reachable = (s: WizardStep): boolean => canGo(state, s, defaults)
   const go = (s: WizardStep): void => dispatch({ type: 'go', step: s, defaults })
 
+  const isVideo = state.file?.kind === 'video'
+  const outputMode = state.outputMode ?? prefs.mode
+  const subtitleExt = isVideo
+    ? (track?.format ?? 'srt')
+    : (state.file?.path.split('.').pop()?.toLowerCase() ?? 'srt')
+  const outputNames =
+    state.file && targetLang
+      ? translateOutputNames(
+          state.file.path,
+          targetLang,
+          subtitleExt,
+          isVideo ? outputMode : 'subtitle'
+        )
+      : []
+  const preview = state.file
+    ? { names: outputNames, folder: outputFolder(state.file.path, state.outputDir) }
+    : null
+
   const createJob = (): void =>
-    create.mutate(buildJobRequest(state, suggestion?.presetId), {
+    create.mutate(buildJobRequest(state, suggestion?.presetId, prefs.mode), {
       onSuccess: (job) => {
+        if (isVideo) prefs.remember({ mode: outputMode })
         setConfirmExisting(false)
         setJobId(job.id)
       },
@@ -209,11 +231,16 @@ export function TranslatePage({
                   ) : null}
                   {state.step === 'output' ? (
                     <OutputStep
-                      video={state.file?.kind === 'video'}
+                      video={isVideo}
                       outputDir={state.outputDir}
+                      mode={outputMode}
                       mux={state.mux}
+                      overwrite={state.overwrite}
+                      preview={preview}
                       onFolder={(outputDir) => dispatch({ type: 'set', patch: { outputDir } })}
+                      onMode={(m) => dispatch({ type: 'set', patch: { outputMode: m } })}
                       onMux={(patch) => dispatch({ type: 'mux', patch })}
+                      onOverwrite={(overwrite) => dispatch({ type: 'set', patch: { overwrite } })}
                     />
                   ) : null}
 
@@ -252,6 +279,7 @@ export function TranslatePage({
                 track={track}
                 media={chosen}
                 existing={existing}
+                outputNames={outputNames}
                 canGo={reachable}
                 onGo={go}
               />

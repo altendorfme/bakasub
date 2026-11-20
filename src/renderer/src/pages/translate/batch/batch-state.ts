@@ -3,7 +3,8 @@ import type {
   BatchGroup,
   BatchKind,
   BatchPlan,
-  BatchSource
+  BatchSource,
+  OutputMode
 } from '@shared/ipc-contract'
 import { NOTES_MAX } from '../wizard-state'
 import {
@@ -38,7 +39,10 @@ export const batchSteps = (flavor: BatchFlavor | null): BatchStep[] =>
 export interface BatchOptions extends WorkSettings {
   /** `null` = next to each file (with a folder and an output dir: the structure is mirrored). */
   outputDir: string | null
-  mux: { setDefault: boolean; keepOriginalSubtitles: boolean; alsoWriteSubtitle: boolean }
+  /** `null` = the last choice remembered in Settings, else `mux`. Videos only. */
+  outputMode: OutputMode | null
+  overwrite: boolean
+  mux: { setDefault: boolean; keepOriginalSubtitles: boolean }
   confirmBeforeTranslate: boolean
 }
 
@@ -68,7 +72,9 @@ export const initialBatchWizard: BatchWizardState = {
     targetLang: null,
     notes: '',
     outputDir: null,
-    mux: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
+    outputMode: null,
+    overwrite: false,
+    mux: { setDefault: true, keepOriginalSubtitles: true },
     confirmBeforeTranslate: true
   },
   draw: 0
@@ -210,7 +216,8 @@ export function buildBatchRequest(
   rows: readonly BatchRow[],
   g: Grouping,
   o: BatchOptions,
-  suggestions: PresetSuggestions = {}
+  suggestions: PresetSuggestions = {},
+  defaultMode: OutputMode = 'mux'
 ): BatchCreateRequest {
   const included = rows.filter((r) => r.include)
   const used = g.works.filter((w) => included.some((r) => g.of[r.item.path] === w.id))
@@ -249,7 +256,21 @@ export function buildBatchRequest(
     ...(o.targetLang ? { targetLang: o.targetLang } : {}),
     ...(notes ? { notes } : {}),
     ...(o.outputDir ? { outputDir: o.outputDir } : {}),
-    ...(plan.kind === 'pipeline' ? { options: { ...o.mux } } : {}),
+    ...writeOptions(plan.kind, o, defaultMode),
     confirmBeforeTranslate: o.confirmBeforeTranslate
+  }
+}
+
+/** `options` of the request: the output mode and mux options (videos), `overwrite` (any). */
+function writeOptions(
+  kind: BatchKind,
+  o: BatchOptions,
+  defaultMode: OutputMode
+): Pick<BatchCreateRequest, 'options'> {
+  const overwrite = o.overwrite ? { overwrite: true } : {}
+  if (kind !== 'pipeline') return o.overwrite ? { options: overwrite } : {}
+  const outputMode = o.outputMode ?? defaultMode
+  return {
+    options: { outputMode, ...(outputMode === 'subtitle' ? {} : { ...o.mux }), ...overwrite }
   }
 }

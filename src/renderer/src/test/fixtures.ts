@@ -13,6 +13,8 @@ export const onboardedSettings: PublicSettings = {
   'logs.level': 'info',
   'updates.autoCheck': true,
   'ui.language': 'en',
+  'output.mode': 'mux',
+  'output.extractNaming': 'player',
   'llm.rateLimit.freeRpm': 20,
   'llm.rateLimit.paidRpm': null,
   'llm.rateLimit.freeTier': 'auto',

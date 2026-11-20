@@ -285,7 +285,26 @@ export const common: LocaleShape<typeof en> = {
       reset: 'Usar a pasta de origem',
       setDefault: 'Tornar a legenda traduzida a faixa padrão',
       keepOriginal: 'Manter as legendas originais no vídeo',
-      alsoWrite: 'Salvar também a legenda traduzida como arquivo separado',
+      mode: {
+        label: 'O que salvar',
+        mux: 'MKV com a legenda embutida',
+        muxHint: 'Um novo MKV com a faixa traduzida; o vídeo original não é alterado.',
+        subtitle: 'Só a legenda (para players)',
+        subtitleHint:
+          'Apenas o arquivo de legenda ao lado do vídeo, sem remux: mais rápido e sem usar espaço extra em disco.',
+        both: 'Ambos',
+        bothHint: 'O novo MKV e o arquivo de legenda separado.'
+      },
+      playersNote:
+        'Players que leem legenda externa carregam o arquivo quando ele tem o mesmo nome do vídeo, por ex. Episodio.mkv e Episodio.pt-BR.ass na mesma pasta.',
+      previewLabel: 'Arquivos que serão gravados',
+      preview_one: 'Será salvo como',
+      preview_other: 'Serão salvos como',
+      previewExample: 'Exemplo, a partir do primeiro arquivo',
+      overwrite: 'Substituir arquivos que já existem',
+      overwriteOff: 'Se já existir um arquivo com esse nome, o novo é salvo como "nome (2)".',
+      overwriteOn:
+        'Um arquivo com esse nome é substituído. O arquivo de origem nunca é sobrescrito.',
       summary:
         'O BakaSub primeiro estima o custo e pede sua confirmação antes de enviar qualquer coisa para a IA.'
     }
@@ -432,6 +451,7 @@ export const common: LocaleShape<typeof en> = {
       model: 'Modelo',
       language: 'Para',
       output: 'Saída',
+      write: 'Gravar',
       nextToEach: 'Ao lado de cada arquivo',
       included: '{{count}} incluídos',
       includedOut: '{{count}} incluídos · {{out}} de fora',
@@ -509,6 +529,7 @@ export const common: LocaleShape<typeof en> = {
     retry: 'Tentar de novo',
     openQueue: 'Abrir na fila',
     logs: 'Ver logs',
+    subtitleFile: 'Legenda salva em',
     outputs: 'Salvo em',
     finalCost: 'Custo: US$ {{value}}',
     costIncomplete: 'Não foi possível determinar todo o custo das requisições interrompidas.',
@@ -1052,6 +1073,17 @@ export const common: LocaleShape<typeof en> = {
     output: 'Pasta de saída',
     start: 'Extrair',
     another: 'Extrair de outro vídeo',
+    naming: {
+      label: 'Nome dos arquivos',
+      player: 'Compatível com player',
+      playerHint: 'Episodio.en.ass: os players carregam ao lado do vídeo sozinhos.',
+      track: 'Com o id da faixa',
+      trackHint: 'Episodio.3.en.ass: sempre único, mas os players não carregam sozinhos.',
+      ambiguous_one:
+        '{{count}} arquivo tem várias faixas no mesmo idioma: elas recebem um número (Episodio.en.1.ass, Episodio.en.2.ass), que os players podem não carregar sozinhos.',
+      ambiguous_other:
+        '{{count}} arquivos têm várias faixas no mesmo idioma: elas recebem um número (Episodio.en.1.ass, Episodio.en.2.ass), que os players podem não carregar sozinhos.'
+    },
     needTrack: 'Escolha pelo menos uma faixa.'
   },
   extractBatch: {

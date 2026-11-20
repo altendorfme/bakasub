@@ -279,7 +279,25 @@ export const common = {
       reset: 'Use the source folder',
       setDefault: 'Make the translated subtitle the default track',
       keepOriginal: 'Keep the original subtitles in the video',
-      alsoWrite: 'Also save the translated subtitle as a separate file',
+      mode: {
+        label: 'What to save',
+        mux: 'MKV with the subtitle embedded',
+        muxHint: 'A new MKV with the translated track; the original video is not touched.',
+        subtitle: 'Subtitle only (for players)',
+        subtitleHint:
+          'Just the subtitle file next to the video, no remux: faster and needs no extra disk space.',
+        both: 'Both',
+        bothHint: 'The new MKV and the separate subtitle file.'
+      },
+      playersNote:
+        'Players that load external subtitles pick the file up when it has the same name as the video, e.g. Episode.mkv and Episode.pt-BR.ass in the same folder.',
+      previewLabel: 'Files that will be written',
+      preview_one: 'Will be saved as',
+      preview_other: 'Will be saved as',
+      previewExample: 'Example, from the first file',
+      overwrite: 'Replace files that already exist',
+      overwriteOff: 'If a file with that name exists, the new one is saved as "name (2)".',
+      overwriteOn: 'A file with that name is replaced. The source file is never overwritten.',
       summary:
         'BakaSub first estimates the cost and asks you to confirm before anything is sent to the AI.'
     }
@@ -426,6 +444,7 @@ export const common = {
       model: 'Model',
       language: 'Into',
       output: 'Output',
+      write: 'Write',
       nextToEach: 'Next to each file',
       included: '{{count}} included',
       includedOut: '{{count}} included · {{out}} out',
@@ -503,6 +522,7 @@ export const common = {
     retry: 'Retry',
     openQueue: 'Open in Queue',
     logs: 'Show logs',
+    subtitleFile: 'Subtitle saved to',
     outputs: 'Saved to',
     finalCost: 'Cost: US$ {{value}}',
     costIncomplete: 'Cost of interrupted requests could not be fully determined.',
@@ -1040,6 +1060,17 @@ export const common = {
     output: 'Output folder',
     start: 'Extract',
     another: 'Extract from another video',
+    naming: {
+      label: 'File names',
+      player: 'Player-compatible',
+      playerHint: 'Episode.en.ass: players load it next to the video on their own.',
+      track: 'With the track id',
+      trackHint: 'Episode.3.en.ass: always unique, but players do not pick it up by itself.',
+      ambiguous_one:
+        '{{count}} file has several tracks in the same language: they get a number (Episode.en.1.ass, Episode.en.2.ass), which players may not load on their own.',
+      ambiguous_other:
+        '{{count}} files have several tracks in the same language: they get a number (Episode.en.1.ass, Episode.en.2.ass), which players may not load on their own.'
+    },
     needTrack: 'Choose at least one track.'
   },
   extractBatch: {

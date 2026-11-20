@@ -35,7 +35,14 @@ export function JobResult({ job }: { job: Job }): React.JSX.Element {
           {r.outputs.map((o) => (
             <span key={o} className="flex items-center gap-2 text-sm break-all">
               <FileCheck2 className="size-4 shrink-0 text-success" />
-              {o}
+              <span className="min-w-0">
+                {o === r.subtitle ? (
+                  <span className="mr-1.5 text-xs text-muted-foreground">
+                    {t('jobs.subtitleFile')}
+                  </span>
+                ) : null}
+                {o}
+              </span>
             </span>
           ))}
         </div>

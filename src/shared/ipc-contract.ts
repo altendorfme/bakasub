@@ -141,6 +141,10 @@ export interface PublicSettings {
   'updates.autoCheck': boolean
   /** `null` = idioma do sistema (`navigator.language`). */
   'ui.language': AppLanguage | null
+  /** Último modo de saída escolhido ao traduzir um vídeo; a UI começa por ele. */
+  'output.mode': OutputMode
+  /** Última nomeação escolhida ao extrair legendas. */
+  'output.extractNaming': ExtractNaming
   /** Avançado (Settings → Advanced). Ver docs/rate-limits.md. */
   'llm.rateLimit.freeRpm': number
   'llm.rateLimit.paidRpm': number | null

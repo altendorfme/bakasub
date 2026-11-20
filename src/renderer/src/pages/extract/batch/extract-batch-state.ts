@@ -1,5 +1,6 @@
 import type {
   BatchCreateRequest,
+  ExtractNaming,
   BatchPlan,
   BatchPlanItem,
   BatchSource,
@@ -22,6 +23,9 @@ export interface ExtractBatchState {
   source: BatchSource | null
   edits: Record<string, ExtractEdit>
   outputDir: string | null
+  /** `null` = the last choice remembered in Settings, else `player`. */
+  naming: ExtractNaming | null
+  overwrite: boolean
 }
 
 export const initialExtractBatch: ExtractBatchState = {
@@ -29,13 +33,17 @@ export const initialExtractBatch: ExtractBatchState = {
   furthest: 0,
   source: null,
   edits: {},
-  outputDir: null
+  outputDir: null,
+  naming: null,
+  overwrite: false
 }
 
 export type ExtractBatchAction =
   | { type: 'source'; source: BatchSource }
   | { type: 'edit'; edits: Record<string, ExtractEdit> }
   | { type: 'outputDir'; dir: string | null }
+  | { type: 'naming'; naming: ExtractNaming }
+  | { type: 'overwrite'; overwrite: boolean }
   | { type: 'go'; step: ExtractBatchStep }
   | { type: 'reset' }
 
@@ -46,7 +54,13 @@ export function extractBatchReducer(
   switch (a.type) {
     case 'source':
       // Another set of files: edits no longer apply; the output folder stays.
-      return { ...initialExtractBatch, source: a.source, outputDir: s.outputDir }
+      return {
+        ...initialExtractBatch,
+        source: a.source,
+        outputDir: s.outputDir,
+        naming: s.naming,
+        overwrite: s.overwrite
+      }
     case 'edit': {
       const edits = { ...s.edits }
       for (const [path, e] of Object.entries(a.edits)) edits[path] = { ...edits[path], ...e }
@@ -54,6 +68,10 @@ export function extractBatchReducer(
     }
     case 'outputDir':
       return { ...s, outputDir: a.dir }
+    case 'naming':
+      return { ...s, naming: a.naming }
+    case 'overwrite':
+      return { ...s, overwrite: a.overwrite }
     case 'go':
       return {
         ...s,
@@ -162,13 +180,16 @@ export function signatureEdits(
 export function buildExtractRequest(
   plan: BatchPlan,
   rows: readonly ExtractRow[],
-  outputDir: string | null
+  outputDir: string | null,
+  naming: ExtractNaming = 'player',
+  overwrite = false
 ): BatchCreateRequest {
   return {
     kind: 'extract',
     root: plan.root,
     items: rows.filter((r) => r.include).map((r) => ({ path: r.item.path, trackIds: r.trackIds })),
-    ...(outputDir ? { outputDir } : {})
+    ...(outputDir ? { outputDir } : {}),
+    options: { extractNaming: naming, ...(overwrite ? { overwrite: true } : {}) }
   }
 }
 
@@ -183,4 +204,15 @@ export function failedItem(
   const m = /^item (\d+): (.*)$/s.exec(message)
   const row = m ? rows.filter((r) => r.include)[Number(m[1])] : undefined
   return m && row ? { row, reason: m[2] } : null
+}
+
+/** Included files whose selected tracks repeat a language (they need a `.n` suffix in `player` naming). */
+export function ambiguousFiles(rows: readonly ExtractRow[]): number {
+  return rows.filter((r) => {
+    if (!r.include) return false
+    const langs = r.item
+      .tracks!.filter((t) => r.trackIds.includes(t.id))
+      .map((t) => t.language ?? 'und')
+    return new Set(langs).size < langs.length
+  }).length
 }

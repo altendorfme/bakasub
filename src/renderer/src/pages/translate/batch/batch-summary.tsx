@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BatchSource } from '@shared/ipc-contract'
+import { useOutputPrefs } from '@renderer/data/output-prefs'
 import { cn } from '@renderer/lib/utils'
 import type { BatchCtx } from './batch-ctx'
 import type { BatchStep } from './batch-state'
@@ -26,6 +27,7 @@ export function BatchSummary({
   const { t } = useTranslation()
   const label = useSettingsLabels()
   const none = t('batch.summary.none')
+  const prefs = useOutputPrefs()
   const o = ctx?.options
   const included = ctx?.rows.filter((r) => r.include).length ?? 0
   const out = (ctx?.rows.length ?? 0) - included
@@ -93,6 +95,15 @@ export function BatchSummary({
       label: t('batch.summary.language'),
       value: label.lang(o?.targetLang ?? null)
     },
+    ...(ctx?.flavor === 'pipeline'
+      ? [
+          {
+            step: 'output' as const,
+            label: t('batch.summary.write'),
+            value: t(`translate.output.mode.${o?.outputMode ?? prefs.mode}`)
+          }
+        ]
+      : []),
     {
       step: 'output',
       label: t('batch.summary.output'),

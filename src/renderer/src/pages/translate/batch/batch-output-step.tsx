@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Checkbox } from '@renderer/components/ui/checkbox'
+import { useOutputPrefs } from '@renderer/data/output-prefs'
+import { useSettings } from '@renderer/data/settings'
+import { outputFolder, translateOutputNames } from '@renderer/lib/output-names'
 import { episodeCode } from '@renderer/lib/episode'
 import { OutputStep } from '../output-step'
 import type { BatchCtx } from './batch-ctx'
@@ -13,13 +16,39 @@ export function BatchOutputStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
   const { t } = useTranslation()
   const label = useSettingsLabels()
   const o = ctx.options
+  const prefs = useOutputPrefs()
+  const defaultLang = useSettings().data?.['translation.defaultTargetLang'] ?? null
+  const video = ctx.flavor === 'pipeline'
+  const mode = o.outputMode ?? prefs.mode
+  // Preview of the first included file: the rest follow the same rule.
+  const first = ctx.rows.find((r) => r.include)
+  const lang = o.targetLang ?? defaultLang
+  const track = first?.item.tracks?.find((x) => x.id === first.trackId)
+  const preview =
+    first && lang
+      ? {
+          names: translateOutputNames(
+            first.item.path,
+            lang,
+            video ? (track?.format ?? 'srt') : (first.item.path.split('.').pop() ?? 'srt'),
+            video ? mode : 'subtitle'
+          ),
+          folder: outputFolder(first.item.path, o.outputDir),
+          example: true
+        }
+      : null
   return (
     <>
       <OutputStep
-        video={ctx.flavor === 'pipeline'}
+        video={video}
         outputDir={o.outputDir}
+        mode={mode}
         mux={o.mux}
+        overwrite={o.overwrite}
+        preview={preview}
         onFolder={(outputDir) => ctx.setOptions({ outputDir })}
+        onMode={(outputMode) => ctx.setOptions({ outputMode })}
+        onOverwrite={(overwrite) => ctx.setOptions({ overwrite })}
         onMux={(patch) => ctx.setOptions({ mux: { ...o.mux, ...patch } })}
         summary={
           ctx.plan.root && o.outputDir ? (

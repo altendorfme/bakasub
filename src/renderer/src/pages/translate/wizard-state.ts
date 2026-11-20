@@ -1,4 +1,4 @@
-import type { JobCreateRequest } from '@shared/ipc-contract'
+import type { JobCreateRequest, OutputMode } from '@shared/ipc-contract'
 import { noMedia, type MediaChoice } from '@renderer/components/media/media-choice'
 import { sourceKindOf, type SourceKind } from '@shared/file-types'
 
@@ -15,7 +15,11 @@ export interface WizardState {
   notes: string
   /** `null` = next to the source file. */
   outputDir: string | null
-  mux: { setDefault: boolean; keepOriginalSubtitles: boolean; alsoWriteSubtitle: boolean }
+  /** `null` = the last choice remembered in Settings (`output.mode`), else `mux`. Videos only. */
+  outputMode: OutputMode | null
+  /** Replace a file that already has the output name instead of writing ` (2)`. */
+  overwrite: boolean
+  mux: { setDefault: boolean; keepOriginalSubtitles: boolean }
   media: MediaChoice
   /** Furthest step reached: completed steps can be revisited from the step bar. */
   furthest: number
@@ -32,7 +36,9 @@ export const initialWizard: WizardState = {
   targetLang: null,
   notes: '',
   outputDir: null,
-  mux: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
+  outputMode: null,
+  overwrite: false,
+  mux: { setDefault: true, keepOriginalSubtitles: true },
   media: noMedia,
   furthest: 0,
   notice: null
@@ -49,7 +55,12 @@ export type WizardAction =
   | { type: 'track'; trackId: number }
   | {
       type: 'set'
-      patch: Partial<Pick<WizardState, 'presetId' | 'model' | 'targetLang' | 'notes' | 'outputDir'>>
+      patch: Partial<
+        Pick<
+          WizardState,
+          'presetId' | 'model' | 'targetLang' | 'notes' | 'outputDir' | 'outputMode' | 'overwrite'
+        >
+      >
     }
   | { type: 'mux'; patch: Partial<WizardState['mux']> }
   | { type: 'media'; patch: Partial<MediaChoice> }
@@ -151,11 +162,13 @@ export function canGo(s: WizardState, target: WizardStep, defaults?: Defaults): 
 
 /**
  * The `jobs:create` request. `suggestedPresetId`: the TMDB suggestion, used when the user kept
- * it. Unset model/language/preset are left to the Main's defaults.
+ * it. Unset model/language/preset are left to the Main's defaults. `defaultMode`: the output
+ * mode remembered in Settings, used when the user did not pick one.
  */
 export function buildJobRequest(
   s: WizardState,
-  suggestedPresetId?: string | null
+  suggestedPresetId?: string | null,
+  defaultMode: OutputMode = 'mux'
 ): JobCreateRequest {
   if (!s.file) throw new Error('No file selected')
   const presetId = s.presetId ?? suggestedPresetId
@@ -169,9 +182,18 @@ export function buildJobRequest(
     ...mediaRequest(s.media),
     confirmBeforeTranslate: true
   }
-  if (s.file.kind === 'subtitle') return { kind: 'translate', ...common }
+  const write = s.overwrite ? { overwrite: true } : {}
+  if (s.file.kind === 'subtitle')
+    return { kind: 'translate', ...common, ...(s.overwrite ? { options: write } : {}) }
   if (s.trackId === null) throw new Error('No track selected')
-  return { kind: 'pipeline', ...common, trackId: s.trackId, options: { ...s.mux } }
+  const outputMode = s.outputMode ?? defaultMode
+  // Only a written video has mux options: the subtitle-only mode never touches the MKV.
+  const options = {
+    outputMode,
+    ...(outputMode === 'subtitle' ? {} : { ...s.mux }),
+    ...write
+  }
+  return { kind: 'pipeline', ...common, trackId: s.trackId, options }
 }
 
 /** `media` for the request: only when included; the episode only for a series with both numbers. */

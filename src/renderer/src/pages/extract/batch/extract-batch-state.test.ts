@@ -142,13 +142,14 @@ describe('extract batch reducer', () => {
 describe('extract batch request', () => {
   it('included files in plan order with their tracks; root and outputDir only when set', () => {
     const rows = buildRows(plan, { '/a/s01.mkv': { trackIds: [3] } })
-    expect(buildExtractRequest(plan, rows, null)).toEqual({
+    expect(buildExtractRequest(plan, rows, null, 'player')).toEqual({
       kind: 'extract',
       root: '/a',
       items: [
         { path: '/a/s01.mkv', trackIds: [3] },
         { path: '/a/s02.mkv', trackIds: [4, 5, 6] }
-      ]
+      ],
+      options: { extractNaming: 'player' }
     })
     expect(buildExtractRequest({ ...plan, root: null }, rows, '/out')).toMatchObject({
       root: null,
@@ -178,5 +179,25 @@ describe('extract counts', () => {
         job('cancelled')
       ])
     ).toEqual({ queued: 1, running: 1, done: 2, failed: 2 })
+  })
+})
+
+describe('extract naming', () => {
+  it('the request carries the naming and overwrite only when on', () => {
+    const rows = buildRows(plan, {})
+    expect(buildExtractRequest(plan, rows, null, 'track').options).toEqual({
+      extractNaming: 'track'
+    })
+    expect(buildExtractRequest(plan, rows, null, 'player', true).options).toEqual({
+      extractNaming: 'player',
+      overwrite: true
+    })
+  })
+
+  it('the reducer keeps naming and overwrite when the files change', () => {
+    let s = extractBatchReducer(initialExtractBatch, { type: 'naming', naming: 'track' })
+    s = extractBatchReducer(s, { type: 'overwrite', overwrite: true })
+    s = extractBatchReducer(s, { type: 'source', source: { type: 'files', paths: ['/a/x.mkv'] } })
+    expect(s).toMatchObject({ naming: 'track', overwrite: true })
   })
 })
