@@ -24,7 +24,10 @@ export const PUBLIC_SETTING_KEYS = [
   'llm.retry.maxTransient',
   'llm.retry.baseDelayMs',
   'llm.retry.maxDelayMs',
-  'llm.retry.chunkRounds'
+  'llm.retry.chunkRounds',
+  'llm.concurrency.perJob',
+  'llm.concurrency.paidMaxInFlight',
+  'llm.concurrency.freeMaxInFlight'
 ] as const satisfies readonly (keyof PublicSettings & SettingKey)[]
 
 type PublicKey = (typeof PUBLIC_SETTING_KEYS)[number]

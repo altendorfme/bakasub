@@ -43,6 +43,7 @@ hash = sha256_hex("v1" + "\0" + prev + "\0" + normalizeForHash(payload))
 ## Writes and cancellation
 
 - `commitChunk(ctx, entries, signal)` validates each translation again, writes the valid ones with `upsertMany` in **one transaction per LLM chunk** and returns `{ written, rejected }`.
+- **One write queue per process**: `commitChunk`, the hit `touch` and `prune` go through `JobMemoryService.write`, a promise chain. libsql transactions take different connections from its pool and SQLite's lock wait is synchronous (it blocks the Main thread), so two concurrent write transactions (parallel lanes, concurrent jobs) gave `SQLITE_BUSY: database is locked` immediately, or would freeze the Main for `busy_timeout` if one were set on the pool. Regression test: `escritas simultâneas … sem SQLITE_BUSY`.
 - If the `AbortSignal` is already aborted (or the service is disposed), it throws `AppError('CANCELLED')` and nothing is written. A transaction that already started finishes (it is short); completed chunks stay cached, so a dropped connection or closed app loses at most the chunk in flight.
 - Shutdown: the `job-memory` disposer (registered after `database`, LIFO) refuses new writes and awaits in-flight ones before the database closes.
 - Hits update `last_used_at` in one batched `UPDATE` per lookup, except with `{ peek: true }` (the preflight): a cancelled preflight must not keep stale entries alive.

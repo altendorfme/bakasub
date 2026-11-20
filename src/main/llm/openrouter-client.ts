@@ -7,6 +7,11 @@ export type LlmErrorKind =
   | 'auth'
   /** 402, ou 403 de orçamento/limite da key. Fatal. */
   | 'credits'
+  /**
+   * 402 `in_flight_budget_exhausted`: requisições em voo demais para o saldo pré-pago. Repete
+   * respeitando `Retry-After` e reduz o paralelismo (AIMD). `weight_exceeds_budget` é `credits`.
+   */
+  | 'budget-busy'
   /** 400. Fatal (requisição malformada: bug nosso ou modelo incompatível). */
   | 'bad-request'
   /** 403 de moderação ou `finish_reason: content_filter`. Não repete. */
@@ -88,6 +93,8 @@ export interface ChatRequest {
   readonly responseFormat?: ResponseFormat
   /** Só provedores que suportam todos os parâmetros (ex.: `structured_outputs`). */
   readonly requireParameters?: boolean
+  /** `session_id`: sticky routing para o mesmo provedor (preserva o cache do prefixo). */
+  readonly sessionId?: string
 }
 
 export interface Usage {
@@ -168,7 +175,27 @@ function isDailyLimit(rl: RateLimitHeaders | undefined, now = Date.now()): boole
 }
 
 interface ErrorBody {
-  error?: { code?: unknown; message?: unknown; metadata?: { limit_source?: unknown } }
+  error?: {
+    code?: unknown
+    message?: unknown
+    reason?: unknown
+    metadata?: { limit_source?: unknown; reason?: unknown }
+  }
+}
+
+const IN_FLIGHT_EXHAUSTED = 'in_flight_budget_exhausted'
+
+/** O orçamento em voo está cheio agora (passa sozinho); não é falta de saldo. */
+function isInFlightBusy(body: ErrorBody | null): boolean {
+  const e = body?.error
+  if (!e) return false
+  if (e.reason === IN_FLIGHT_EXHAUSTED || e.metadata?.reason === IN_FLIGHT_EXHAUSTED) return true
+  const reason = e.reason ?? e.metadata?.reason
+  return (
+    reason === undefined &&
+    (e.metadata?.limit_source === 'openrouter_in_flight_budget' ||
+      (typeof e.message === 'string' && e.message.includes(IN_FLIGHT_EXHAUSTED)))
+  )
 }
 
 const BUDGET_SOURCES =
@@ -177,6 +204,7 @@ const BUDGET_SOURCES =
 function kindForStatus(status: number, body: ErrorBody | null): LlmErrorKind {
   if (status === 400) return 'bad-request'
   if (status === 401) return 'auth'
+  if ((status === 402 || status === 403) && isInFlightBusy(body)) return 'budget-busy'
   if (status === 402) return 'credits'
   if (status === 403) {
     const src = body?.error?.metadata?.limit_source
@@ -242,7 +270,8 @@ export class OpenRouterClient {
                 : { type: 'json_object' }
           }
         : {}),
-      ...(req.requireParameters ? { provider: { require_parameters: true } } : {})
+      ...(req.requireParameters ? { provider: { require_parameters: true } } : {}),
+      ...(req.sessionId ? { session_id: req.sessionId } : {})
     }
 
     const local = new AbortController()

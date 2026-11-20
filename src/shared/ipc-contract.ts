@@ -98,7 +98,22 @@ export interface PublicSettings {
   'llm.retry.baseDelayMs': number
   'llm.retry.maxDelayMs': number
   'llm.retry.chunkRounds': number
+  /** Lanes paralelas por arquivo (1 = sequencial). */
+  'llm.concurrency.perJob': number
+  /** Teto global de requisições em voo (todos os jobs), por faixa. */
+  'llm.concurrency.paidMaxInFlight': number
+  'llm.concurrency.freeMaxInFlight': number
 }
+
+/**
+ * Faixas recomendadas das settings de concorrência. Fora delas a UI avisa (sem bloquear); os
+ * limites rígidos ficam no schema do main.
+ */
+export const CONCURRENCY_RECOMMENDED = {
+  'llm.concurrency.perJob': { min: 2, max: 4 },
+  'llm.concurrency.paidMaxInFlight': { min: 4, max: 12 },
+  'llm.concurrency.freeMaxInFlight': { min: 2, max: 3 }
+} as const satisfies Partial<Record<keyof PublicSettings, { min: number; max: number }>>
 
 /** Idiomas da interface (os guias seguem o mesmo idioma). */
 export const APP_LANGUAGES = ['en', 'pt-BR'] as const
@@ -331,6 +346,22 @@ export type JobCreateRequest =
       confirmBeforeTranslate?: boolean
     }
 
+/** `[from, to)` em posições da linha do tempo dos traduzíveis (`timeIndex`). */
+export type TimelineRange = readonly [from: number, to: number]
+
+/**
+ * Onde do episódio a tradução está. Faixas compactadas; posições vão de 0 a `total`.
+ * `active` = chunks em voo; `lanes` = segmento de cada lane (cortes = fronteiras de paralelismo).
+ */
+export interface TranslationTimeline {
+  total: number
+  cached: TimelineRange[]
+  translated: TimelineRange[]
+  failed: TimelineRange[]
+  active: TimelineRange[]
+  lanes: TimelineRange[]
+}
+
 export interface JobProgress {
   step: JobStep | null
   /** 0..1 dentro da etapa, quando conhecido. */
@@ -340,7 +371,10 @@ export interface JobProgress {
     done: number
     total: number
     cached: number
-    chunk?: { index: number; count: number }
+    /** Chunks concluídos, total e em voo (as lanes rodam em paralelo). */
+    chunk?: { completed: number; count: number; inFlight: number }
+    /** Mapa da linha do tempo para a barra de progresso. */
+    timeline?: TranslationTimeline
   }
   cost?: number
   /**

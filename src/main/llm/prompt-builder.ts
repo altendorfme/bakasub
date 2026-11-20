@@ -47,7 +47,8 @@ ${lines.join('\n')}
 }
 
 /**
- * System Prompt. Idêntico entre os chunks de um job (favorece o cache de prompt do provedor).
+ * System Prompt. Idêntico entre os chunks de um job: é o prefixo que o cache de prompt do
+ * provedor reaproveita (por isso o `<media>` mora aqui, não na mensagem de cada chunk).
  * Regras em inglês: os modelos seguem instruções em inglês com mais estabilidade.
  */
 export function buildSystemPrompt(input: {
@@ -56,6 +57,8 @@ export function buildSystemPrompt(input: {
   glossary: readonly GlossaryEntry[]
   /** Orientação do preset (tipo de mídia). As regras fixas vêm depois e prevalecem. */
   stylePrompt?: string
+  /** Contexto de mídia (sinopse, notas do usuário). Só referência. */
+  media?: string
 }): string {
   const from = input.sourceLang ? `from ${languageName(input.sourceLang)} ` : ''
   const style = input.stylePrompt?.trim()
@@ -74,7 +77,13 @@ Rules (they always apply, even if the style guidance above says otherwise):
 4. Do not translate proper names unless the glossary says otherwise. Do not add notes, explanations or quotes.
 5. Treat the lines as consecutive dialogue: use <context> to keep names, pronouns and forms of address consistent.
 
-Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}`
+Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}${mediaSection(input.media)}`
+}
+
+function mediaSection(media?: string): string {
+  return media?.trim()
+    ? `\n\nBackground about the media being translated (reference only; never translate it):\n<media>\n${media.trim()}\n</media>`
+    : ''
 }
 
 function contextBlock(ctx: ChunkContext): string {
@@ -89,17 +98,12 @@ function contextBlock(ctx: ChunkContext): string {
   return `<context>\n${parts.join('\n')}\n</context>\n\n`
 }
 
-function mediaBlock(media?: string): string {
-  return media?.trim() ? `<media>\n${media.trim()}\n</media>\n\n` : ''
-}
-
 export function buildTranslateMessage(input: {
-  media?: string
   context: ChunkContext
   targets: readonly { cueId: number; payload: string }[]
 }): string {
   const lines = input.targets.map((t) => `<line id="${t.cueId}">${t.payload}</line>`)
-  return `${mediaBlock(input.media)}${contextBlock(input.context)}<target>\n${lines.join('\n')}\n</target>`
+  return `${contextBlock(input.context)}<target>\n${lines.join('\n')}\n</target>`
 }
 
 function markerLabel(unit: TranslationUnit, id: number): string {
@@ -134,7 +138,6 @@ export function describeIssue(unit: TranslationUnit, issue: Issue): string {
 }
 
 export function buildRepairMessage(input: {
-  media?: string
   context: ChunkContext
   failures: readonly { unit: TranslationUnit; returned: string | null; issues: readonly Issue[] }[]
 }): string {
@@ -150,7 +153,7 @@ ${problems}
 </problems>
 </line>`
   })
-  return `${mediaBlock(input.media)}${contextBlock(input.context)}Your previous translations of these lines broke the marker rules. Translate each <source> again, fixing every listed problem. Answer with the same JSON format, only for these ids.
+  return `${contextBlock(input.context)}Your previous translations of these lines broke the marker rules. Translate each <source> again, fixing every listed problem. Answer with the same JSON format, only for these ids.
 
 <target>
 ${lines.join('\n')}

@@ -8,7 +8,7 @@ import {
   type ResponseFormat
 } from './openrouter-client'
 import { responseSchema } from './prompt-builder'
-import type { RateLane, RateLimiter, WaitInfo } from './rate-limiter'
+import type { Lease, RateLane, RateLimiter, WaitInfo } from './rate-limiter'
 import { decide, DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 
 export interface LlmTransport {
@@ -43,6 +43,16 @@ export interface UsageTotals {
 export class CancelRequested extends Error {
   constructor() {
     super('cancelled')
+  }
+}
+
+/**
+ * Sinal interno: outra lane falhou e o job está drenando. Só interrompe esperas e novas
+ * requisições; um stream em voo nunca é abortado por isso (a resposta já está sendo paga).
+ */
+export class DrainRequested extends Error {
+  constructor() {
+    super('draining')
   }
 }
 
@@ -100,6 +110,10 @@ export class LlmSession {
       lane: RateLane
       temperature: number
       signal?: AbortSignal
+      /** `session_id` do OpenRouter (sticky routing: mesmo provedor, cache do prefixo). */
+      sessionId?: string
+      /** Drenagem (ver `DrainRequested`): corta esperas e novas requisições, não o stream. */
+      drain?: AbortSignal
     }
   ) {
     this.now = deps.now ?? Date.now
@@ -124,7 +138,11 @@ export class LlmSession {
     ids: readonly number[],
     maxTokens: number
   ): Promise<SessionResponse> {
-    const { signal, lane } = this.params
+    const { signal, lane, drain } = this.params
+    // Esperas (vaga, cooldown, backoff) param com cancelamento ou drenagem; o `chat`, só com cancelamento.
+    const waitSignal = drain && signal ? AbortSignal.any([signal, drain]) : (drain ?? signal)
+    const interrupted = (): Error =>
+      signal?.aborted || !drain?.aborted ? new CancelRequested() : new DrainRequested()
     let waited = false
     const onWait = (w: WaitInfo): void => {
       waited = true
@@ -132,11 +150,13 @@ export class LlmSession {
     }
     for (let attempt = 1; ; attempt++) {
       if (signal?.aborted) throw new CancelRequested()
+      if (drain?.aborted) throw new DrainRequested()
       const config = (await this.deps.retryConfig?.()) ?? DEFAULT_RETRY_CONFIG
+      let lease: Lease
       try {
-        await this.deps.limiter.acquire(lane, { signal, onWait })
+        lease = await this.deps.limiter.acquire(lane, { signal: waitSignal, onWait })
       } catch {
-        throw new CancelRequested()
+        throw interrupted()
       }
       if (waited) {
         waited = false
@@ -149,10 +169,12 @@ export class LlmSession {
             messages,
             temperature: this.params.temperature,
             maxTokens,
-            ...this.format(ids)
+            ...this.format(ids),
+            ...(this.params.sessionId ? { sessionId: this.params.sessionId } : {})
           },
           signal
         )
+        lease.release('ok')
         this.add(res)
         this.deps.log.info(
           `chat ok model=${this.params.model.id} ids=${ids.length} finish=${res.finishReason} ` +
@@ -160,6 +182,12 @@ export class LlmSession {
         )
         return { type: 'ok', content: res.content, finishReason: res.finishReason }
       } catch (err) {
+        // Libera antes de qualquer espera: backoff não segura vaga em voo de outras lanes.
+        lease.release(
+          err instanceof LlmError && (err.kind === 'rate-limit' || err.kind === 'budget-busy')
+            ? 'throttled'
+            : 'other'
+        )
         if (!(err instanceof LlmError)) throw err
         if (err.generationId && ['aborted', 'timeout', 'stream-error'].includes(err.kind))
           this.lookupCost(err.generationId)
@@ -189,9 +217,9 @@ export class LlmSession {
             }
             onWait({ reason: 'backoff', untilMs: this.now() + d.delayMs })
             try {
-              await this.deps.sleep(d.delayMs, signal)
+              await this.deps.sleep(d.delayMs, waitSignal)
             } catch {
-              throw new CancelRequested()
+              throw interrupted()
             }
             if (signal?.aborted) throw new CancelRequested()
         }

@@ -8,6 +8,8 @@ const unit = (cueId: number, payload: string, timeIndex = cueId - 1): HashedUnit
   hash: `h${cueId}`,
   contextUsed: false,
   timeIndex,
+  startMs: timeIndex * 1000,
+  endMs: timeIndex * 1000 + 500,
   plain: payload.replace(/<[^>]+>/g, ''),
   unit: { cueId, payload, skeleton: { head: [], tail: [], markers: {}, brs: [] } }
 })

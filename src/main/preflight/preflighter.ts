@@ -45,6 +45,8 @@ export class Preflighter {
       memory: JobMemoryService
       /** Cota diária de modelos free. Sem ela, o preflight não fala de cota. */
       freeQuota?: { status(signal?: AbortSignal): Promise<FreeQuotaStatus> }
+      /** `llm.concurrency.perJob` (o corte em lanes muda os chunks). Padrão 1. */
+      lanes?: () => Promise<number>
     }
   ) {}
 
@@ -75,7 +77,8 @@ export class Preflighter {
       media: input.media,
       model,
       lookup,
-      catalogFetchedAt: snapshot.fetchedAt
+      catalogFetchedAt: snapshot.fetchedAt,
+      maxLanes: (await this.deps.lanes?.()) ?? 1
     })
     const quota =
       laneOf(model) === 'free' && this.deps.freeQuota

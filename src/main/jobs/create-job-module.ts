@@ -74,7 +74,9 @@ export function createJobModule(o: JobModuleOptions): {
   const limiter = new RateLimiter({
     config: async () => ({
       freeRpm: await settings.get('llm.rateLimit.freeRpm'),
-      paidRpm: await settings.get('llm.rateLimit.paidRpm')
+      paidRpm: await settings.get('llm.rateLimit.paidRpm'),
+      freeMaxInFlight: await settings.get('llm.concurrency.freeMaxInFlight'),
+      paidMaxInFlight: await settings.get('llm.concurrency.paidMaxInFlight')
     }),
     sleep: realSleep
   })
@@ -89,7 +91,8 @@ export function createJobModule(o: JobModuleOptions): {
     keyInfo: (signal) => client.keyInfo(signal),
     tierSetting: () => settings.get('llm.rateLimit.freeTier')
   })
-  const preflighter = new Preflighter({ models, memory: o.memory, freeQuota })
+  const lanes = (): Promise<number> => settings.get('llm.concurrency.perJob')
+  const preflighter = new Preflighter({ models, memory: o.memory, freeQuota, lanes })
 
   const translator: SubtitleTranslator = {
     translate: (input, opts) =>
@@ -107,7 +110,7 @@ export function createJobModule(o: JobModuleOptions): {
           targetLang: input.targetLang,
           sourceLang: input.sourceLang
         },
-        { llm: client, memory: o.memory, models, log: o.log.llm, limiter, retrySettings },
+        { llm: client, memory: o.memory, models, log: o.log.llm, limiter, retrySettings, lanes },
         opts
       )
   }

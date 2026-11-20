@@ -23,7 +23,7 @@ export const RETRY_AFTER_CAP_MS = 60_000
 
 export type RetryDecision =
   /**
-   * `lane`: 429; a faixa inteira entra em cooldown (todos os jobs esperam).
+   * `lane`: 429 ou 402 de orçamento em voo; a faixa inteira entra em cooldown (todos os jobs esperam).
    * `request`: só esta requisição espera.
    */
   | { action: 'retry'; delayMs: number; scope: 'lane' | 'request' }
@@ -74,13 +74,15 @@ export function decide(
     case 'aborted':
       return { action: 'cancel' }
     case 'rate-limit':
+    case 'budget-busy':
     case 'unavailable':
       if (attempt >= config.maxThrottled) return { action: 'fatal', code: 'LLM_UNAVAILABLE' }
       return {
         action: 'retry',
         delayMs: serverHint(err, now) ?? backoffDelay(attempt, config, random),
         // 503 costuma ser do modelo/provedor, não da conta: não trava a faixa.
-        scope: err.kind === 'rate-limit' ? 'lane' : 'request'
+        // 402 de orçamento em voo é da conta inteira, como o 429.
+        scope: err.kind === 'unavailable' ? 'request' : 'lane'
       }
     case 'server':
     case 'timeout':

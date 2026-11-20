@@ -78,7 +78,7 @@ describe('GuideView tables', () => {
       </I18nextProvider>
     )
     const table = screen.getByRole('table')
-    expect(table.querySelectorAll('tbody tr').length).toBe(7)
+    expect(table.querySelectorAll('tbody tr').length).toBe(10)
   })
 })
 

@@ -66,6 +66,19 @@ describe('JobMemoryService', () => {
     expect(second.hits.get(1)?.translated).toBe('Hello <g1>world</g1> beautiful today')
   })
 
+  it('escritas simultâneas (lanes, jobs) vão em fila: sem SQLITE_BUSY', async () => {
+    // Transações do libsql pegam conexões distintas do pool; sem a fila, a 2ª dá database locked.
+    const c = ctx()
+    const { misses } = await svc.lookupDocument(doc, c)
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        svc.commitChunk(c, [{ hashed: misses[1], translated: `All good with you? ${i}` }])
+      )
+    )
+    expect(results.every((r) => r.written === 1)).toBe(true)
+    expect((await svc.lookupDocument(doc, c)).hits.get(2)?.translated).toBe('All good with you? 7')
+  })
+
   it('hit atualiza last_used_at (sobrevive ao prune)', async () => {
     const c = ctx()
     const { misses } = await svc.lookupDocument(doc, c)

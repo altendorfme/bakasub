@@ -38,12 +38,8 @@ exports[`mensagens > repair: descreve cada problema com o marcador concreto 1`] 
 </target>"
 `;
 
-exports[`mensagens > translate: media, context (com traduções) e target com payload 1`] = `
-"<media>
-Anime X, S01E02
-</media>
-
-<context>
+exports[`mensagens > translate: context (com traduções) e target com payload 1`] = `
+"<context>
 <before>
 <line id="1"><source>Hi</source><translation>Oi</translation></line>
 </before>

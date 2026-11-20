@@ -185,6 +185,35 @@ describe('OpenRouterClient.chat', () => {
     })
   })
 
+  it.each([
+    [402, { reason: 'in_flight_budget_exhausted' }, 'budget-busy'],
+    [402, { metadata: { reason: 'in_flight_budget_exhausted' } }, 'budget-busy'],
+    [402, { metadata: { reason: 'weight_exceeds_budget' } }, 'credits'],
+    [403, { metadata: { limit_source: 'openrouter_in_flight_budget' } }, 'budget-busy'],
+    [402, {}, 'credits']
+  ])(
+    'HTTP %i %j => %s (orçamento em voo cheio passa sozinho; falta de saldo é fatal)',
+    async (status, extra, kind) => {
+      const f = async (): Promise<Response> =>
+        new Response(JSON.stringify({ error: { code: status, message: 'x', ...extra } }), {
+          status,
+          headers: { 'retry-after': '2' }
+        })
+      await expect(client(f as unknown as typeof fetch).chat(req)).rejects.toMatchObject({
+        kind,
+        retryAfterMs: 2000
+      })
+    }
+  )
+
+  it('session_id vai no corpo quando informado', async () => {
+    const f = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () =>
+      streamResponse([sse(chunk('x', 'stop'), '[DONE]')])
+    )
+    await client(f as unknown as typeof fetch).chat({ ...req, sessionId: 'job-1' })
+    expect(JSON.parse(f.mock.calls[0][1].body as string)).toMatchObject({ session_id: 'job-1' })
+  })
+
   it('403 com budget (não moderação) => credits', async () => {
     const f = async (): Promise<Response> =>
       new Response(

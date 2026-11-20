@@ -42,7 +42,6 @@ export class ChunkTranslator {
     private readonly session: LlmSession,
     private readonly env: {
       system: string
-      media?: string
       timeline: readonly HashedUnit[]
       known: Map<number, string>
       lexInline: InlineLexer
@@ -156,7 +155,6 @@ export class ChunkTranslator {
     const hasFeedback = pending.some((u) => attempts.get(u.cueId)!.returned !== null)
     if (repair && hasFeedback)
       return buildRepairMessage({
-        media: this.env.media,
         context,
         failures: pending.map((u) => ({
           unit: u.unit,
@@ -165,7 +163,6 @@ export class ChunkTranslator {
         }))
       })
     return buildTranslateMessage({
-      media: this.env.media,
       context,
       targets: pending.map((u) => ({ cueId: u.cueId, payload: u.unit.payload }))
     })

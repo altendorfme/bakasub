@@ -12,7 +12,7 @@ JobManager (FIFO, concurrency = settings 'jobs.concurrency', default 2)
 jobs:progress (throttled 250 ms; state transitions immediately)
 ```
 
-While the translate step waits on OpenRouter (rate limit, lane cooldown after a 429, backoff), `progress.waiting { reason, untilMs }` is set; it is cleared when the request goes out and never kept in a terminal state. See [`rate-limits.md`](./rate-limits.md).
+During the translate step `progress.translation` carries `done/total/cached`, `chunk { completed, count, inFlight }` and the `timeline` map of the episode (cached, translated, failed and in-flight ranges, plus the lane cuts; see [`llm.md`](./llm.md#lanes-parallel-translation)). While every lane waits on OpenRouter (rate limit, lane cooldown after a 429, backoff), `progress.waiting { reason, untilMs }` is set; it is cleared when the request goes out and never kept in a terminal state. See [`rate-limits.md`](./rate-limits.md).
 
 ## Kinds
 

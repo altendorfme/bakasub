@@ -452,7 +452,17 @@ export const common: LocaleShape<typeof en> = {
     },
     lines: '{{done}} de {{total}} falas',
     cached: '{{count}} do cache de tradução',
-    chunk: 'parte {{index}} de {{count}}',
+    chunk: '{{completed}} de {{count}} partes',
+    inFlight_one: '{{count}} em andamento',
+    inFlight_other: '{{count}} em andamento',
+    timeline: {
+      label: 'Andamento da tradução ao longo do episódio',
+      translated: 'Traduzido',
+      cached: 'Do cache',
+      active: 'Em andamento',
+      failed: 'Não traduzido',
+      lanes: '{{count}} trechos em paralelo'
+    },
     cost: 'US$ {{value}} até agora',
     confirm: 'Traduzir',
     cancel: 'Cancelar job',
@@ -685,6 +695,26 @@ export const common: LocaleShape<typeof en> = {
       chunkRoundsHint:
         'Espera 1 minuto, depois 2, antes de tentar essa parte de novo. 0 falha na hora.',
       seconds: 's',
+      parallel: 'Tradução em paralelo',
+      parallelBody:
+        'O arquivo é dividido em trechos traduzidos ao mesmo tempo. Cada trecho segue em ordem, com o contexto das falas anteriores; os cortes ficam nas pausas entre falas. Não muda o custo.',
+      recommended: 'Recomendado: {{min}} a {{max}}',
+      perJob: 'Trechos em paralelo por arquivo',
+      perJobHint: '1 traduz em sequência, como antes.',
+      perJobLow: 'Tradução sequencial: bem mais lenta.',
+      perJobHigh: 'Mais cortes no arquivo: pode reduzir a coerência entre trechos.',
+      paidMaxInFlight: 'Requisições simultâneas (modelos pagos)',
+      paidMaxInFlightHint: 'Somando todos os jobs. Diminui sozinho se o provedor pedir calma.',
+      paidMaxInFlightLow: 'Limita o paralelismo quando há mais de um job rodando.',
+      paidMaxInFlightHigh:
+        'Mais chance de o provedor pedir para diminuir o ritmo e de faltar saldo reservado no OpenRouter.',
+      freeMaxInFlight: 'Requisições simultâneas (modelos gratuitos)',
+      freeMaxInFlightHint:
+        'Somando todos os jobs. O OpenRouter aceita 20 por minuto nos gratuitos.',
+      freeMaxInFlightLow: 'Tradução sequencial: bem mais lenta.',
+      freeMaxInFlightHigh: 'Vai esbarrar no limite de 20 por minuto e gerar esperas.',
+      starved:
+        '{{jobs}} jobs × {{perJob}} trechos = {{wanted}} requisições, mas o limite é {{limit}}: alguns trechos vão esperar vaga.',
       restore: 'Restaurar padrões',
       restored: 'Padrões restaurados.'
     },

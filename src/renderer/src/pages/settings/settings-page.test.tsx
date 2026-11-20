@@ -144,6 +144,29 @@ describe('Settings', () => {
     )
   })
 
+  it('advanced: parallel settings show the recommended band and warn outside it', async () => {
+    const { update } = setup()
+    await tab('Advanced')
+    const perJob = await screen.findByLabelText('Parallel stretches per file')
+    expect(screen.getByText('Recommended: 2 to 4')).toBeTruthy()
+    expect(screen.queryByText(/stretches may read less consistently/)).toBeNull()
+    expect(screen.queryByText(/some stretches will wait/)).toBeNull()
+
+    await userEvent.clear(perJob)
+    await userEvent.type(perJob, '6')
+    // Avisa enquanto digita, antes de salvar; não bloqueia.
+    expect(screen.getByText(/stretches may read less consistently/)).toBeTruthy()
+    await userEvent.tab()
+    expect(update).toHaveBeenCalledWith({ 'llm.concurrency.perJob': 6 })
+    // 2 jobs × 6 = 12 requisições contra um teto de 8.
+    expect(await screen.findByText(/2 jobs × 6 stretches = 12 requests/)).toBeTruthy()
+
+    const free = screen.getByLabelText('Simultaneous requests (free models)')
+    await userEvent.clear(free)
+    await userEvent.type(free, '1')
+    expect(screen.getAllByText('Sequential translation: much slower.')).toHaveLength(1)
+  })
+
   it('cache: size and prune; disabled while a job runs', async () => {
     const { prune } = setup()
     await tab('Translation cache')

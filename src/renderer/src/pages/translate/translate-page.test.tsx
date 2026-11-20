@@ -226,12 +226,17 @@ describe('Translate a file', () => {
       status: 'running',
       progress: {
         step: 'translate',
-        translation: { done: 120, total: 280, cached: 20, chunk: { index: 3, count: 7 } },
+        translation: {
+          done: 120,
+          total: 280,
+          cached: 20,
+          chunk: { completed: 2, count: 7, inFlight: 1 }
+        },
         cost: 0.012,
         waiting: { reason: 'cooldown', untilMs: Date.now() + 9000 }
       }
     })
-    expect(await screen.findByText(/120 of 280 lines · part 3 of 7/)).toBeTruthy()
+    expect(await screen.findByText(/120 of 280 lines · 2 of 7 parts/)).toBeTruthy()
     expect(screen.getByText(/Paused after a rate limit · \d s/)).toBeTruthy()
   })
 

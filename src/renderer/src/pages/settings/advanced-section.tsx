@@ -1,7 +1,11 @@
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, TriangleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import type { FreeTierSetting, PublicSettings } from '@shared/ipc-contract'
+import {
+  CONCURRENCY_RECOMMENDED,
+  type FreeTierSetting,
+  type PublicSettings
+} from '@shared/ipc-contract'
 import { GuideDialog } from '@renderer/components/common/guide-dialog'
 import { Button } from '@renderer/components/ui/button'
 import {
@@ -15,7 +19,7 @@ import { useFreeQuota } from '@renderer/data/models'
 import { useSetting } from '@renderer/data/preferences'
 import { useResetSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
-import { NumberSetting, SettingRow } from './setting-row'
+import { NumberSetting, SettingRow, type Recommended } from './setting-row'
 
 const ADVANCED_KEYS: (keyof PublicSettings)[] = [
   'llm.rateLimit.freeRpm',
@@ -25,7 +29,10 @@ const ADVANCED_KEYS: (keyof PublicSettings)[] = [
   'llm.retry.maxTransient',
   'llm.retry.baseDelayMs',
   'llm.retry.maxDelayMs',
-  'llm.retry.chunkRounds'
+  'llm.retry.chunkRounds',
+  'llm.concurrency.perJob',
+  'llm.concurrency.paidMaxInFlight',
+  'llm.concurrency.freeMaxInFlight'
 ]
 const TIERS: readonly FreeTierSetting[] = ['auto', 'under-10', 'over-10']
 
@@ -68,6 +75,8 @@ export function AdvancedSection(): React.JSX.Element {
           </span>
         ) : null}
       </div>
+
+      <ParallelSettings />
 
       <div className="divide-y">
         <SettingRow
@@ -161,5 +170,84 @@ export function AdvancedSection(): React.JSX.Element {
         {t('settings.advanced.restore')}
       </Button>
     </div>
+  )
+}
+
+/** Lanes per file and the global in-flight caps, each with its recommended band. */
+function ParallelSettings(): React.JSX.Element {
+  const { t } = useTranslation()
+  const [jobs] = useSetting('jobs.concurrency')
+  const [perJob, setPerJob] = useSetting('llm.concurrency.perJob')
+  const [paid, setPaid] = useSetting('llm.concurrency.paidMaxInFlight')
+  const [free, setFree] = useSetting('llm.concurrency.freeMaxInFlight')
+  const rec = (
+    key: keyof typeof CONCURRENCY_RECOMMENDED,
+    low: string,
+    high: string
+  ): Recommended => ({
+    ...CONCURRENCY_RECOMMENDED[key],
+    low,
+    high
+  })
+  // Jobs rodando juntos × lanes de cada um: acima do teto, lanes ficam esperando vaga.
+  const wanted = jobs !== undefined && perJob !== undefined ? jobs * perJob : null
+  const starved = wanted !== null && paid !== undefined && jobs! > 1 && wanted > paid
+
+  return (
+    <section aria-labelledby="parallel-title" className="grid gap-1 rounded-lg border p-3">
+      <h3 id="parallel-title" className="text-sm font-semibold">
+        {t('settings.advanced.parallel')}
+      </h3>
+      <p className="max-w-[65ch] text-xs text-muted-foreground">
+        {t('settings.advanced.parallelBody')}
+      </p>
+      <div className="divide-y">
+        <NumberSetting
+          label={t('settings.advanced.perJob')}
+          description={t('settings.advanced.perJobHint')}
+          value={perJob}
+          min={1}
+          max={8}
+          recommended={rec(
+            'llm.concurrency.perJob',
+            t('settings.advanced.perJobLow'),
+            t('settings.advanced.perJobHigh')
+          )}
+          onSave={(v) => v !== null && setPerJob(v)}
+        />
+        <NumberSetting
+          label={t('settings.advanced.paidMaxInFlight')}
+          description={t('settings.advanced.paidMaxInFlightHint')}
+          value={paid}
+          min={1}
+          max={32}
+          recommended={rec(
+            'llm.concurrency.paidMaxInFlight',
+            t('settings.advanced.paidMaxInFlightLow'),
+            t('settings.advanced.paidMaxInFlightHigh')
+          )}
+          onSave={(v) => v !== null && setPaid(v)}
+        />
+        <NumberSetting
+          label={t('settings.advanced.freeMaxInFlight')}
+          description={t('settings.advanced.freeMaxInFlightHint')}
+          value={free}
+          min={1}
+          max={10}
+          recommended={rec(
+            'llm.concurrency.freeMaxInFlight',
+            t('settings.advanced.freeMaxInFlightLow'),
+            t('settings.advanced.freeMaxInFlightHigh')
+          )}
+          onSave={(v) => v !== null && setFree(v)}
+        />
+      </div>
+      {starved ? (
+        <p role="status" className="flex items-start gap-1.5 text-xs text-warning">
+          <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+          {t('settings.advanced.starved', { jobs, perJob, wanted, limit: paid })}
+        </p>
+      ) : null}
+    </section>
   )
 }

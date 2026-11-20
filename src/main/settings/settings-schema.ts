@@ -70,6 +70,14 @@ export const SETTINGS_SCHEMA = {
   'llm.retry.maxDelayMs': { schema: z.number().int().min(1000).max(120_000), default: 30_000 },
   /** Rodadas extras de um chunk (60 s, 120 s…) depois de esgotar o retry de transporte. */
   'llm.retry.chunkRounds': { schema: z.number().int().min(0).max(5), default: 2 },
+  /**
+   * Paralelismo da tradução (ver docs/llm.md, "Lanes"). `perJob` = máximo de lanes por arquivo
+   * (1 = sequencial); `*MaxInFlight` = teto global de requisições em voo por faixa, somando
+   * todos os jobs (o AIMD trabalha abaixo dele). Faixas recomendadas em `CONCURRENCY_RECOMMENDED`.
+   */
+  'llm.concurrency.perJob': { schema: z.number().int().min(1).max(8), default: 4 },
+  'llm.concurrency.paidMaxInFlight': { schema: z.number().int().min(1).max(32), default: 8 },
+  'llm.concurrency.freeMaxInFlight': { schema: z.number().int().min(1).max(10), default: 3 },
   /** Idiomas de origem preferidos (ordem) na seleção automática de faixas do batch. */
   'tracks.preferredSourceLangs': {
     schema: z.array(z.string().min(1).max(35)).max(10),

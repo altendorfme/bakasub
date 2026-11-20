@@ -22,6 +22,12 @@ Quantas requisições um arquivo usa? Mais ou menos uma a cada 40 falas que não
 - **Pausado após limite de requisições**: o OpenRouter pediu ao BakaSub que diminuísse o ritmo. Todos os jobs que usam o mesmo tipo de modelo (gratuito ou pago) esperam juntos e depois continuam.
 - **Tentando de novo**: uma requisição falhou (rede, provedor ocupado). O BakaSub espera um pouco mais a cada vez e tenta outra vez. Se uma parte do arquivo continuar falhando, ele espera um minuto, depois dois, e tenta essa parte de novo antes de desistir.
 
+## Tradução em paralelo
+
+Para ir mais rápido, o BakaSub divide o arquivo em alguns trechos e traduz esses trechos ao mesmo tempo. Cada trecho segue em ordem, com o contexto das falas anteriores, e os cortes ficam nas pausas entre falas, onde o contexto importa menos. O custo é o mesmo: as mesmas falas, o mesmo número de requisições.
+
+Se o provedor pedir para diminuir o ritmo, ou se o saldo reservado do OpenRouter não der para tantas requisições ao mesmo tempo, o BakaSub reduz o paralelismo sozinho e volta a acelerar quando as coisas se acalmam.
+
 Falas já traduzidas nunca se perdem. Elas são salvas durante o job, então tentar de novo um job que falhou continua de onde parou e não paga por elas outra vez.
 
 ## Quando um job para
@@ -43,5 +49,10 @@ Em **Configurações → Avançado** você pode mudar como o BakaSub espaça e r
 | Tentativas após erros                               | 3          | aumente se a conexão for instável                                         |
 | Primeira espera / maior espera entre tentativas     | 1 s / 30 s | aumente se a conexão for instável                                         |
 | Rodadas extras para uma parte do arquivo que falhou | 2          | use 0 para falhar na hora em vez de esperar minutos                       |
+| Trechos em paralelo por arquivo                     | 4          | 1 traduz em sequência; acima de 4, mais cortes no arquivo                 |
+| Requisições simultâneas (modelos pagos)             | 8          | diminua se o provedor vive pedindo calma ou se o seu saldo é baixo        |
+| Requisições simultâneas (modelos gratuitos)         | 3          | acima de 3 só gera esperas pelo limite de 20 por minuto                   |
+
+Cada um desses três mostra a faixa recomendada e avisa quando o valor sai dela.
 
 **Restaurar padrões** volta todos os valores.

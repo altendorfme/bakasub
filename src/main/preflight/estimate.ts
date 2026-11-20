@@ -3,7 +3,6 @@ import {
   buildContext,
   DEFAULT_CHUNK_LIMITS,
   DEFAULT_CONTEXT_WINDOW,
-  planChunks,
   type ChunkLimits
 } from '../llm/chunker'
 import type { ModelInfo } from '../llm/model-catalog'
@@ -13,6 +12,7 @@ import {
   parseGlossary,
   responseSchema
 } from '../llm/prompt-builder'
+import { planLanes } from '../llm/segmenter'
 import type { DocumentLookup } from '../memory/job-memory.service'
 import type { SubtitleDocument } from '../parsers'
 import { countMessageTokens, countTokens, isExactTokenizer } from './token-counter'
@@ -37,12 +37,15 @@ export interface EstimateInput {
   readonly lookup: DocumentLookup
   readonly catalogFetchedAt: number | null
   readonly limits?: Partial<ChunkLimits>
+  /** `llm.concurrency.perJob`: o mesmo corte em lanes da execução. Padrão 1. */
+  readonly maxLanes?: number
 }
 
 /**
- * Simula o envio com o MESMO código de produção (`planChunks`, `buildContext`, `PromptBuilder`,
+ * Simula o envio com o MESMO código de produção (`planLanes`, `buildContext`, `PromptBuilder`,
  * `responseSchema`) e conta tokens localmente (o200k). Traduções ainda desconhecidas entram no
- * contexto como o próprio texto de origem (tamanho parecido). Determinístico.
+ * contexto como o próprio texto de origem (tamanho parecido). Cada lane é simulada só com o
+ * cache e as próprias traduções, como na execução paralela. Determinístico.
  */
 export function estimatePreflight(input: EstimateInput): Omit<PreflightEstimate, 'decision'> {
   const { lookup, model } = input
@@ -50,31 +53,38 @@ export function estimatePreflight(input: EstimateInput): Omit<PreflightEstimate,
     targetLang: input.targetLang,
     sourceLang: input.sourceLang,
     glossary: parseGlossary(input.preset.glossary).entries,
-    stylePrompt: input.preset.prompt
+    stylePrompt: input.preset.prompt,
+    media: input.media
   })
-  const known = new Map<number, string>()
-  for (const [cueId, hit] of lookup.hits) known.set(cueId, hit.translated)
+  const cached = new Map<number, string>()
+  for (const [cueId, hit] of lookup.hits) cached.set(cueId, hit.translated)
   const timeline = [...[...lookup.hits.values()].map((h) => h.unit), ...lookup.misses]
-  const chunks = planChunks(lookup.misses, { ...DEFAULT_CHUNK_LIMITS, ...input.limits })
+  const lanes = planLanes(lookup.misses, {
+    maxLanes: input.maxLanes ?? 1,
+    limits: { ...DEFAULT_CHUNK_LIMITS, ...input.limits }
+  })
+  const chunks = lanes.flat()
 
   let inputTokens = 0
   let outputTokens = 0
-  for (const chunk of chunks) {
-    const context = buildContext(timeline, chunk, known, DEFAULT_CONTEXT_WINDOW)
-    const user = buildTranslateMessage({
-      media: input.media,
-      context,
-      targets: chunk.map((u) => ({ cueId: u.cueId, payload: u.unit.payload }))
-    })
-    inputTokens += countMessageTokens([
-      { role: 'system', content: system },
-      { role: 'user', content: user }
-    ])
-    if (model.structuredOutputs)
-      inputTokens += countTokens(JSON.stringify(responseSchema(chunk.map((u) => u.cueId))))
-    const target = chunk.reduce((n, u) => n + countTokens(u.unit.payload), 0)
-    outputTokens += Math.ceil(target * OUTPUT_RATIO) + chunk.length * JSON_OVERHEAD_PER_LINE
-    for (const u of chunk) known.set(u.cueId, u.unit.payload)
+  for (const lane of lanes) {
+    const known = new Map(cached)
+    for (const chunk of lane) {
+      const context = buildContext(timeline, chunk, known, DEFAULT_CONTEXT_WINDOW)
+      const user = buildTranslateMessage({
+        context,
+        targets: chunk.map((u) => ({ cueId: u.cueId, payload: u.unit.payload }))
+      })
+      inputTokens += countMessageTokens([
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ])
+      if (model.structuredOutputs)
+        inputTokens += countTokens(JSON.stringify(responseSchema(chunk.map((u) => u.cueId))))
+      const target = chunk.reduce((n, u) => n + countTokens(u.unit.payload), 0)
+      outputTokens += Math.ceil(target * OUTPUT_RATIO) + chunk.length * JSON_OVERHEAD_PER_LINE
+      for (const u of chunk) known.set(u.cueId, u.unit.payload)
+    }
   }
 
   const approximate = !isExactTokenizer(model.tokenizer)

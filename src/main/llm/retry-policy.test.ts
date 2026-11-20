@@ -23,6 +23,17 @@ describe('decide', () => {
   it('aborted => cancel', () => {
     expect(decide(e('aborted'), 1)).toEqual({ action: 'cancel' })
   })
+  it('402 de orçamento em voo: cooldown da faixa (é da conta), respeitando Retry-After', () => {
+    expect(decide(e('budget-busy', 4000), 1)).toEqual({
+      action: 'retry',
+      delayMs: 4000,
+      scope: 'lane'
+    })
+    expect(decide(e('budget-busy'), DEFAULT_RETRY_CONFIG.maxThrottled)).toEqual({
+      action: 'fatal',
+      code: 'LLM_UNAVAILABLE'
+    })
+  })
   it('429: cooldown da faixa, respeitando Retry-After', () => {
     expect(decide(e('rate-limit', 7000), 1)).toEqual({
       action: 'retry',

@@ -25,7 +25,13 @@ export const translateStep: Step = async (ctx) => {
         onProgress: (p) =>
           ctx.progress({
             stepFraction: p.total ? p.done / p.total : undefined,
-            translation: { done: p.done, total: p.total, cached: p.cached, chunk: p.chunk },
+            translation: {
+              done: p.done,
+              total: p.total,
+              cached: p.cached,
+              ...(p.chunk ? { chunk: p.chunk } : {}),
+              ...(p.timeline ? { timeline: p.timeline } : {})
+            },
             cost: p.cost,
             ...(p.waiting ? { waiting: p.waiting } : {})
           })

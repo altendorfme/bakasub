@@ -27,6 +27,9 @@ export interface HashedUnit {
   readonly contextUsed: boolean
   /** Posição na linha do tempo dos traduzíveis (`start.ms`, empate pela ordem do arquivo). */
   readonly timeIndex: number
+  /** Início e fim do cue (ms). Usados para cortar o arquivo em lanes nos intervalos entre falas. */
+  readonly startMs: number
+  readonly endMs: number
   /** Texto puro normalizado do cue (contexto do LLM e linha anterior do hash). */
   readonly plain: string
 }
@@ -91,7 +94,16 @@ export function computeContextHashes(
     const hash = sha256(
       `${CONTEXT_HASH_VERSION}\0${contextUsed ? prev : ''}\0${normalizeForHash(unit.payload)}`
     )
-    out.set(cue.id, { cueId: cue.id, hash, unit, contextUsed, timeIndex, plain })
+    out.set(cue.id, {
+      cueId: cue.id,
+      hash,
+      unit,
+      contextUsed,
+      timeIndex,
+      startMs: cue.start.ms,
+      endMs: cue.end.ms,
+      plain
+    })
     prev = plain
   }
   return translatable.map(({ cue }) => out.get(cue.id)!)

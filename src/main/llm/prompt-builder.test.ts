@@ -80,9 +80,8 @@ describe('buildSystemPrompt', () => {
 })
 
 describe('mensagens', () => {
-  it('translate: media, context (com traduções) e target com payload', () => {
+  it('translate: context (com traduções) e target com payload', () => {
     const m = buildTranslateMessage({
-      media: 'Anime X, S01E02',
       context: {
         before: [{ cueId: 1, source: 'Hi', translation: 'Oi' }],
         after: [{ cueId: 4, source: 'Bye' }]
@@ -96,7 +95,14 @@ describe('mensagens', () => {
     expect(m).toContain('<line id="2">Hello <g1>world</g1></line>')
     expect(m).toContain('<line id="1"><source>Hi</source><translation>Oi</translation></line>')
   })
-  it('translate sem media/contexto omite os blocos', () => {
+  it('media vai no System Prompt (prefixo estável do cache), nunca na mensagem do chunk', () => {
+    const base = { targetLang: 'pt-BR', glossary: [] }
+    const sys = buildSystemPrompt({ ...base, media: '  Anime X, S01E02  ' })
+    expect(sys).toContain('<media>\nAnime X, S01E02\n</media>')
+    expect(sys.startsWith(buildSystemPrompt(base))).toBe(true)
+    expect(buildSystemPrompt({ ...base, media: '   ' })).toBe(buildSystemPrompt(base))
+  })
+  it('translate sem contexto omite os blocos', () => {
     const m = buildTranslateMessage({
       context: { before: [], after: [] },
       targets: [{ cueId: 1, payload: 'a' }]

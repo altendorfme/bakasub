@@ -58,6 +58,8 @@ export interface JobMemoryServiceOptions {
  */
 export class JobMemoryService {
   private readonly inflight = new Set<Promise<unknown>>()
+  /** Fim da fila de escritas (ver `write`). */
+  private writes: Promise<unknown> = Promise.resolve()
   private disposed = false
   private readonly now: () => number
   private readonly isBusy: () => boolean
@@ -117,7 +119,7 @@ export class JobMemoryService {
         touched.push(row.id)
       } else misses.push(u)
     }
-    if (!options.peek) await this.track(this.repo.touch(touched))
+    if (!options.peek) await this.write(() => this.repo.touch(touched))
     return { hits, misses }
   }
 
@@ -139,7 +141,7 @@ export class JobMemoryService {
       if (!ok) rejected.push(e.hashed.cueId)
       return ok
     })
-    await this.track(
+    await this.write(() =>
       this.repo.upsertMany(
         ctx.key,
         valid.map((e) => ({
@@ -160,7 +162,7 @@ export class JobMemoryService {
   async prune(scope: PruneDays | 'all'): Promise<{ deleted: number }> {
     if (this.isBusy())
       throw new AppError('MEMORY_BUSY', 'Cannot prune the job memory while a job is running')
-    return this.track(
+    return this.write(() =>
       this.repo.prune(
         scope === 'all' ? 'all' : { olderThan: new Date(this.now() - scope * DAY_MS) }
       )
@@ -171,6 +173,17 @@ export class JobMemoryService {
   async dispose(): Promise<void> {
     this.disposed = true
     await Promise.allSettled([...this.inflight])
+  }
+
+  /**
+   * Escritas em fila única no processo. As transações do libsql pegam conexões distintas do
+   * pool e a espera por lock do SQLite é síncrona (trava a thread): duas transações de escrita
+   * simultâneas (lanes paralelas, jobs concorrentes) dariam SQLITE_BUSY ou congelariam o main.
+   */
+  private write<T>(fn: () => Promise<T>): Promise<T> {
+    const p = this.writes.then(fn, fn)
+    this.writes = p.catch(() => undefined)
+    return this.track(p)
   }
 
   private track<T>(p: Promise<T>): Promise<T> {
