@@ -8,6 +8,10 @@
 
 Version **1.0.0** · Windows x64 and Linux x64 · [GPL-3.0](./LICENSE)
 
+<p align="center">
+  <a href="https://buymeacoffee.com/leosilvatto"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" /></a>
+</p>
+
 ## What it does
 
 - **Translates** `.srt`, `.ass`, `.ssa` and `.vtt` with any model from [OpenRouter](https://openrouter.ai). Only the text goes to the model: timestamps, styles and tags come back exactly where they were.
