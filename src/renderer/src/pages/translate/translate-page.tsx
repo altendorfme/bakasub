@@ -125,6 +125,7 @@ export function TranslatePage({
             <JobDetail
               id={jobId}
               showQueueLink
+              inspectPath={state.file?.kind === 'subtitle' ? state.file.path : undefined}
               onAnother={() => {
                 setJobId(null)
                 dispatch({ type: 'reset' })

@@ -3,14 +3,18 @@ import { useTranslation } from 'react-i18next'
 import type { CoverageReport, PreflightEstimate } from '@shared/ipc-contract'
 import { formatDate, formatInt, formatUsd } from '@renderer/lib/format'
 import { CoverageList } from './coverage-list'
+import { CoverageSummary, FileCheck } from './file-check'
 
 /** The numbers the user confirms: lines, requests, tokens, cost, free quota and coverage. */
 export function PreflightReview({
   estimate: e,
-  coverage
+  coverage,
+  inspectPath
 }: {
   estimate: PreflightEstimate
   coverage: CoverageReport
+  /** Subtitle file to check for encoding and parser warnings (not available for videos). */
+  inspectPath?: string
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const n = (v: number): string => formatInt(v, i18n.language)
@@ -98,6 +102,8 @@ export function PreflightReview({
         )
       ) : null}
 
+      {inspectPath ? <FileCheck path={inspectPath} /> : null}
+      <CoverageSummary report={coverage} />
       <CoverageList report={coverage} />
 
       <p className="text-xs text-muted-foreground">

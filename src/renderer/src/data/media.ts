@@ -6,7 +6,8 @@ import type {
   MediaProbe,
   MediaRef,
   MediaSearchResult,
-  OpenDialogKind
+  OpenDialogKind,
+  SubtitleInspection
 } from '@shared/ipc-contract'
 import { unwrap } from '@renderer/lib/ipc'
 import { qk } from './query-keys'
@@ -81,3 +82,13 @@ export function useMediaDetailsMany(
     combine: (res) => res.map((r) => (r.data as MediaContextLookup | undefined)?.details)
   })
 }
+
+/** Parser diagnostics, coverage and detected encoding of a subtitle file (no LLM, no job). */
+export const useInspectSubtitle = (path: string | null): UseQueryResult<SubtitleInspection> =>
+  useQuery({
+    queryKey: qk.files.inspect(path ?? ''),
+    queryFn: () => unwrap(window.api.files.inspect(path!)),
+    enabled: path !== null,
+    staleTime: Infinity,
+    retry: false
+  })

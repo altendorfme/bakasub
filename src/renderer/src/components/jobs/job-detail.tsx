@@ -44,13 +44,16 @@ export function JobDetail({
   id,
   onAnother,
   onRemoved,
-  showQueueLink = false
+  showQueueLink = false,
+  inspectPath
 }: {
   id: string
   /** Wizard: "Translate/Extract/Mux another…" once the job is over (label follows `job.kind`). */
   onAnother?: () => void
   onRemoved?: () => void
   showQueueLink?: boolean
+  /** Wizard: the subtitle file behind the job, for the encoding and parser check. */
+  inspectPath?: string
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const query = useJob(id)
@@ -108,7 +111,11 @@ export function JobDetail({
 
       {waiting ? (
         preflight.data ? (
-          <PreflightReview estimate={preflight.data.estimate} coverage={preflight.data.coverage} />
+          <PreflightReview
+            estimate={preflight.data.estimate}
+            coverage={preflight.data.coverage}
+            inspectPath={inspectPath}
+          />
         ) : (
           <p className="text-sm text-muted-foreground">{t('translate.starting')}</p>
         )

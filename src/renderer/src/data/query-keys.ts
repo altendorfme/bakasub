@@ -38,6 +38,9 @@ export const qk = {
     /** `jobs`: the statuses of its jobs, so the counts and totals refetch as they change. */
     detail: (id: string, jobs: string) => ['batches', 'detail', id, jobs] as const
   },
+  files: {
+    inspect: (path: string) => ['files', 'inspect', path] as const
+  },
   jobs: {
     all: ['jobs'] as const,
     list: () => ['jobs', 'list'] as const,
