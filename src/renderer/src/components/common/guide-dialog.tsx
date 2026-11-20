@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { ArrowLeft, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GuideId } from '@renderer/guides/guides'
 import { Button } from '@renderer/components/ui/button'
 import { Dialog, DialogContent, DialogTrigger } from '@renderer/components/ui/dialog'
-import { GuideView } from './guide-view'
+
+// react-markdown is only needed once a guide is opened.
+const GuideView = lazy(async () => ({ default: (await import('./guide-view')).GuideView }))
 
 /** "How to get one" link that opens a bundled guide; links between guides navigate inside. */
 export function GuideDialog({ id, label }: { id: GuideId; label?: string }): React.JSX.Element {
@@ -31,7 +33,9 @@ export function GuideDialog({ id, label }: { id: GuideId; label?: string }): Rea
             {t('actions.back')}
           </Button>
         ) : null}
-        <GuideView id={current} onNavigate={(next) => setStack((s) => [...s, next])} />
+        <Suspense fallback={null}>
+          <GuideView id={current} onNavigate={(next) => setStack((s) => [...s, next])} />
+        </Suspense>
       </DialogContent>
     </Dialog>
   )

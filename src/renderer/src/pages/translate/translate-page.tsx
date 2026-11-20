@@ -2,20 +2,20 @@ import { useCallback, useReducer, useState } from 'react'
 import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { FileDrop } from '@renderer/components/files/file-drop'
 import { JobDetail } from '@renderer/components/jobs/job-detail'
 import { Backdrop } from '@renderer/components/media/backdrop'
 import type { MediaChoice } from '@renderer/components/media/media-choice'
 import { MediaPanel } from '@renderer/components/media/media-panel'
+import { TrackPicker } from '@renderer/components/media/track-picker'
 import { Button } from '@renderer/components/ui/button'
 import { useCreateJob, useJob } from '@renderer/data/jobs'
 import { useMediaLookup } from '@renderer/data/media'
 import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { cn } from '@renderer/lib/utils'
-import { FileStep } from './file-step'
 import { OutputStep } from './output-step'
 import { PresetStep } from './preset-step'
-import { TrackStep } from './track-step'
 import {
   buildJobRequest,
   canContinue,
@@ -31,7 +31,10 @@ export function TranslatePage(): React.JSX.Element {
   const [jobId, setJobId] = useState<string | null>(null)
   const settings = useSettings().data
   const create = useCreateJob()
-  const onTrack = useCallback((trackId: number) => dispatch({ type: 'track', trackId }), [])
+  const onTrack = useCallback(
+    (ids: number[]) => ids[0] !== undefined && dispatch({ type: 'track', trackId: ids[0] }),
+    []
+  )
   const onMedia = useCallback(
     (patch: Partial<MediaChoice>) => dispatch({ type: 'media', patch }),
     []
@@ -113,11 +116,19 @@ export function TranslatePage(): React.JSX.Element {
               {state.step === 'file' ? (
                 <>
                   <p className="-mt-2 text-sm text-muted-foreground">{t('translate.file.body')}</p>
-                  <FileStep file={state.file} onFile={(path) => dispatch({ type: 'file', path })} />
+                  <FileDrop
+                    path={state.file?.path ?? null}
+                    onFile={(path) => dispatch({ type: 'file', path })}
+                  />
                 </>
               ) : null}
               {state.step === 'track' && state.file ? (
-                <TrackStep path={state.file.path} trackId={state.trackId} onTrack={onTrack} />
+                <TrackPicker
+                  path={state.file.path}
+                  mode="single"
+                  value={state.trackId === null ? [] : [state.trackId]}
+                  onChange={onTrack}
+                />
               ) : null}
               {state.step === 'preset' ? (
                 <PresetStep state={state} onChange={(patch) => dispatch({ type: 'set', patch })} />

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApiKeyStatus, ModelList, PublicSettings } from '@shared/ipc-contract'
 import { App } from '@renderer/app/app'
 import { createAppRouter } from '@renderer/app/router'
+import { i18n } from '@renderer/i18n'
 import { installFakeApi, ok } from '@renderer/test/fake-api'
 import { onboardedSettings } from '@renderer/test/fixtures'
 
@@ -92,7 +93,10 @@ function setup(initial: { key: boolean; settings: PublicSettings }): {
   return { setApiKey, update, router }
 }
 
-afterEach(cleanup)
+afterEach(async () => {
+  cleanup()
+  await i18n.changeLanguage('en')
+})
 
 describe('Onboarding', () => {
   it('redirects to /welcome while the key is missing, and opens on the key step', async () => {
@@ -155,5 +159,15 @@ describe('Onboarding', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Start translating' }))
     expect(await screen.findByRole('heading', { name: 'Translate a file' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/translate')
+  })
+
+  it('the language can be chosen on the first screen, and the setup switches to it', async () => {
+    const { update } = setup({ key: false, settings: fresh })
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Language' }))
+    await userEvent.click(await screen.findByRole('option', { name: /português/i }))
+    expect(update).toHaveBeenCalledWith({ 'ui.language': 'pt-BR' })
+    expect(
+      await screen.findByRole('heading', { name: 'Conecte sua conta do OpenRouter' })
+    ).toBeTruthy()
   })
 })

@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ApiKeyStatus, PublicSettings } from '@shared/ipc-contract'
+import { LanguageSelect } from '@renderer/components/common/language-select'
 import { Button } from '@renderer/components/ui/button'
 import { qk } from '@renderer/data/query-keys'
 import { useApiKeyStatus, useSettings } from '@renderer/data/settings'
@@ -88,6 +89,13 @@ export function WelcomePage(): React.JSX.Element {
           <h1 className="bg-linear-to-r from-primary to-violet bg-clip-text text-2xl font-semibold text-transparent">
             {t('welcome.title')}
           </h1>
+          {/* First thing on screen: the rest of the setup reads in the chosen language. */}
+          <div className="grid gap-1">
+            <label htmlFor="welcome-language" className="text-xs text-muted-foreground">
+              {t('settings.general.language')}
+            </label>
+            <LanguageSelect id="welcome-language" className="w-full" />
+          </div>
           <ol className="grid gap-1" aria-label={t('welcome.title')}>
             {STEPS.map((st, i) => {
               const ok = isDone(st.id, key, settings, toolsReady)

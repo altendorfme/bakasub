@@ -1,39 +1,53 @@
 import { useState, type DragEvent } from 'react'
 import { FileText, FileVideo, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { sourceKindOf } from '@shared/file-types'
+import type { OpenDialogKind } from '@shared/ipc-contract'
+import { sourceKindOf, type SourceKind } from '@shared/file-types'
 import { Button } from '@renderer/components/ui/button'
 import { pickFile } from '@renderer/data/media'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { cn } from '@renderer/lib/utils'
-import type { WizardState } from './wizard-state'
 
-/** Drop zone + native dialog. Paths come from the dialog or `files.pathFor` (never typed). */
-export function FileStep({
-  file,
+const DIALOG: Record<string, OpenDialogKind> = { video: 'media', subtitle: 'subtitle', any: 'any' }
+
+/**
+ * Drop zone + native dialog for one file. Paths come from the dialog or `files.pathFor`
+ * (never typed). `accept` limits the kinds; the Main revalidates every path anyway.
+ */
+export function FileDrop({
+  path,
+  accept = ['video', 'subtitle'],
   onFile
 }: {
-  file: WizardState['file']
+  path: string | null
+  accept?: readonly SourceKind[]
   onFile: (path: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [over, setOver] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const kind = path ? sourceKindOf(path) : null
+  const dialogKind = DIALOG[accept.length === 1 ? accept[0] : 'any']
+  const unsupported =
+    accept.length === 1 && accept[0] === 'video'
+      ? t('files.videoOnly')
+      : t('translate.file.unsupported')
 
-  const accept = (path: string | null): void => {
-    if (!path) return
-    if (!sourceKindOf(path)) return setProblem(t('translate.file.unsupported'))
+  const take = (p: string | null): void => {
+    if (!p) return
+    const k = sourceKindOf(p)
+    if (!k || !accept.includes(k)) return setProblem(unsupported)
     setProblem(null)
-    onFile(path)
+    onFile(p)
   }
   const onDrop = (e: DragEvent): void => {
     e.preventDefault()
     setOver(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped) accept(window.api.files.pathFor(dropped))
+    if (dropped) take(window.api.files.pathFor(dropped))
   }
   const browse = (): void => {
-    pickFile('any').then(accept, (err: unknown) => setProblem(errorMessage(err)))
+    pickFile(dialogKind).then(take, (err: unknown) => setProblem(errorMessage(err)))
   }
 
   return (
@@ -50,16 +64,16 @@ export function FileStep({
           over ? 'border-primary bg-primary-soft/40' : 'border-border bg-background/30'
         )}
       >
-        {file ? (
+        {path ? (
           <>
-            {file.kind === 'video' ? (
+            {kind === 'video' ? (
               <FileVideo className="size-8 text-violet" />
             ) : (
               <FileText className="size-8 text-violet" />
             )}
-            <span className="text-sm font-medium break-all">{file.name}</span>
+            <span className="text-sm font-medium break-all">{path.split(/[\\/]/).pop()}</span>
             <span className="text-xs text-muted-foreground">
-              {file.kind === 'video' ? t('translate.file.video') : t('translate.file.subtitle')}
+              {kind === 'video' ? t('translate.file.video') : t('translate.file.subtitle')}
             </span>
             <Button size="sm" onClick={browse}>
               {t('translate.file.change')}

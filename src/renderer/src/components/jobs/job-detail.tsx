@@ -134,6 +134,11 @@ function JobActions({
   const active = ACTIVE_STATUSES.has(job.status)
   return (
     <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+      <Button variant="ghost" asChild className={showQueueLink ? '' : 'mr-auto'}>
+        <Link to="/logs" search={{ job: job.id }}>
+          {t('jobs.logs')}
+        </Link>
+      </Button>
       {showQueueLink ? (
         <Button variant="ghost" asChild className="mr-auto">
           <Link to="/queue" search={{ job: job.id }}>

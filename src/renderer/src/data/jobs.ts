@@ -15,6 +15,7 @@ import type {
   PreflightEstimate
 } from '@shared/ipc-contract'
 import { unwrap } from '@renderer/lib/ipc'
+import { notifyJob } from '@renderer/lib/notify'
 import { qk } from './query-keys'
 
 export const useJobs = (): UseQueryResult<Job[]> =>
@@ -97,7 +98,9 @@ export function useJobEvents(qc: QueryClient): void {
   useEffect(
     () =>
       window.api.events.on('jobs:progress', (e) => {
+        const before = qc.getQueryData<Job[]>(qk.jobs.list())?.find((j) => j.id === e.id)
         const known = applyJobProgress(qc, e)
+        if (before && before.status !== e.status) notifyJob(before, e.status)
         const terminal = !['queued', 'running', 'awaiting-confirmation'].includes(e.status)
         if (!known) void qc.invalidateQueries({ queryKey: qk.jobs.list() })
         else if (terminal) void qc.invalidateQueries({ queryKey: qk.jobs.all })

@@ -1,6 +1,6 @@
 import { ArrowUp, Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { APP_LANGUAGES, type AppLanguage } from '@shared/ipc-contract'
+import { LanguageSelect } from '@renderer/components/common/language-select'
 import { Switch } from '@renderer/components/ui/checkbox'
 import {
   Select,
@@ -14,11 +14,8 @@ import { usePresets } from '@renderer/data/presets'
 import { languageName, TARGET_LANGUAGES } from '@renderer/lib/languages'
 import { NumberSetting, SettingRow } from './setting-row'
 
-const SYSTEM = 'system'
-
 export function GeneralSection(): React.JSX.Element {
   const { t } = useTranslation()
-  const [lang, setLang] = useSetting('ui.language')
   const [preset, setPreset] = useSetting('translation.defaultPresetId')
   const [concurrency, setConcurrency] = useSetting('jobs.concurrency')
   const [autoConfirm, setAutoConfirm] = useSetting('preflight.autoConfirmBelowUsd')
@@ -31,23 +28,7 @@ export function GeneralSection(): React.JSX.Element {
         label={t('settings.general.language')}
         description={t('settings.general.languageHint')}
       >
-        <Select
-          value={lang ?? SYSTEM}
-          onValueChange={(v) => setLang(v === SYSTEM ? null : (v as AppLanguage))}
-        >
-          <SelectTrigger className="w-56" aria-label={t('settings.general.language')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={SYSTEM}>{t('settings.general.system')}</SelectItem>
-            {APP_LANGUAGES.map((l) => (
-              // Each language in its own name, so it is findable whatever the current one is.
-              <SelectItem key={l} value={l}>
-                {languageName(l, l)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <LanguageSelect />
       </SettingRow>
 
       <SettingRow

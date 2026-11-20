@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import {
   createHashHistory,
@@ -11,9 +12,8 @@ import {
 import { AppShell } from '@renderer/components/layout/app-shell'
 import { apiKeyStatusQuery, isOnboarded, settingsQuery } from '@renderer/data/settings'
 import { PlaceholderPage } from '@renderer/pages/placeholder-page'
-import { WelcomePage } from '@renderer/pages/welcome/welcome-page'
 import { PAGES } from './pages'
-import { SCREENS } from './screens'
+import { SCREENS, WelcomeScreen } from './screens'
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -47,7 +47,11 @@ const shellRoute = createRoute({
 const welcomeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/welcome',
-  component: WelcomePage,
+  component: () => (
+    <Suspense fallback={null}>
+      <WelcomeScreen />
+    </Suspense>
+  ),
   loader: ({ context }) => onboarded(context.queryClient)
 })
 
@@ -66,7 +70,16 @@ const pageRoutes = PAGES.map((page) =>
     // Only the queue has a search param (`?job=` selects a job); the rest ignore it.
     validateSearch: (search: Record<string, unknown>): { job?: string } =>
       typeof search.job === 'string' ? { job: search.job } : {},
-    component: SCREENS[page] ?? ((): React.JSX.Element => <PlaceholderPage page={page} />)
+    component: (): React.JSX.Element => {
+      const Screen = SCREENS[page]
+      return Screen ? (
+        <Suspense fallback={null}>
+          <Screen />
+        </Suspense>
+      ) : (
+        <PlaceholderPage page={page} />
+      )
+    }
   })
 )
 

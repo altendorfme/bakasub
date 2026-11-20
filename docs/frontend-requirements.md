@@ -134,8 +134,8 @@ Priority = shortest path to a full translation through the UI, then whatever unb
 
 **P2, management screens**
 
-6. ~~Settings~~ (done, see [`renderer.md`](./renderer.md#settings)): general, keys, cache, sidecars, advanced limits, About. 7. ~~Models and Languages~~ (done, see [`renderer.md`](./renderer.md#models-and-languages)). 8. ~~Presets~~ (done, see [`renderer.md`](./renderer.md#presets)): glossary, import/export. 9. Extract and Mux on their own. 10. Logs.
+6. ~~Settings~~ (done, see [`renderer.md`](./renderer.md#settings)): general, keys, cache, sidecars, advanced limits, About. 7. ~~Models and Languages~~ (done, see [`renderer.md`](./renderer.md#models-and-languages)). 8. ~~Presets~~ (done, see [`renderer.md`](./renderer.md#presets)): glossary, import/export. 9. ~~Extract and Mux on their own~~ (done, see [`renderer.md`](./renderer.md#extract-and-mux)). 10. ~~Logs~~ (done, see [`renderer.md`](./renderer.md#logs)).
 
 **P3, needs a decision or is polish**
 
-11. Batch (needs its own prototype and per-file media identification). 12. Parser diagnostics and encoding confidence (gap: not exposed through IPC). 13. Full pt-BR UI locale, native notifications, accessibility review, bundle splitting.
+11. Batch (needs its own prototype and per-file media identification). 12. Parser diagnostics and encoding confidence (gap: not exposed through IPC). 13. ~~Full pt-BR UI locale, native notifications, accessibility review, bundle splitting~~ (done, see [`renderer.md`](./renderer.md#polish)); language picker also on the first onboarding screen.

@@ -40,7 +40,7 @@ i18next with **English as the default and source language**. Namespaces: `common
 - **UI primitives** (`components/ui/`, shadcn style on our tokens, Radix underneath): `Button`, `Badge`, `Card`, `Input`/`Textarea`, `Field`/`Label` (wires `aria-describedby`/`aria-invalid`), `Select`, `Checkbox`, `Switch`, `Dialog`, `Popover`, `Tooltip` (needs the root `TooltipProvider`), `Command` (cmdk, for searchable pickers), `Tabs`, `Progress` (0..1, indeterminate without a value), `Toaster` (sonner; call `toast` from `sonner`).
 - **Common components** (`components/common/`): `ErrorBoundary` (one around the router, one per page keyed by the path; logs through `reportError(err, 'boundary')`), `GuideView` (bundled guide in the app language; guide links call `onNavigate`, other links go through `app:open-external`; no raw HTML), `WaitLabel` (`progress.waiting` with a live countdown, `lib/use-countdown.ts`).
 - **Data hooks** (`data/`): `useSettings` / `useUpdateSettings` / `useResetSettings` (the Main returns the full snapshot, which replaces the cache), `useApiKeyStatus` / `useSetApiKey` and `useTmdbKeyStatus` / `useSetTmdbKey` (`null` clears; a new OpenRouter key invalidates the catalog and the free quota), `useModels`, `useFreeQuota`, `isFreeModel` (same rule as the Main), `usePresets`, `useJobs`.
-- **Language**: setting `ui.language` (`en`, `pt-BR`, `null` = system). `useLanguageSync` (in the root `EventBridge`) switches i18next and `<html lang>`; `resolveAppLanguage` maps the request to a supported language (exact, base language, English). UI strings without a translation fall back to English.
+- **Language**: setting `ui.language` (`en`, `pt-BR`, `null` = system). `useLanguageSync` (in the root `EventBridge`) switches i18next and `<html lang>`; `resolveAppLanguage` maps the request to a supported language (exact, base language, English). UI strings without a translation fall back to English (both `en` and `pt-BR` are complete).
 
 ## Onboarding
 
@@ -103,6 +103,24 @@ Thin pages over the onboarding pickers (`ModelPicker`, `LanguagePicker`, `useLis
 ## Presets
 
 `pages/presets/`. Built-in and custom presets on the left (checkbox per preset to export), the editor on the right. Built-ins are read-only with "Duplicate" (the copy opens selected, "Copied from …"). The form keeps text drafts (`preset-draft.ts`: same limits as the Main's `PresetInputSchema`, validated before sending, errors shown after the first save attempt), trims on save and drops empty optional glossary fields. Media type is free text with suggestions; temperature 0 to 2. The glossary editor needs a term plus a translation or a rule per row (≤ 500 rows). Delete asks first; `PRESET_IN_USE` and `PRESET_NAME_TAKEN` come back as toasts. Import asks the name-conflict policy (rename / skip), opens the native dialog and lists what was imported and what was skipped with the reason.
+
+## Extract and Mux
+
+Single-form pages that create one job and then show it with `JobDetail` (like the wizard). Shared pieces moved out of the wizard: `FileDrop` (`components/files/`, `accept` limits the kinds), `OutputFolder`, and `TrackPicker` (`components/media/`, `single` for translate, `multi` for extract, preselects with `pickTrack` from `lib/tracks.ts`).
+
+- **Extract**: video, one or more tracks, output folder → `{ kind: 'extract', trackIds }`.
+- **Mux**: video, subtitle files (native dialog, several at once, duplicates ignored, ≤ 32), per row: language (guessed from the file name suffix by `guessSubtitleLanguage`, `lib/subtitle-lang.ts`: skips `forced`/`sdh`/…, accepts only real languages so `Dr.Who.srt` is not "who"), track name (defaults to the language name), at most one default; options `setDefault` / `keepOriginalSubtitles`. "Create video" stays disabled until every row has a language. Row logic is pure (`pages/mux/mux-rows.ts`).
+
+## Logs
+
+`pages/logs/`. The last 1,000 lines (`logs:tail`) and then live lines (`useLiveLogs`: `logs:watch` on while the page is mounted, off when leaving; at most 2,000 lines kept). Filters are local (level, area, job) so changing them never drops live lines; `?job=` filters to one job and `JobDetail` links there ("Show logs"), and each line with a `jobId` links back to the queue. Details (stderr, HTTP bodies) are collapsible. Follows the bottom while live. "Open log folder" and "Export logs" use the Main's channels.
+
+## Polish
+
+- **Locales**: `i18n/locales/<lang>/{common,errors}.ts`. Every non-English file is typed `LocaleShape<typeof en>` (`i18n/locale-shape.ts`), so a missing or extra key fails the typecheck, and `i18n/locales.test.ts` checks that every string keeps the same `{{variables}}` as English. Adding a language: add it to `APP_LANGUAGES` (contract), translate both files and every guide, register it in `i18n/index.ts`. The language picker (`LanguageSelect`) is in Settings and on the first onboarding screen.
+- **Notifications**: `lib/notify.ts`, called from `useJobEvents` when a job changes to completed / with warnings / failed / awaiting confirmation while the window is not focused (web `Notification`, supported by Electron; the Main sets the AppUserModelId on Windows). Clicking it focuses the window on that job in the queue.
+- **Bundle**: screens are `React.lazy` chunks (`app/screens.ts`, rendered in `Suspense` by the router), the guide viewer (react-markdown) loads only when a guide opens, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves it off by default). Entry chunk ≈ 380 kB (was ≈ 2.2 MB unminified, single chunk).
+- **Accessibility**: labelled controls (`Field`, `aria-label` on icon buttons), `aria-current` on steps and selections, `role="alert"`/`status`/`log` where state changes, visible focus everywhere, and `prefers-reduced-motion` turns off spinners, pulses and transitions. Not yet audited with a screen reader on each OS.
 
 ## In-app guides
 

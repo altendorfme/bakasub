@@ -1,8 +1,6 @@
-import { FolderOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
-import { pickOutputDir } from '@renderer/data/media'
+import { OutputFolder } from '@renderer/components/files/output-folder'
 import type { WizardState } from './wizard-state'
 
 /** Output folder; for videos also the mux options (hidden for subtitle files). */
@@ -26,20 +24,7 @@ export function OutputStep({
     <div className="grid gap-4">
       <div className="grid gap-1.5">
         <span className="text-sm font-medium">{t('translate.output.folder')}</span>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="min-w-0 flex-1 truncate rounded-md border bg-background/40 px-3 py-2 text-sm">
-            {state.outputDir ?? t('translate.output.nextToSource')}
-          </span>
-          <Button onClick={() => void pickOutputDir().then((d) => d && onFolder(d))}>
-            <FolderOpen />
-            {t('translate.output.choose')}
-          </Button>
-          {state.outputDir ? (
-            <Button variant="ghost" onClick={() => onFolder(null)}>
-              {t('translate.output.reset')}
-            </Button>
-          ) : null}
-        </div>
+        <OutputFolder value={state.outputDir} onChange={onFolder} />
       </div>
       {video ? (
         <div className="grid gap-2">

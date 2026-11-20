@@ -254,6 +254,7 @@ export const common = {
     cancelHint: 'Some providers keep generating (and billing) the request already in progress.',
     retry: 'Retry',
     openQueue: 'Open in Queue',
+    logs: 'Show logs',
     outputs: 'Saved to',
     finalCost: 'Cost: US$ {{value}}',
     costIncomplete: 'Cost of interrupted requests could not be fully determined.',
@@ -565,5 +566,66 @@ export const common = {
       nameTaken: 'name already exists',
       done: 'Done'
     }
+  },
+  files: {
+    videoOnly: 'Choose a video file (.mkv).'
+  },
+  extractPage: {
+    body: 'Save subtitle tracks from a video as separate files, without translating.',
+    video: 'Video',
+    tracks: 'Tracks to save',
+    output: 'Output folder',
+    start: 'Extract',
+    another: 'Extract from another video',
+    needTrack: 'Choose at least one track.'
+  },
+  muxPage: {
+    body: 'Put subtitle files into a video. The video is copied; the original is never changed.',
+    video: 'Video',
+    subtitles: 'Subtitles to add',
+    add: 'Add subtitle files',
+    empty: 'No subtitles yet.',
+    language: 'Language',
+    name: 'Track name',
+    namePlaceholder: 'Defaults to the language name',
+    isDefault: 'Default track',
+    remove: 'Remove {{name}}',
+    guessed: 'From the file name',
+    needLanguage: 'Choose the language.',
+    options: 'Options',
+    setDefault: 'Make the chosen default the only default subtitle',
+    keepOriginal: 'Keep the subtitles already in the video',
+    start: 'Create video',
+    another: 'Mux another video',
+    max: 'At most 32 subtitles.'
+  },
+  notify: {
+    done: 'Translation finished',
+    warnings: 'Finished, with warnings',
+    failed: 'Job failed',
+    confirm: 'Confirm the cost to translate'
+  },
+  logsPage: {
+    body: 'What BakaSub did, newest at the bottom. Keys and other secrets are never written here.',
+    live: 'Live',
+    level: 'Level',
+    levels: {
+      debug: 'Everything',
+      info: 'Info and above',
+      warn: 'Warnings and errors',
+      error: 'Errors only'
+    },
+    scope: 'Area',
+    allScopes: 'All areas',
+    job: 'Job {{id}}',
+    clearJob: 'Show all jobs',
+    openFolder: 'Open log folder',
+    export: 'Export logs',
+    exported: 'Logs exported.',
+    empty: 'No log lines match the filters.',
+    loading: 'Reading the log…',
+    loadFailed: 'Could not read the log.',
+    details: 'Details',
+    count: '{{shown}} of {{total}} lines'
   }
 }

@@ -14,6 +14,9 @@ export default defineConfig({
     resolve: {
       alias: { '@renderer': resolve('src/renderer/src'), '@shared': resolve('src/shared') }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    // electron-vite leaves output unminified; the renderer is loaded on every start, so it is
+    // worth it here (the Main and preload stay readable for stack traces in the logs).
+    build: { minify: true }
   }
 })

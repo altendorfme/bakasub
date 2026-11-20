@@ -1,33 +1,38 @@
 import { useEffect } from 'react'
+import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@renderer/components/ui/badge'
 import { useProbe } from '@renderer/data/media'
 import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { languageName } from '@renderer/lib/languages'
+import { pickTrack } from '@renderer/lib/tracks'
 import { cn } from '@renderer/lib/utils'
-import { pickTrack } from './wizard-state'
 
-/** Subtitle tracks of the video; unsupported ones are visible but disabled, with the reason. */
-export function TrackStep({
+/**
+ * Subtitle tracks of a video (`media:probe`). `single` (translate) or `multi` (extract).
+ * Unsupported tracks are listed but disabled, with the reason. One track is preselected.
+ */
+export function TrackPicker({
   path,
-  trackId,
-  onTrack
+  mode,
+  value,
+  onChange
 }: {
   path: string
-  trackId: number | null
-  onTrack: (id: number) => void
+  mode: 'single' | 'multi'
+  value: readonly number[]
+  onChange: (ids: number[]) => void
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const probe = useProbe(path)
   const preferred = useSettings().data?.['tracks.preferredSourceLangs']
 
-  // Preselect once the tracks arrive (the user can still change it).
   useEffect(() => {
-    if (trackId !== null || !probe.data) return
+    if (value.length > 0 || !probe.data) return
     const id = pickTrack(probe.data.subtitles, preferred ?? ['en'])
-    if (id !== null) onTrack(id)
-  }, [probe.data, preferred, trackId, onTrack])
+    if (id !== null) onChange([id])
+  }, [probe.data, preferred, value.length, onChange])
 
   if (probe.isPending)
     return <p className="text-sm text-muted-foreground">{t('translate.track.loading')}</p>
@@ -41,25 +46,45 @@ export function TrackStep({
   if (!tracks.some((tr) => tr.format !== null))
     return <p className="text-sm text-warning">{t('translate.track.none')}</p>
 
+  const toggle = (id: number): void =>
+    onChange(
+      mode === 'single' ? [id] : value.includes(id) ? value.filter((x) => x !== id) : [...value, id]
+    )
+
   return (
     <div className="grid gap-2">
-      <div role="radiogroup" aria-label={t('translate.track.heading')} className="grid gap-1.5">
+      <div
+        role={mode === 'single' ? 'radiogroup' : 'group'}
+        aria-label={t('translate.track.heading')}
+        className="grid gap-1.5"
+      >
         {tracks.map((tr) => {
           const disabled = tr.format === null
-          const selected = tr.id === trackId
+          const selected = value.includes(tr.id)
           return (
             <button
               key={tr.id}
               type="button"
-              role="radio"
+              role={mode === 'single' ? 'radio' : 'checkbox'}
               aria-checked={selected}
               disabled={disabled}
-              onClick={() => onTrack(tr.id)}
+              onClick={() => toggle(tr.id)}
               className={cn(
                 'flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm disabled:opacity-45',
                 selected ? 'border-primary bg-primary-soft/40' : 'bg-background/40 hover:bg-accent'
               )}
             >
+              {mode === 'multi' ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    'grid size-4 place-items-center rounded-[4px] border',
+                    selected && 'border-primary bg-primary text-primary-foreground'
+                  )}
+                >
+                  {selected ? <Check className="size-3" strokeWidth={3} /> : null}
+                </span>
+              ) : null}
               <span className="font-medium">
                 {tr.language
                   ? languageName(tr.language, i18n.language)
