@@ -36,6 +36,8 @@ export class ProcessRunner {
       if (opts.signal?.aborted) return reject(new AppError('CANCELLED', 'Operação cancelada'))
 
       const name = basename(command)
+      const startedAt = Date.now()
+      this.log.info(`${name} start: ${args.join(' ').slice(0, 500)}`)
       const child = spawn(command, args, {
         cwd: opts.cwd,
         env: { ...process.env, ...opts.env },
@@ -93,6 +95,14 @@ export class ProcessRunner {
       child.once('close', (code) => {
         cleanup()
         if (pendingLine && opts.onStdoutLine) opts.onStdoutLine(pendingLine)
+        const plain = stdout
+          .split(/\r\n|\r|\n/)
+          .filter((l) => l.trim() && !l.startsWith('#GUI#'))
+          .join(' | ')
+          .slice(0, 1000)
+        this.log.info(
+          `${name} exit code=${code} ms=${Date.now() - startedAt}${aborted ? ' aborted' : ''}${timedOut ? ' timeout' : ''}${code !== 0 && plain ? ` stdout: ${plain}` : ''}`
+        )
         if (stderr.trim() && code !== 0) {
           this.log.warn(`${name} stderr: ${stderr.trim().slice(0, 2000)}`)
         }

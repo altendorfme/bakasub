@@ -80,6 +80,7 @@ export class MkvToolnix {
       env: tool.env,
       signal: opts.signal,
       onStdoutLine: (line) => {
+        if (/^\s*(Error|Erro):/i.test(line)) errors.push(line.trim())
         const ev = parseGuiLine(line)
         if (!ev) return
         if (ev.type === 'progress') opts.onProgress?.(ev.percent / 100)
