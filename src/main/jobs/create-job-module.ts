@@ -143,7 +143,8 @@ export function createJobModule(o: JobModuleOptions): {
       preflight: {
         run: (input, signal) => preflighter.run(input, signal),
         autoConfirmBelowUsd: () => settings.get('preflight.autoConfirmBelowUsd')
-      }
+      },
+      log: o.log.jobs
     }),
     presets: presetSource,
     ...(media ? { media } : {}),

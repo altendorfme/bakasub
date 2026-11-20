@@ -237,6 +237,48 @@ describe('JobRunner', () => {
     expect(readFileSync(r.result.outputs[0], 'utf8')).toBe(SRT)
   })
 
+  it('translate: relatório de consistência de termos no resultado e no log, sem virar aviso', async () => {
+    const lines = (texts: string[]): string =>
+      texts.map((t, i) => `${i + 1}\n00:00:0${i},000 --> 00:00:0${i},900\n${t}\n`).join('\n')
+    const SOURCE = ['Bro, wait!', 'Thanks, Bro.', 'Come on, Bro.', 'Nice one, Bro!', 'Go, Bro!']
+    const TARGET = ['Mano, espera!', 'Valeu, mano.', 'Vamos, mano.', 'Boa, Bro!', 'Vai, Bro!']
+    writeFileSync(join(root, 'bro.en.srt'), lines(SOURCE))
+    const { srtFormat } = await import('../parsers')
+    translator.translate.mockImplementationOnce(async () => ({
+      doc: srtFormat.parse(lines(TARGET)),
+      failed: [],
+      usage,
+      cache: { hits: 0, misses: 5 },
+      status: 'completed'
+    }))
+    const info = vi.fn()
+    const spec = {
+      kind: 'translate',
+      source: join(root, 'bro.en.srt'),
+      sourceSize: 1,
+      outputDir: outDir,
+      preset,
+      targetLang: 'pt-BR',
+      sourceLang: 'en',
+      confirmBeforeTranslate: false
+    } as JobSpec
+    const r = await new JobRunner({
+      mkv: mkv as unknown as StepDeps['mkv'],
+      translator: translator as unknown as SubtitleTranslator,
+      preflight: {
+        run: async () => ({ estimate: ESTIMATE, coverage: { totals: {} } as never }),
+        autoConfirmBelowUsd: async () => null
+      },
+      log: { info }
+    }).run({ spec, artifacts: {}, workDir }, hooks())
+    expect(r.status).toBe('completed')
+    expect(r.result.consistency?.preset).toEqual({ id: 'p1', name: 'P' })
+    expect(r.result.consistency?.terms.map((t) => [t.term, t.variants.map((v) => v.text)])).toEqual(
+      [['Bro', ['mano', 'Bro']]]
+    )
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('Bro: mano ×3, Bro ×2'))
+  })
+
   it('translate de .vtt solto: grava .vtt, cabeçalho e entidades preservados', async () => {
     const spec = {
       kind: 'translate',

@@ -595,6 +595,35 @@ export const common = {
     show: 'Show the exact system prompt',
     missing: 'This job was created before BakaSub recorded the prompt.'
   },
+  termConsistency: {
+    heading_one: '{{count}} term translated in different ways',
+    heading_other: '{{count}} terms translated in different ways',
+    hint: 'Checked locally, without the AI. Pick the right rendering of each term (click again to leave it out) and save them in a glossary: the next jobs will use them.',
+    builtin:
+      '“{{name}}” is a built-in preset and cannot be edited. Save the chosen terms in a new preset of your own:',
+    newName: 'New preset name',
+    newDetails:
+      'Media type “{{type}}” and the style instructions of “{{name}}”, plus its glossary.',
+    create_one: 'Create preset with {{count}} term',
+    create_other: 'Create preset with {{count}} terms',
+    created_one: 'Preset “{{name}}” created with {{count}} term. Choose it in your next jobs.',
+    created_other: 'Preset “{{name}}” created with {{count}} terms. Choose it in your next jobs.',
+    target: 'Glossary of “{{name}}”',
+    allPinned: 'The chosen renderings are already in the glossary of “{{name}}”.',
+    add_one: 'Add {{count}} term to the glossary',
+    add_other: 'Add {{count}} terms to the glossary',
+    added_one: '{{count}} term added to “{{name}}”',
+    added_other: '{{count}} terms added to “{{name}}”',
+    presetGone: 'The preset of this job (“{{name}}”) no longer exists.',
+    lines_one: 'in {{count}} line',
+    lines_other: 'in {{count}} lines',
+    unmatched_one: '{{count}} line rephrased it',
+    unmatched_other: '{{count}} lines rephrased it',
+    glossaryIgnored: 'Glossary says “{{target}}”',
+    kept: 'kept as in the original',
+    choose: 'Use “{{target}}” for “{{term}}”',
+    inGlossary: 'In the glossary'
+  },
   fileCheck: {
     heading: 'File check',
     encHeading: 'Encoding',

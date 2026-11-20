@@ -54,7 +54,7 @@ queued → running(step) → [awaiting-confirmation] → completed | completed-w
 ```
 
 - `awaiting-confirmation`: the preflight is waiting for the user ([`preflight.md`](./preflight.md)); not running, the slot is free, survives restarts; `jobs:confirm` re-queues it, `jobs:cancel` discards it.
-- `completed-with-warnings`: translation left lines untranslated (`result.failedLines`: `cueId`, `reason`, and the source `excerpt` + `location` (line, start/end ms) built with `analyzeCoverage`, so the UI lists which lines stayed in the original language) or mkvtoolnix reported warnings (`result.warnings`).
+- `completed-with-warnings`: translation left lines untranslated (`result.failedLines`: `cueId`, `reason`, and the source `excerpt` + `location` (line, start/end ms) built with `analyzeCoverage`, so the UI lists which lines stayed in the original language) or mkvtoolnix reported warnings (`result.warnings`). The term consistency report (`result.consistency`, see [`llm.md`](./llm.md#term-consistency-pass-qualityterm-consistencyts)) is informational and never changes the status.
 - `failed`: `error = { code, message }` (`AppError` code, or `INTERNAL` for bugs) and `step` = where it stopped. The work dir is kept.
 - `cancelled` (user) deletes the work dir; `interrupted` (shutdown or crash) keeps it. On boot, `running` rows become `interrupted`.
 - `result.usage` keeps the LLM cost even for cancelled/failed jobs.

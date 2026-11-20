@@ -157,7 +157,7 @@ describe('Onboarding', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Start translating' }))
-    expect(await screen.findByRole('button', { name: /^One file/ })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Select several files' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/translate')
   })
 

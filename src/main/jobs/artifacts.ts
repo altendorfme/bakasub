@@ -23,6 +23,8 @@ export interface Artifacts {
     failedLines: import('../../shared/ipc-contract').FailedLine[]
     usage: NonNullable<import('../../shared/ipc-contract').JobResult['usage']>
     cache: { hits: number; misses: number }
+    /** Passada de consistência de termos (ausente em jobs anteriores a ela). */
+    consistency?: import('../../shared/ipc-contract').TermConsistencyReport
   }
   preflight?: {
     estimate: import('../../shared/ipc-contract').PreflightEstimate

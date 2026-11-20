@@ -454,6 +454,55 @@ export interface FailedLine {
   location?: { line: number; endLine: number; startMs?: number; endMs?: number }
 }
 
+/** Uma fala onde o termo aparece: origem e tradução em texto corrido (≤ 120 caracteres). */
+export interface TermOccurrence {
+  cueId: number
+  line: number
+  startMs: number
+  source: string
+  translation: string
+}
+
+/** Uma forma de traduzir o termo e quantas falas a usam. */
+export interface TermVariant {
+  /** Como aparece na tradução (a grafia mais frequente). */
+  text: string
+  cues: number
+  /** O termo foi mantido como no original. */
+  kept: boolean
+  /** Até 3 falas de exemplo. */
+  examples: TermOccurrence[]
+}
+
+/** Termo recorrente da origem traduzido de mais de uma forma no mesmo arquivo. */
+export interface TermVariation {
+  /** Grafia mais frequente na origem (ex.: "Bro"). */
+  term: string
+  /** Falas traduzidas em que o termo aparece. */
+  cues: number
+  /** Ordenadas pela mais usada. Sempre ≥ 2. */
+  variants: TermVariant[]
+  /** Falas com o termo em que nenhuma das variantes foi encontrada (reformulação, omissão). */
+  unmatched: number
+  /** O glossário do preset já fixava este termo (`target`) e mesmo assim houve variação. */
+  glossaryTarget?: string
+}
+
+/**
+ * Passada local de consistência após a tradução (sem LLM): termos recorrentes da origem (nomes,
+ * apelidos, termos capitalizados) e as formas diferentes como foram traduzidos.
+ */
+export interface TermConsistencyReport {
+  /** Falas comparadas (traduzidas de fato; as que ficaram iguais à origem não contam). */
+  analyzedCues: number
+  /** Termos recorrentes examinados. */
+  candidates: number
+  /** Só os termos com variação, do mais frequente ao menos. */
+  terms: TermVariation[]
+  /** Preset do job: onde fixar a variante escolhida. */
+  preset: { id: string; name: string }
+}
+
 export interface JobResult {
   outputs: string[]
   warnings: string[]
@@ -467,6 +516,8 @@ export interface JobResult {
   }
   cache?: { hits: number; misses: number }
   failedLines?: FailedLine[]
+  /** Termos traduzidos de formas diferentes (ausente em jobs anteriores a esta passada). */
+  consistency?: TermConsistencyReport
   /** Estimativa do preflight (a cobertura completa vem de `jobs:preflight`). */
   preflight?: PreflightEstimate
 }

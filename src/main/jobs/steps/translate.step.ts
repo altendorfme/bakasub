@@ -3,6 +3,7 @@ import type { FailedLine } from '../../../shared/ipc-contract'
 import type { LineFailure } from '../../llm/chunk-translator'
 import { TranslationCancelled } from '../../llm/translate-document'
 import { analyzeCoverage, type SubtitleDocument } from '../../parsers'
+import { analyzeTermConsistency, describeVariations } from '../../quality/term-consistency'
 import { fileArtifact } from '../artifacts'
 import type { Step } from '../step-context'
 import { writeSubtitle } from './subtitle-io'
@@ -54,11 +55,18 @@ export const translateStep: Step = async (ctx) => {
   const out = join(ctx.workDir, `translated.${id}`)
   const fixes = await writeSubtitle(out, result.doc, format)
   if (fixes.length) ctx.warn(`auto-fixed: ${[...new Set(fixes)].join(', ')}`)
+  // Local e determinística (sem LLM): termos recorrentes traduzidos de formas diferentes.
+  const consistency = analyzeTermConsistency(doc, result.doc, input.preset, {
+    glossary: input.preset.glossary,
+    skipCueIds: new Set(result.failed.map((f) => f.cueId))
+  })
+  ctx.deps.log?.info(describeVariations(consistency))
   ctx.artifacts.translate = {
     file: { ...(await fileArtifact(out)), format: id },
     failedLines: describeFailures(doc, result.failed),
     usage: result.usage,
-    cache: result.cache
+    cache: result.cache,
+    consistency
   }
 }
 

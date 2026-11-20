@@ -88,7 +88,13 @@ export class JobRunner {
       outputs: [...(a.write?.outputs ?? []), ...(a.mux ? [a.mux.output] : [])],
       warnings: [...warnings],
       ...(usage ? { usage } : {}),
-      ...(a.translate ? { cache: a.translate.cache, failedLines: a.translate.failedLines } : {}),
+      ...(a.translate
+        ? {
+            cache: a.translate.cache,
+            failedLines: a.translate.failedLines,
+            ...(a.translate.consistency ? { consistency: a.translate.consistency } : {})
+          }
+        : {}),
       ...(a.preflight ? { preflight: a.preflight.estimate } : {})
     }
   }

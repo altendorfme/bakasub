@@ -604,6 +604,35 @@ export const common: LocaleShape<typeof en> = {
     show: 'Ver o prompt de sistema exato',
     missing: 'Este job foi criado antes de o BakaSub registrar o prompt.'
   },
+  termConsistency: {
+    heading_one: '{{count}} termo traduzido de formas diferentes',
+    heading_other: '{{count}} termos traduzidos de formas diferentes',
+    hint: 'Verificado localmente, sem a IA. Escolha a forma certa de cada termo (clique de novo para deixá-lo de fora) e salve num glossário: os próximos jobs vão usá-las.',
+    builtin:
+      '“{{name}}” é um preset embutido e não pode ser editado. Salve os termos escolhidos num preset seu:',
+    newName: 'Nome do novo preset',
+    newDetails:
+      'Tipo de mídia “{{type}}” e as instruções de estilo de “{{name}}”, mais o glossário dele.',
+    create_one: 'Criar preset com {{count}} termo',
+    create_other: 'Criar preset com {{count}} termos',
+    created_one: 'Preset “{{name}}” criado com {{count}} termo. Escolha-o nos próximos jobs.',
+    created_other: 'Preset “{{name}}” criado com {{count}} termos. Escolha-o nos próximos jobs.',
+    target: 'Glossário de “{{name}}”',
+    allPinned: 'As formas escolhidas já estão no glossário de “{{name}}”.',
+    add_one: 'Adicionar {{count}} termo ao glossário',
+    add_other: 'Adicionar {{count}} termos ao glossário',
+    added_one: '{{count}} termo adicionado a “{{name}}”',
+    added_other: '{{count}} termos adicionados a “{{name}}”',
+    presetGone: 'O preset deste job (“{{name}}”) não existe mais.',
+    lines_one: 'em {{count}} fala',
+    lines_other: 'em {{count}} falas',
+    unmatched_one: '{{count}} fala reformulou',
+    unmatched_other: '{{count}} falas reformularam',
+    glossaryIgnored: 'Glossário diz “{{target}}”',
+    kept: 'mantido como no original',
+    choose: 'Usar “{{target}}” para “{{term}}”',
+    inGlossary: 'No glossário'
+  },
   fileCheck: {
     heading: 'Verificação do arquivo',
     encHeading: 'Encoding',

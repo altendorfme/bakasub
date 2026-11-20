@@ -91,6 +91,18 @@ Every request first takes a slot from the shared `RateLimiter`; attempts, delays
 
 Lines that exhaust their attempts become `UNTRANSLATED_VALIDATION_FAILED`, stay in the original language and the job ends `completed-with-warnings`. If more than **10%** of the distinct translatable lines (distinct context hashes) fail validation the job stops right away with `LLM_TOO_MANY_FAILURES` (moderated lines do not count; a failed representative fails its copies too but counts once). Everything accepted so far is already in the cache.
 
+## Term consistency pass (`quality/term-consistency.ts`)
+
+Runs at the end of the `translate` step, locally and deterministically (no LLM call). It compares the source and the translated document cue by cue and lists recurring terms rendered in more than one way (e.g. `Bro` → `mano` ×40, `Bro` ×6).
+
+1. **Candidates**: source words capitalized in ≥ 3 cues, at least once mid-sentence (drops sentence-initial "What", "Hey"), and lowercase in ≤ 25% of their occurrences (drops common words). `I`/`OK` forms are ignored, as are all-caps lines (signs) and cues whose translation equals the source (karaoke, signs, failed lines).
+2. **Renderings**, per candidate, over the translations of its cues: "kept" when the term itself is there; then, greedily over the cues not covered yet, the target word with the highest Dice coefficient between "cues with the term" and "cues with the word" in the whole file (≥ 0.3, in ≥ 2 cues, not present in the source cue). Common words ("de", "que") have a high document frequency and score low; the actual rendering concentrates on the term's cues. Short inflections are one rendering (`mano`/`manos`). The rendering is shown with its mid-sentence spelling.
+3. **Report**: only terms with ≥ 2 renderings, most frequent first (≤ 50 terms, 3 examples per rendering), plus how many cues match none (rephrased/omitted) and the glossary target when the preset already pinned the term.
+
+The report goes to `artifacts.translate.consistency` → `JobResult.consistency` (it does **not** turn the job into `completed-with-warnings`) and one `info` line to the job log. The renderer lists it in the job result: the user picks one rendering per term (the most used, or the one already pinned, is preselected; clicking it again leaves the term out) and saves the choices as `{ source: term, target: rendering }` glossary entries. A custom preset is updated in place (`presets:update`). A built-in preset is read-only, so the UI offers to create a new preset right there (`presets:create`): named after the job's media (TMDB title, else a free "copy" name; editable, numbered when taken), with the built-in's media type, style prompt, temperature and glossary plus the chosen terms; further choices then go to that new preset. Linear in the text size: ~6.7k cues in a few tens of ms.
+
+Limits: needs a cased script in the source (Latin, Cyrillic, Greek); a rendering used in a single cue is indistinguishable from noise and is not reported as its own variant. Automatic correction and an LLM review are out of scope.
+
 ## Streaming, cancellation and cost
 
 - Requests always stream (`stream: true`). The client accumulates `delta.content`, ignores `: OPENROUTER PROCESSING` keep-alives (they still reset the idle timer), treats a chunk with `error` or `finish_reason: "error"` (HTTP 200) as `stream-error`, and a stream that ends without `[DONE]` or a finish reason as truncated.

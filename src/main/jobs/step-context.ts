@@ -32,6 +32,8 @@ export interface StepDeps {
   readonly mkv: Pick<MkvToolnix, 'probe' | 'extract' | 'mux'>
   readonly translator: SubtitleTranslator
   readonly preflight: PreflightDeps
+  /** Log do job (o `jobId` vem do contexto assíncrono). */
+  readonly log?: { info(message: string): void }
 }
 
 export interface StepContext {

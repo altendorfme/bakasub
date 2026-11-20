@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { FailedLine, Job } from '@shared/ipc-contract'
 import { formatTimecode, formatUsd } from '@renderer/lib/format'
 import { JobError } from './job-error'
+import { TermConsistency } from './term-consistency'
 
 /** Terminal state: outputs, cost, untranslated lines and warnings, or the error. */
 export function JobResult({ job }: { job: Job }): React.JSX.Element {
@@ -46,6 +47,9 @@ export function JobResult({ job }: { job: Job }): React.JSX.Element {
         </p>
       ) : null}
       {r?.failedLines?.length ? <FailedLines lines={r.failedLines} /> : null}
+      {r?.consistency?.terms.length ? (
+        <TermConsistency report={r.consistency} mediaTitle={job.media?.title} />
+      ) : null}
       {r?.warnings.length ? (
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer">{t('jobs.warnings')}</summary>
