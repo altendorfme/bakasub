@@ -217,9 +217,10 @@ function setup(
 
 afterEach(cleanup)
 
-/** Translate opens on the "one file / several" choice. */
-const openSingle = async (): Promise<void> =>
-  userEvent.click(await screen.findByRole('button', { name: /^One file/ }))
+/** Translate opens straight on the single-file wizard. */
+const openSingle = async (): Promise<void> => {
+  await screen.findByRole('heading', { name: 'Translate a file' })
+}
 
 const next = async (): Promise<void> =>
   userEvent.click(await screen.findByRole('button', { name: 'Continue' }))

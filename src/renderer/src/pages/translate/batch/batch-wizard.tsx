@@ -43,7 +43,7 @@ const newDraw = (): number => Math.random()
  * "Translate several files": files → tracks (videos) → works → preset & context (per work) →
  * output → batch (progress, total cost). Same look as the single-file wizard.
  */
-export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Element {
+export function BatchWizard({ onSwitchMode }: { onSwitchMode: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const [state, dispatch] = usePageReducer(
     'translate.batch',
@@ -192,9 +192,9 @@ export function BatchWizard({ onBack }: { onBack: () => void }): React.JSX.Eleme
                   <Button
                     variant="ghost"
                     className="mr-auto"
-                    onClick={() => (index > 0 ? go(steps[index - 1]) : onBack())}
+                    onClick={() => (index > 0 ? go(steps[index - 1]) : onSwitchMode())}
                   >
-                    {index > 0 ? t('translate.back') : t('choose.back')}
+                    {index > 0 ? t('translate.back') : t('choose.toSingle')}
                   </Button>
                   {last ? (
                     <Button

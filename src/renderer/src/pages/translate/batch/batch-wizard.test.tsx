@@ -243,7 +243,7 @@ const next = async (): Promise<void> =>
 describe('Translate several files', () => {
   it('folder → works grouped by TMDB → one work customized → batch with groups → confirm all', async () => {
     const { create, confirm, planCall } = setup()
-    await userEvent.click(await screen.findByRole('button', { name: /^Several files or a folder/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Select several files' }))
     expect(screen.getByRole('heading', { name: 'Choose the files' })).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Choose a folder' }))
 
@@ -327,10 +327,10 @@ describe('Translate several files', () => {
     expect(confirm).toHaveBeenCalledWith('b1')
   })
 
-  it('back from the first step returns to the one/several choice', async () => {
+  it('the first step switches back to single-file mode', async () => {
     setup()
-    await userEvent.click(await screen.findByRole('button', { name: /^Several files or a folder/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'One file or several' }))
-    expect(await screen.findByRole('button', { name: /^One file/ })).toBeTruthy()
+    await userEvent.click(await screen.findByRole('button', { name: 'Select several files' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Translate a single file' }))
+    expect(await screen.findByRole('button', { name: 'Select several files' })).toBeTruthy()
   })
 })

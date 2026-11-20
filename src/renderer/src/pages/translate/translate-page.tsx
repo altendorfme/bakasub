@@ -38,9 +38,11 @@ import {
 
 /**
  * "Translate a file": file → track (video) → preset & context → output → job (preflight, progress).
- * `onBack`: from the first step, back to the "one file / several" choice.
+ * `onSwitchMode`: from the first step, switch to the several-files (batch) mode.
  */
-export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.JSX.Element {
+export function TranslatePage({
+  onSwitchMode
+}: { onSwitchMode?: () => void } = {}): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [state, dispatch] = usePageReducer('translate.single', wizardReducer, initialWizard)
   const [jobId, setJobId] = usePageState<string | null>('translate.single.job', null)
@@ -215,13 +217,13 @@ export function TranslatePage({ onBack }: { onBack?: () => void } = {}): React.J
                   ) : null}
 
                   <div className="flex items-center justify-end gap-2 border-t pt-4">
-                    {index > 0 || onBack ? (
+                    {index > 0 || onSwitchMode ? (
                       <Button
                         variant="ghost"
                         className="mr-auto"
-                        onClick={() => (index > 0 ? dispatch({ type: 'back' }) : onBack?.())}
+                        onClick={() => (index > 0 ? dispatch({ type: 'back' }) : onSwitchMode?.())}
                       >
-                        {index > 0 ? t('translate.back') : t('choose.back')}
+                        {index > 0 ? t('translate.back') : t('choose.toMany')}
                       </Button>
                     ) : null}
                     {last ? (

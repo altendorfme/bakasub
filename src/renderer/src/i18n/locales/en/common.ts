@@ -285,14 +285,8 @@ export const common = {
     }
   },
   choose: {
-    heading: 'What do you want to translate?',
-    single: 'One file',
-    singleBody:
-      'A video (.mkv) or a subtitle file. You pick the track, the preset and the context.',
-    many: 'Several files or a folder',
-    manyBody:
-      'A whole season, a folder of movies or several files at once. Works are recognized and grouped for you.',
-    back: 'One file or several'
+    toMany: 'Select several files',
+    toSingle: 'Translate a single file'
   },
   batch: {
     title: 'Translate several files',

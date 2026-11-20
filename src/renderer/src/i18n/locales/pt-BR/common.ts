@@ -291,14 +291,8 @@ export const common: LocaleShape<typeof en> = {
     }
   },
   choose: {
-    heading: 'O que você quer traduzir?',
-    single: 'Um arquivo',
-    singleBody:
-      'Um vídeo (.mkv) ou um arquivo de legenda. Você escolhe a faixa, o preset e o contexto.',
-    many: 'Vários arquivos ou uma pasta',
-    manyBody:
-      'Uma temporada inteira, uma pasta de filmes ou vários arquivos de uma vez. As obras são reconhecidas e agrupadas para você.',
-    back: 'Um arquivo ou vários'
+    toMany: 'Selecionar vários arquivos',
+    toSingle: 'Traduzir um arquivo só'
   },
   batch: {
     title: 'Traduzir vários arquivos',
