@@ -170,6 +170,7 @@ output:   {\an8}Hello <i>world</i>, how are you?
 | skipped      | `SKIPPED_NO_LETTERS`             | cue without any Unicode letter (`♪♪`, `...`, numbers, only tags) |
 | skipped      | `SKIPPED_EMPTY_BLOCK`            | lone index number                                                |
 | skipped      | `SKIPPED_DRAWING`                | ASS/SSA vector drawing (`\p1`)                                   |
+| skipped      | `SKIPPED_FRAGMENT`               | typeset karaoke: ≤4-char token, no spaces, `\pos`/`\move` + `\t`/`\move`/`\org` (1-char: `\pos`/`\move` is enough) |
 | untranslated | `UNTRANSLATED_ORPHAN_TEXT`       | text after a blank line without timing                           |
 | untranslated | `UNTRANSLATED_BAD_TIMING`        | unreadable `-->` line                                            |
 | untranslated | `UNTRANSLATED_MARKER_COLLISION`  | text resembles a marker                                          |

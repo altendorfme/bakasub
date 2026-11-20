@@ -599,6 +599,7 @@ export const common = {
       SKIPPED_NO_LETTERS: 'No words (music notes, dots or only formatting)',
       SKIPPED_EMPTY_BLOCK: 'Empty block',
       SKIPPED_DRAWING: 'Vector drawing',
+      SKIPPED_FRAGMENT: 'Karaoke fragment (one letter/syllable per event)',
       UNTRANSLATED_ORPHAN_TEXT: 'Text without timing after a blank line',
       UNTRANSLATED_BAD_TIMING: 'The timing line could not be read',
       UNTRANSLATED_MARKER_COLLISION: 'Text looks like an internal marker',

@@ -9,7 +9,7 @@ export interface TranslationUnit {
   readonly skeleton: Skeleton
 }
 
-export type SkipReason = 'SKIPPED_NO_LETTERS' | 'SKIPPED_EMPTY_BLOCK' | 'SKIPPED_DRAWING'
+export type SkipReason = 'SKIPPED_NO_LETTERS' | 'SKIPPED_EMPTY_BLOCK' | 'SKIPPED_DRAWING' | 'SKIPPED_FRAGMENT'
 export type UntranslatedReason =
   | 'UNTRANSLATED_ORPHAN_TEXT'
   | 'UNTRANSLATED_BAD_TIMING'
@@ -31,6 +31,29 @@ const HAS_LETTER = /\p{L}/u
 const DRAWING = /\\p0*[1-9]/
 /** Karaokê ASS: `\k`, `\K`, `\kf`, `\ko` seguidos de duração. */
 const KARAOKE = /\\(?:kf|ko|k|K)\d/
+
+/** Animação/posicionamento por evento: `\t(`, `\move`, `\org`, `\pos`. */
+const ANIMATED = /\\(?:t\(|move|org)/
+const POSITIONED = /\\(?:pos|move)\(/
+/** Fragmento de karaokê tipografado: 1 evento por letra/sílaba (até 4 caracteres, sem espaço). */
+const FRAGMENT_MAX_CHARS = 4
+
+/**
+ * Karaokê "typeset" (sem `\k`): cada letra/sílaba é um evento próprio, posicionado e animado.
+ * Traduzir um fragmento ("shii", "k") não tem sentido e corrompe o efeito; o texto vira ruído.
+ */
+function isKaraokeFragment(cue: Cue<unknown>): boolean {
+  const text = cue.nodes
+    .filter((n) => n.type === 'text')
+    .map((n) => n.value)
+    .join('')
+    .trim()
+  if (text === '' || /\s/u.test(text) || [...text].length > FRAGMENT_MAX_CHARS) return false
+  const overrides = cue.nodes.filter((n) => n.type === 'tag' && n.kind === 'override')
+  const raw = overrides.map((n) => n.raw).join('')
+  if ([...text].length === 1) return POSITIONED.test(raw)
+  return POSITIONED.test(raw) && ANIMATED.test(raw)
+}
 
 function hasOverride(cue: Cue<unknown>, re: RegExp): boolean {
   return cue.nodes.some((n) => n.type === 'tag' && n.kind === 'override' && re.test(n.raw))
@@ -60,6 +83,7 @@ export function classifyCue(cue: Cue<unknown>): Classification {
   // Reconhecido pelas tags, não pelo formato: o núcleo continua agnóstico.
   if (hasOverride(cue, DRAWING)) return { status: 'skipped', reason: 'SKIPPED_DRAWING' }
   if (hasOverride(cue, KARAOKE)) return { status: 'untranslated', reason: 'UNTRANSLATED_KARAOKE' }
+  if (isKaraokeFragment(cue)) return { status: 'skipped', reason: 'SKIPPED_FRAGMENT' }
   const hasLetters = cue.nodes.some((n) => n.type === 'text' && HAS_LETTER.test(n.value))
   if (!hasLetters) return { status: 'skipped', reason: 'SKIPPED_NO_LETTERS' }
 

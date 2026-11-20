@@ -607,6 +607,7 @@ export const common: LocaleShape<typeof en> = {
       SKIPPED_NO_LETTERS: 'Sem palavras (notas musicais, pontos ou só formatação)',
       SKIPPED_EMPTY_BLOCK: 'Bloco vazio',
       SKIPPED_DRAWING: 'Desenho vetorial',
+      SKIPPED_FRAGMENT: 'Fragmento de karaokê (uma letra/sílaba por evento)',
       UNTRANSLATED_ORPHAN_TEXT: 'Texto sem tempo depois de uma linha em branco',
       UNTRANSLATED_BAD_TIMING: 'Não foi possível ler a linha de tempo',
       UNTRANSLATED_MARKER_COLLISION: 'O texto parece um marcador interno',
