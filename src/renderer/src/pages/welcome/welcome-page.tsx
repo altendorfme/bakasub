@@ -84,7 +84,7 @@ export function WelcomePage(): React.JSX.Element {
 
   return (
     <div className="grid min-h-screen place-items-center bg-[radial-gradient(ellipse_at_top,var(--primary-soft),transparent_60%)] p-4">
-      <div className="grid w-full max-w-4xl gap-6 md:grid-cols-[13rem_1fr]">
+      <div className="grid w-full max-w-4xl items-center gap-6 md:grid-cols-[13rem_1fr]">
         <aside className="grid content-start gap-4">
           <h1 className="bg-linear-to-r from-primary to-violet bg-clip-text text-2xl font-semibold text-transparent">
             {t('welcome.title')}
