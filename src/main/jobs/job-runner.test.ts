@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -53,7 +54,7 @@ beforeEach(() => {
   threshold = null
   freeQuota = undefined
   preflightRuns = 0
-  root = mkdtempSync(join(tmpdir(), 'bakasub-runner-'))
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'bakasub-runner-')))
   workDir = join(root, 'work')
   outDir = join(root, 'out')
   mkdirSync(workDir)

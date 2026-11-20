@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { collectFiles, scanFolder } from './scan-files'
 
 let root: string
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), 'bakasub-scan-'))
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'bakasub-scan-')))
   for (const f of ['ep10.mkv', 'ep2.mkv', 'notes.txt', 'ep1.ass']) writeFileSync(join(root, f), 'x')
   mkdirSync(join(root, 'S02', 'extras'), { recursive: true })
   writeFileSync(join(root, 'S02', 'ep1.mkv'), 'x')

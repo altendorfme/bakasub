@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,7 +48,7 @@ async function until(cond: () => boolean | Promise<boolean>, ms = 3000): Promise
 
 beforeEach(async () => {
   t = await openTestDatabase()
-  root = mkdtempSync(join(tmpdir(), 'bakasub-mgr-'))
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'bakasub-mgr-')))
   workRoot = join(root, 'jobs')
   writeFileSync(join(root, 'a.srt'), '1\n00:00:01,000 --> 00:00:02,000\nHi\n')
   pending = []

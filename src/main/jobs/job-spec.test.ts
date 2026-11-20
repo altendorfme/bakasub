@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
@@ -9,7 +9,7 @@ import { resolveJobSpec } from './job-spec'
 let dir: string
 const presets = testPresetSource()
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'bakasub-spec-'))
+  dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'bakasub-spec-')))
   writeFileSync(join(dir, 'ep01.mkv'), 'mkv')
   writeFileSync(join(dir, 'ep01.en.srt'), 'srt')
   writeFileSync(join(dir, 'ep01.pt-BR.ass'), 'ass')

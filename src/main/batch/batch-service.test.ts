@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -64,7 +64,7 @@ async function until(cond: () => boolean | Promise<boolean>): Promise<void> {
 
 beforeEach(async () => {
   t = await openTestDatabase()
-  root = mkdtempSync(join(tmpdir(), 'bakasub-batch-'))
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'bakasub-batch-')))
   out = join(root, 'out')
   mkdirSync(join(root, 'show', 'S02'), { recursive: true })
   mkdirSync(out)

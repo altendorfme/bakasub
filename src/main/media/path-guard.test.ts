@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { ensureFreeSpace, validateInputFile, validateOutputDir } from './path-gu
 
 let dir: string
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'bakasub-guard-'))
+  dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'bakasub-guard-')))
   writeFileSync(join(dir, 'ep.mkv'), 'x'.repeat(10))
   writeFileSync(join(dir, 'ep.ass'), 'y')
   writeFileSync(join(dir, 'virus.exe'), 'z')
