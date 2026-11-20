@@ -33,7 +33,7 @@ Triggers: `v*` tags and `workflow_dispatch` (artifacts only, no release).
 3. A step validates `manifests/**` with the app's own Zod schema (`manifest.schema.test.ts`).
 4. `release` job: verify the artifacts (including the updater metadata) exist, generate `SHA256SUMS.txt`, `gh release create --draft` (pre-release when the tag contains `-`).
 
-Artifacts: `bakasub-<v>.AppImage`, `bakasub-<v>-linux-x64-unpacked.tar.gz`, `bakasub-<v>-setup.exe`, `bakasub-<v>-win-x64-unpacked.zip`, `SHA256SUMS.txt`, and the updater files `latest.yml` (Windows), `latest-linux.yml` and the `*.blockmap` of the AppImage and the installer.
+Artifacts: `bakasub-<v>.AppImage`, `bakasub-<v>-linux-x64-unpacked.tar.gz`, `bakasub-<v>-setup.exe`, `bakasub-<v>-win-x64-unpacked.zip`, `SHA256SUMS.txt`, and the updater files `latest.yml` (Windows), `latest-linux.yml` and the installer's `*.blockmap` (the AppImage's blockmap is embedded, there is no separate file).
 
 ## Auto-update (electron-updater)
 

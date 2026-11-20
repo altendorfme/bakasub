@@ -14,7 +14,13 @@ export async function openTestDatabase(): Promise<{ db: Database; client: Client
     client,
     close() {
       client.close()
-      rmSync(dir, { recursive: true, force: true })
+      // Windows: o libsql pode manter o arquivo aberto após close() (EPERM/EBUSY). Limpeza é
+      // best-effort; o SO apaga o tmp depois.
+      try {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+      } catch {
+        /* ignorado */
+      }
     }
   }
 }

@@ -79,9 +79,8 @@ jobs:
         run: |
           mkdir release
           cp "dist/bakasub-${{ steps.meta.outputs.version }}.AppImage" release/
-          # Metadados do electron-updater (checksum sha512 + blockmap da AppImage).
+          # Metadados do electron-updater (sha512; o blockmap da AppImage vai embutido, sem arquivo .blockmap).
           cp dist/latest-linux.yml release/
-          cp "dist/bakasub-${{ steps.meta.outputs.version }}.AppImage.blockmap" release/
           # tar preserva o bit de execução (zip não preserva).
           tar -czf "release/bakasub-${{ steps.meta.outputs.version }}-linux-x64-unpacked.tar.gz" -C dist linux-unpacked
 
@@ -141,7 +140,7 @@ jobs:
           for f in "bakasub-$V.AppImage" "bakasub-$V-setup.exe" \
                    "bakasub-$V-linux-x64-unpacked.tar.gz" "bakasub-$V-win-x64-unpacked.zip" \
                    latest.yml latest-linux.yml \
-                   "bakasub-$V.AppImage.blockmap" "bakasub-$V-setup.exe.blockmap"; do
+                   "bakasub-$V-setup.exe.blockmap"; do
             test -s "release/$f" || { echo "::error::Faltando $f"; exit 1; }
           done
           # O updater resolve o arquivo pelo nome citado no yml: eles precisam bater.

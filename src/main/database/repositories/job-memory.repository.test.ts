@@ -24,7 +24,11 @@ beforeEach(async () => {
 })
 afterEach(() => {
   client.close()
-  rmSync(dir, { recursive: true, force: true })
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+  } catch {
+    /* Windows: libsql pode manter o arquivo aberto; limpeza best-effort */
+  }
 })
 
 const entry = (
