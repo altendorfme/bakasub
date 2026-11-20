@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JobCreateRequest, JobProgressEvent } from '../../shared/ipc-contract'
 import { testPresetSource } from '../presets/test-presets'
@@ -61,7 +61,7 @@ beforeEach(async () => {
     runner: {
       run: (input, hooks) =>
         new Promise<RunOutcome>((resolve, reject) => {
-          const id = input.workDir.split('/').pop()!
+          const id = basename(input.workDir)
           pending.push({ id, input, hooks, resolve, reject, logJobId: currentJobId() })
           hooks.signal.addEventListener('abort', () =>
             reject(
