@@ -8,10 +8,13 @@ import { TrackPicker } from '@renderer/components/media/track-picker'
 import { Button } from '@renderer/components/ui/button'
 import { useCreateJob } from '@renderer/data/jobs'
 import { errorMessage } from '@renderer/i18n/error-message'
+import { cn } from '@renderer/lib/utils'
 import { usePageState } from '@renderer/lib/page-state'
 
 /** Extract subtitle tracks from a video, no translation. Then follows the job. */
-export function ExtractPage(): React.JSX.Element {
+export function ExtractPage({
+  onSwitchMode
+}: { onSwitchMode?: () => void } = {}): React.JSX.Element {
   const { t } = useTranslation()
   const [source, setSource] = usePageState<string | null>('extract.source', null)
   const [tracks, setTracks] = usePageState<number[]>('extract.tracks', [])
@@ -76,8 +79,13 @@ export function ExtractPage(): React.JSX.Element {
             <OutputFolder value={outputDir} onChange={setOutputDir} />
           </div>
           <div className="flex items-center justify-end gap-2 border-t pt-4">
+            {onSwitchMode ? (
+              <Button variant="ghost" className="mr-auto" onClick={onSwitchMode}>
+                {t('choose.toMany')}
+              </Button>
+            ) : null}
             {source && tracks.length === 0 ? (
-              <span className="mr-auto text-xs text-muted-foreground">
+              <span className={cn('text-xs text-muted-foreground', !onSwitchMode && 'mr-auto')}>
                 {t('extractPage.needTrack')}
               </span>
             ) : null}

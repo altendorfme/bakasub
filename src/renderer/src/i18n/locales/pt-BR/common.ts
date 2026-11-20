@@ -292,7 +292,8 @@ export const common: LocaleShape<typeof en> = {
   },
   choose: {
     toMany: 'Selecionar vários arquivos',
-    toSingle: 'Traduzir um arquivo só'
+    toSingle: 'Traduzir um arquivo só',
+    toSingleExtract: 'Extrair de um arquivo só'
   },
   batch: {
     title: 'Traduzir vários arquivos',
@@ -1051,6 +1052,49 @@ export const common: LocaleShape<typeof en> = {
     start: 'Extrair',
     another: 'Extrair de outro vídeo',
     needTrack: 'Escolha pelo menos uma faixa.'
+  },
+  extractBatch: {
+    title: 'Extrair de vários arquivos',
+    steps: { files: 'Arquivos', tracks: 'Faixas', output: 'Saída' },
+    files: {
+      heading: 'Escolha os vídeos',
+      body: 'Uma pasta (com ou sem subpastas) ou vários vídeos (.mkv).',
+      none: 'Nenhum vídeo (.mkv) foi encontrado.'
+    },
+    tracks: {
+      heading: 'Escolha as faixas a salvar',
+      body: 'Por padrão todas as faixas de texto são salvas (legendas em imagem não podem ser extraídas). Altere um tipo de faixa para todos os arquivos ou ajuste cada arquivo.',
+      kinds: 'Tipos de faixa',
+      perFile: 'Arquivos',
+      count: '{{selected}} de {{total}} faixas'
+    },
+    output: {
+      heading: 'Onde salvar',
+      next: 'Sem pasta de saída, cada arquivo é salvo ao lado do seu vídeo.',
+      review: '{{tracks}} faixas de {{files}} arquivos serão salvas.'
+    },
+    error: {
+      item: 'O lote não foi criado: corrija {{file}}.',
+      fix: 'Ir para as faixas'
+    },
+    start: 'Extrair {{count}} arquivos',
+    starting: 'Iniciando…',
+    run: {
+      running: 'Extraindo…',
+      done: 'Lote concluído.',
+      progress: '{{done}} de {{total}} concluídos',
+      another: 'Extrair outros arquivos',
+      count: {
+        queued_one: '{{count}} aguardando',
+        queued_other: '{{count}} aguardando',
+        running_one: '{{count}} extraindo',
+        running_other: '{{count}} extraindo',
+        done_one: '{{count}} concluído',
+        done_other: '{{count}} concluídos',
+        failed_one: '{{count}} com falha ou cancelado',
+        failed_other: '{{count}} com falha ou cancelados'
+      }
+    }
   },
   muxPage: {
     body: 'Coloque arquivos de legenda em um vídeo. O vídeo é copiado; o original nunca é alterado.',

@@ -20,8 +20,12 @@ import { unwrap } from '@renderer/lib/ipc'
 import { useJobs } from './jobs'
 import { qk } from './query-keys'
 
-type Flavor = 'pipeline' | 'translate'
-const KIND_OF: Record<Flavor, 'video' | 'subtitle'> = { pipeline: 'video', translate: 'subtitle' }
+type Flavor = 'pipeline' | 'translate' | 'extract'
+const KIND_OF: Record<Flavor, 'video' | 'subtitle'> = {
+  pipeline: 'video',
+  translate: 'subtitle',
+  extract: 'video'
+}
 
 /** The source as each plan needs it: loose files are split by type; a folder is scanned twice. */
 function sourceFor(flavor: Flavor, source: BatchSource): BatchSource | null {
@@ -56,6 +60,17 @@ export function useBatchPlans(source: BatchSource | null): {
     pending: (q[0].enabled && pipeline.isPending) || (q[1].enabled && translate.isPending),
     error: pipeline.error ?? translate.error
   }
+}
+
+/** The plan of an extract batch: only videos count (loose files of other types are dropped). */
+export function useExtractPlan(source: BatchSource | null): UseQueryResult<BatchPlan | null> {
+  const src = source ? sourceFor('extract', source) : null
+  return useQuery({
+    queryKey: qk.batches.plan('extract', src),
+    queryFn: () => unwrap(window.api.batches.plan({ kind: 'extract', source: src! })),
+    enabled: src !== null,
+    staleTime: Infinity
+  })
 }
 
 const baseName = (p: string): string => p.split(/[\\/]/).pop() ?? p

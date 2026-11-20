@@ -13,7 +13,7 @@ export const SCREENS: Partial<Record<PageKey, LazyExoticComponent<ComponentType>
   models: page(() => import('@renderer/pages/models/models-page'), 'ModelsPage'),
   languages: page(() => import('@renderer/pages/languages/languages-page'), 'LanguagesPage'),
   presets: page(() => import('@renderer/pages/presets/presets-page'), 'PresetsPage'),
-  extract: page(() => import('@renderer/pages/extract/extract-page'), 'ExtractPage'),
+  extract: page(() => import('@renderer/pages/extract/extract-entry'), 'ExtractEntry'),
   mux: page(() => import('@renderer/pages/mux/mux-page'), 'MuxPage'),
   logs: page(() => import('@renderer/pages/logs/logs-page'), 'LogsPage')
 }

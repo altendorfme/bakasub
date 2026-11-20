@@ -286,7 +286,8 @@ export const common = {
   },
   choose: {
     toMany: 'Select several files',
-    toSingle: 'Translate a single file'
+    toSingle: 'Translate a single file',
+    toSingleExtract: 'Extract from a single file'
   },
   batch: {
     title: 'Translate several files',
@@ -1039,6 +1040,49 @@ export const common = {
     start: 'Extract',
     another: 'Extract from another video',
     needTrack: 'Choose at least one track.'
+  },
+  extractBatch: {
+    title: 'Extract from several files',
+    steps: { files: 'Files', tracks: 'Tracks', output: 'Output' },
+    files: {
+      heading: 'Choose the videos',
+      body: 'A folder (with or without subfolders) or several videos (.mkv).',
+      none: 'No video (.mkv) was found.'
+    },
+    tracks: {
+      heading: 'Choose the tracks to save',
+      body: 'By default every text track is saved (image subtitles cannot be extracted). Change a kind of track for all files, or fine-tune each file.',
+      kinds: 'Kinds of track',
+      perFile: 'Files',
+      count: '{{selected}} of {{total}} tracks'
+    },
+    output: {
+      heading: 'Where to save',
+      next: 'Without an output folder, each file is saved next to its video.',
+      review: '{{tracks}} tracks from {{files}} files will be saved.'
+    },
+    error: {
+      item: 'The batch was not created: fix {{file}}.',
+      fix: 'Go to the tracks'
+    },
+    start: 'Extract {{count}} files',
+    starting: 'Starting…',
+    run: {
+      running: 'Extracting…',
+      done: 'Batch finished.',
+      progress: '{{done}} of {{total}} finished',
+      another: 'Extract other files',
+      count: {
+        queued_one: '{{count}} waiting',
+        queued_other: '{{count}} waiting',
+        running_one: '{{count}} extracting',
+        running_other: '{{count}} extracting',
+        done_one: '{{count}} done',
+        done_other: '{{count}} done',
+        failed_one: '{{count}} failed or cancelled',
+        failed_other: '{{count}} failed or cancelled'
+      }
+    }
   },
   muxPage: {
     body: 'Put subtitle files into a video. The video is copied; the original is never changed.',
