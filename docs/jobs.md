@@ -16,20 +16,20 @@ During the translate step `progress.translation` carries `done/total/cached`, `c
 
 ## Kinds
 
-| `kind`      | Input                                           | Steps                                                   | Output                                                        |
-| ----------- | ----------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
-| `extract`   | MKV + track ids                                 | probe → extract → write                                 | `<base>.<lang\|und>.<ext>` (`naming: 'player'`, default with one track; same language twice → `<base>.<lang>.<n>.<ext>`) or `<base>.<trackId>.<lang\|und>.<ext>` (`naming: 'track'`, default with several tracks) |
-| `translate` | `.srt` / `.ass` / `.ssa` / `.vtt`               | translate → write                                       | `<base>.<targetLang>.<ext>`                                   |
-| `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                                  | `<base>.<lang>.mkv`                                           |
-| `pipeline`  | MKV + track id                                  | probe → extract → preflight → translate → [write] → [mux] | by `outputMode` (see below): `<base>.<targetLang>.mkv`, `<base>.<targetLang>.<ext>`, or both |
+| `kind`      | Input                                           | Steps                                                     | Output                                                                                                                                                                                                            |
+| ----------- | ----------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `extract`   | MKV + track ids                                 | probe → extract → write                                   | `<base>.<lang\|und>.<ext>` (`naming: 'player'`, default with one track; same language twice → `<base>.<lang>.<n>.<ext>`) or `<base>.<trackId>.<lang\|und>.<ext>` (`naming: 'track'`, default with several tracks) |
+| `translate` | `.srt` / `.ass` / `.ssa` / `.vtt`               | translate → write                                         | `<base>.<targetLang>.<ext>`                                                                                                                                                                                       |
+| `mux`       | MKV + 1..32 subtitles (language, name, default) | probe → validate → mux                                    | `<base>.<lang>.mkv`                                                                                                                                                                                               |
+| `pipeline`  | MKV + track id                                  | probe → extract → preflight → translate → [write] → [mux] | by `outputMode` (see below): `<base>.<targetLang>.mkv`, `<base>.<targetLang>.<ext>`, or both                                                                                                                      |
 
 ### Pipeline output mode (`options.outputMode`)
 
-| `outputMode`        | Steps after `translate` | Result                                                                                   |
-| ------------------- | ----------------------- | ---------------------------------------------------------------------------------------- |
-| `mux` (default)     | `mux`                   | `<base>.<targetLang>.mkv`                                                                |
-| `subtitle`          | `write`                 | `<base>.<targetLang>.<ext>` next to the video (or in `outputDir`); the MKV is never read again, no remux free-space check |
-| `both`              | `write` → `mux`         | both files                                                                               |
+| `outputMode`    | Steps after `translate` | Result                                                                                                                    |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `mux` (default) | `mux`                   | `<base>.<targetLang>.mkv`                                                                                                 |
+| `subtitle`      | `write`                 | `<base>.<targetLang>.<ext>` next to the video (or in `outputDir`); the MKV is never read again, no remux free-space check |
+| `both`          | `write` → `mux`         | both files                                                                                                                |
 
 - The subtitle name is `<video base>.<BCP-47 language>.<ext>` (`Episode.mkv` → `Episode.pt-BR.ass`), the convention players use to auto-load external subtitles. `JobResult.subtitle` carries its path (also the first entry of `outputs`).
 - **Compatibility**: `options.alsoWriteSubtitle` (old requests) is deprecated: when `outputMode` is absent, `true` → `both`, `false`/absent → `mux`; an explicit `outputMode` wins. New specs store `outputMode`; specs persisted before it (only `alsoWriteSubtitle`) keep working: `planFor` reads them through `pipelineOutputMode`, so queued/failed jobs resume with the same steps. The renderer's default stays `mux` (the last choice is remembered in Settings by the UI).

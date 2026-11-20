@@ -1,10 +1,12 @@
 import { dirname } from 'node:path'
 import { z } from 'zod'
 import type {
+  ExtractNaming,
   JobCreateRequest,
   JobMediaRequest,
   MediaContextLookup,
   MediaType,
+  OutputMode,
   Preset
 } from '../../shared/ipc-contract'
 import { AppError } from '../errors'
@@ -82,6 +84,19 @@ export interface MuxSpecOptions {
   readonly setDefault: boolean
   readonly keepOriginalSubtitles: boolean
 }
+export interface WriteSpecOptions {
+  /** Ausente em jobs antigos = nome único (` (2)`). */
+  readonly overwrite?: boolean
+}
+
+/** Modo de saída efetivo do pipeline, inclusive de specs persistidas antes de `outputMode`. */
+export function pipelineOutputMode(spec: {
+  readonly outputMode?: OutputMode
+  readonly alsoWriteSubtitle?: boolean
+}): OutputMode {
+  return spec.outputMode ?? (spec.alsoWriteSubtitle ? 'both' : 'mux')
+}
+
 export interface MuxSubtitleSpec {
   readonly path: string
   readonly size: number
@@ -91,30 +106,41 @@ export interface MuxSubtitleSpec {
 }
 
 export type JobSpec =
-  | (Base & { readonly kind: 'extract'; readonly trackIds: readonly number[] })
-  | (Base & {
-      readonly kind: 'translate'
-      readonly preset: PresetSnapshot
-      readonly targetLang: string
-      readonly sourceLang?: string
-      /** Contexto do usuário (vai no `<media>`). */
-      readonly notes?: string
-      /** Detalhes do TMDB congelados na criação (retry usa os mesmos, mesmo offline). */
-      readonly media?: MediaContextLookup
-      /** O usuário pediu o contexto do TMDB e ele não pôde ser obtido: o motivo (o job avisa). */
-      readonly mediaUnavailable?: string
-      readonly confirmBeforeTranslate: boolean
-    })
+  | (Base &
+      WriteSpecOptions & {
+        readonly kind: 'extract'
+        readonly trackIds: readonly number[]
+        /** Ausente em jobs antigos = `track`. */
+        readonly naming?: ExtractNaming
+      })
+  | (Base &
+      WriteSpecOptions & {
+        readonly kind: 'translate'
+        readonly preset: PresetSnapshot
+        readonly targetLang: string
+        readonly sourceLang?: string
+        /** Contexto do usuário (vai no `<media>`). */
+        readonly notes?: string
+        /** Detalhes do TMDB congelados na criação (retry usa os mesmos, mesmo offline). */
+        readonly media?: MediaContextLookup
+        /** O usuário pediu o contexto do TMDB e ele não pôde ser obtido: o motivo (o job avisa). */
+        readonly mediaUnavailable?: string
+        readonly confirmBeforeTranslate: boolean
+      })
   | (Base &
       MuxSpecOptions & { readonly kind: 'mux'; readonly subtitles: readonly MuxSubtitleSpec[] })
   | (Base &
-      MuxSpecOptions & {
+      MuxSpecOptions &
+      WriteSpecOptions & {
         readonly kind: 'pipeline'
         readonly trackId: number
         readonly preset: PresetSnapshot
         readonly targetLang: string
         readonly sourceLang?: string
-        readonly alsoWriteSubtitle: boolean
+        /** Jobs novos sempre trazem; jobs persistidos antigos só têm `alsoWriteSubtitle`. */
+        readonly outputMode?: OutputMode
+        /** @deprecated Legado: `true` = `both`. Use `pipelineOutputMode`. */
+        readonly alsoWriteSubtitle?: boolean
         readonly notes?: string
         readonly media?: MediaContextLookup
         readonly mediaUnavailable?: string
@@ -143,7 +169,10 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('extract'),
     source: path,
     trackIds: z.array(trackId).min(1).max(64),
-    outputDir: path.optional()
+    outputDir: path.optional(),
+    options: z
+      .object({ overwrite: z.boolean().optional(), naming: z.enum(['player', 'track']).optional() })
+      .optional()
   }),
   z.object({
     kind: z.literal('translate'),
@@ -155,6 +184,7 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     targetLang: lang.optional(),
     sourceLang: lang.optional(),
     outputDir: path.optional(),
+    options: z.object({ overwrite: z.boolean().optional() }).optional(),
     confirmBeforeTranslate: z.boolean().optional()
   }),
   z.object({
@@ -189,7 +219,9 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
       .object({
         setDefault: z.boolean().optional(),
         keepOriginalSubtitles: z.boolean().optional(),
-        alsoWriteSubtitle: z.boolean().optional()
+        outputMode: z.enum(['mux', 'subtitle', 'both']).optional(),
+        alsoWriteSubtitle: z.boolean().optional(),
+        overwrite: z.boolean().optional()
       })
       .optional(),
     confirmBeforeTranslate: z.boolean().optional()
@@ -256,12 +288,16 @@ export async function resolveJobSpec(
   const base = { source: src.path, sourceSize: src.size, outputDir }
 
   switch (req.kind) {
-    case 'extract':
+    case 'extract': {
+      const trackIds = [...new Set(req.trackIds)].sort((a, b) => a - b)
       return {
         ...base,
         kind: 'extract',
-        trackIds: [...new Set(req.trackIds)].sort((a, b) => a - b)
+        trackIds,
+        naming: req.options?.naming ?? (trackIds.length === 1 ? 'player' : 'track'),
+        ...overwrite(req.options?.overwrite)
       }
+    }
     case 'translate': {
       const { preset, targetLang } = await resolvePreset(req, presets)
       return {
@@ -272,6 +308,7 @@ export async function resolveJobSpec(
         ...withNotes(req.notes),
         ...(await resolveMedia(req.media, media)),
         ...withLang(optionalLang(req.sourceLang) ?? langFromFilename(src.path)),
+        ...overwrite(req.options?.overwrite),
         confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
       }
     }
@@ -310,12 +347,16 @@ export async function resolveJobSpec(
         ...withLang(optionalLang(req.sourceLang)),
         setDefault: req.options?.setDefault ?? true,
         keepOriginalSubtitles: req.options?.keepOriginalSubtitles ?? true,
-        alsoWriteSubtitle: req.options?.alsoWriteSubtitle ?? false,
+        // `alsoWriteSubtitle` (legado) só vale sem `outputMode`: `true` = `both`.
+        outputMode: req.options?.outputMode ?? (req.options?.alsoWriteSubtitle ? 'both' : 'mux'),
+        ...overwrite(req.options?.overwrite),
         confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
       }
     }
   }
 }
+
+const overwrite = (v: boolean | undefined): { overwrite?: true } => (v ? { overwrite: true } : {})
 
 const withLang = (sourceLang: string | undefined): { sourceLang?: string } =>
   sourceLang ? { sourceLang } : {}

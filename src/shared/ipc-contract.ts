@@ -349,9 +349,36 @@ export interface MuxOptions {
   keepOriginalSubtitles?: boolean
 }
 
+/**
+ * Saída do `pipeline`: `mux` (MKV novo, padrão), `subtitle` (só a legenda ao lado do vídeo, o MKV
+ * não é tocado) ou `both`.
+ */
+export type OutputMode = 'mux' | 'subtitle' | 'both'
+
+/**
+ * Nome da legenda extraída: `player` = `<base>.<lang>.<ext>` (players carregam sozinhos; várias
+ * faixas do mesmo idioma viram `<base>.<lang>.<n>.<ext>`), `track` = `<base>.<trackId>.<lang>.<ext>`.
+ */
+export type ExtractNaming = 'player' | 'track'
+
+/** Opções de saída comuns às legendas gravadas (extract/translate/pipeline). */
+export interface WriteOptions {
+  /** Colisão de nome: `true` substitui o arquivo existente; padrão `false` (` (2)`, ` (3)`…). */
+  overwrite?: boolean
+}
+
 /** Pedido do renderer. Caminhos vêm do diálogo/drag & drop e são revalidados no Main. */
 export type JobCreateRequest =
-  | { kind: 'extract'; source: string; trackIds: number[]; outputDir?: string }
+  | {
+      kind: 'extract'
+      source: string
+      trackIds: number[]
+      outputDir?: string
+      options?: WriteOptions & {
+        /** Padrão: `player` com uma só faixa, `track` com várias. */
+        naming?: ExtractNaming
+      }
+    }
   | {
       kind: 'translate'
       source: string
@@ -371,6 +398,7 @@ export type JobCreateRequest =
       sourceLang?: string
       outputDir?: string
       /** Para em `awaiting-confirmation` com a estimativa de custo. Padrão `true`. */
+      options?: WriteOptions
       confirmBeforeTranslate?: boolean
     }
   | {
@@ -399,7 +427,13 @@ export type JobCreateRequest =
       targetLang?: string
       sourceLang?: string
       outputDir?: string
-      options?: MuxOptions & { alsoWriteSubtitle?: boolean }
+      options?: MuxOptions &
+        WriteOptions & {
+          /** Padrão `mux`. */
+          outputMode?: OutputMode
+          /** @deprecated Use `outputMode`: `true` = `both`. Ignorado se `outputMode` vier. */
+          alsoWriteSubtitle?: boolean
+        }
       /** Para em `awaiting-confirmation` com a estimativa de custo. Padrão `true`. */
       confirmBeforeTranslate?: boolean
     }
@@ -505,6 +539,8 @@ export interface TermConsistencyReport {
 
 export interface JobResult {
   outputs: string[]
+  /** Legenda gravada (`translate`/`pipeline` com saída `subtitle`/`both`); também está em `outputs`. */
+  subtitle?: string
   warnings: string[]
   usage?: {
     requests: number
@@ -719,7 +755,15 @@ export interface BatchCreateRequest {
   sourceLang?: string
   /** Sem `outputDir`: saída ao lado de cada arquivo. Com `outputDir` e `root`: estrutura espelhada. */
   outputDir?: string
-  options?: MuxOptions & { alsoWriteSubtitle?: boolean }
+  options?: MuxOptions &
+    WriteOptions & {
+      /** `pipeline`. Padrão `mux`. */
+      outputMode?: OutputMode
+      /** @deprecated Use `outputMode`. */
+      alsoWriteSubtitle?: boolean
+      /** `extract`. Padrão: `player` com uma só faixa por item, `track` com várias. */
+      extractNaming?: ExtractNaming
+    }
   confirmBeforeTranslate?: boolean
 }
 

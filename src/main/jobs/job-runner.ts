@@ -86,6 +86,8 @@ export class JobRunner {
   private result(a: Artifacts, warnings: string[], usage: JobResult['usage']): JobResult {
     return {
       outputs: [...(a.write?.outputs ?? []), ...(a.mux ? [a.mux.output] : [])],
+      // Legenda gravada por `translate`/`pipeline`; no `extract` são várias (ficam em `outputs`).
+      ...(a.write && a.translate && a.write.outputs[0] ? { subtitle: a.write.outputs[0] } : {}),
       warnings: [...warnings],
       ...(usage ? { usage } : {}),
       ...(a.translate

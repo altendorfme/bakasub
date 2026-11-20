@@ -63,9 +63,44 @@ describe('resolveJobSpec', () => {
       outputDir: join(dir, 'out'),
       setDefault: true,
       keepOriginalSubtitles: true,
-      alsoWriteSubtitle: false,
+      outputMode: 'mux',
       confirmBeforeTranslate: true
     })
+  })
+
+  it('pipeline: outputMode, migração de alsoWriteSubtitle e overwrite', async () => {
+    const req = {
+      kind: 'pipeline' as const,
+      source: join(dir, 'ep01.mkv'),
+      trackId: 2,
+      presetId: 'p-test',
+      targetLang: 'pt-BR'
+    }
+    const mode = async (options?: object): Promise<unknown> =>
+      (await resolveJobSpec({ ...req, options }, presets)) as unknown
+    expect(await mode()).toMatchObject({ outputMode: 'mux' })
+    expect(await mode({ alsoWriteSubtitle: true })).toMatchObject({ outputMode: 'both' })
+    expect(await mode({ alsoWriteSubtitle: false })).toMatchObject({ outputMode: 'mux' })
+    expect(await mode({ outputMode: 'subtitle' })).toMatchObject({ outputMode: 'subtitle' })
+    // outputMode explícito vence o legado
+    expect(await mode({ outputMode: 'subtitle', alsoWriteSubtitle: true })).toMatchObject({
+      outputMode: 'subtitle'
+    })
+    expect(await mode({ overwrite: true })).toMatchObject({ overwrite: true })
+    expect(await mode()).not.toHaveProperty('overwrite')
+    await expect(mode({ outputMode: 'nope' })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+
+  it('extract: nomeação padrão (player com uma faixa, track com várias) e explícita', async () => {
+    const ex = (trackIds: number[], options?: object): Promise<unknown> =>
+      resolveJobSpec({ kind: 'extract', source: join(dir, 'ep01.mkv'), trackIds, options }, presets)
+    expect(await ex([2])).toMatchObject({ naming: 'player' })
+    expect(await ex([2, 3])).toMatchObject({ naming: 'track' })
+    expect(await ex([2, 3], { naming: 'player', overwrite: true })).toMatchObject({
+      naming: 'player',
+      overwrite: true
+    })
+    expect(await ex([2], { naming: 'track' })).toMatchObject({ naming: 'track' })
   })
 
   it('mux: idioma pré-preenchido pelo nome não é necessário quando enviado; nome padrão do idioma', async () => {

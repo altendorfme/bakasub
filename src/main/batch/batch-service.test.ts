@@ -178,6 +178,39 @@ describe('BatchService.create', () => {
     expect(runs[1].spec).toMatchObject({ trackId: 2, outputDir: join(out, 'S02') })
   })
 
+  it('repassa outputMode (e o legado alsoWriteSubtitle) ao job do pipeline, e naming/overwrite ao extract', async () => {
+    await svc.create({
+      kind: 'pipeline',
+      root: null,
+      items: [{ path: join(root, 'show', 'ep1.mkv'), trackIds: [3] }],
+      presetId: 'p-test',
+      options: { outputMode: 'subtitle', overwrite: true }
+    })
+    await until(() => runs.length === 1)
+    expect(runs[0].spec).toMatchObject({ outputMode: 'subtitle', overwrite: true })
+    runs[0].resolve({ status: 'completed', result: { outputs: [], warnings: [] } })
+
+    await svc.create({
+      kind: 'pipeline',
+      root: null,
+      items: [{ path: join(root, 'show', 'ep2.mkv'), trackIds: [3] }],
+      presetId: 'p-test',
+      options: { alsoWriteSubtitle: true }
+    })
+    await until(() => runs.length === 2)
+    expect(runs[1].spec).toMatchObject({ outputMode: 'both' })
+    runs[1].resolve({ status: 'completed', result: { outputs: [], warnings: [] } })
+
+    await svc.create({
+      kind: 'extract',
+      root: null,
+      items: [{ path: join(root, 'show', 'ep2.mkv'), trackIds: [2, 3] }],
+      options: { extractNaming: 'player' }
+    })
+    await until(() => runs.length === 3)
+    expect(runs[2].spec).toMatchObject({ kind: 'extract', naming: 'player' })
+  })
+
   it('sem outputDir: saída ao lado de cada arquivo; nome padrão para arquivos avulsos', async () => {
     const b = await svc.create({
       kind: 'extract',

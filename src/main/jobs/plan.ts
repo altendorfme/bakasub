@@ -1,5 +1,5 @@
 import type { JobStep } from '../../shared/ipc-contract'
-import type { JobSpec } from './job-spec'
+import { pipelineOutputMode, type JobSpec } from './job-spec'
 import type { Step } from './step-context'
 import { extractStep } from './steps/extract.step'
 import { muxStep } from './steps/mux.step'
@@ -28,14 +28,16 @@ export function planFor(spec: JobSpec): JobStep[] {
       return ['preflight', 'translate', 'write']
     case 'mux':
       return ['probe', 'validate', 'mux']
-    case 'pipeline':
+    case 'pipeline': {
+      const mode = pipelineOutputMode(spec)
       return [
         'probe',
         'extract',
         'preflight',
         'translate',
-        ...(spec.alsoWriteSubtitle ? (['write'] as const) : []),
-        'mux'
+        ...(mode === 'mux' ? [] : (['write'] as const)),
+        ...(mode === 'subtitle' ? [] : (['mux'] as const))
       ]
+    }
   }
 }

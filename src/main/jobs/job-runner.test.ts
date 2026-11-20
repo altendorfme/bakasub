@@ -198,6 +198,115 @@ describe('JobRunner', () => {
     ])
   })
 
+  it('pipeline subtitle: só a legenda ao lado, sem mux nem checagem de espaço do remux', async () => {
+    const h = hooks()
+    const r = await runner().run(
+      { spec: pipeline({ outputMode: 'subtitle' } as Partial<JobSpec>), artifacts: {}, workDir },
+      h
+    )
+    expect(h.steps).toEqual(['probe', 'extract', 'preflight', 'translate', 'write'])
+    expect(mkv.mux).not.toHaveBeenCalled()
+    expect(r.result.outputs).toEqual([join(outDir, 'ep01.pt-BR.ass')])
+    expect(r.result.subtitle).toBe(join(outDir, 'ep01.pt-BR.ass'))
+    expect(readdirSync(outDir)).toEqual(['ep01.pt-BR.ass'])
+    expect(readFileSync(join(root, 'ep01.mkv'), 'utf8')).toBe('MKV-SOURCE')
+  })
+
+  it('pipeline subtitle: colisão vira (2); overwrite substitui', async () => {
+    writeFileSync(join(outDir, 'ep01.pt-BR.ass'), 'antiga')
+    const spec = { outputMode: 'subtitle' } as Partial<JobSpec>
+    const a = await runner().run({ spec: pipeline(spec), artifacts: {}, workDir }, hooks())
+    expect(a.result.subtitle).toBe(join(outDir, 'ep01.pt-BR (2).ass'))
+    expect(readFileSync(join(outDir, 'ep01.pt-BR.ass'), 'utf8')).toBe('antiga')
+    const b = await runner().run(
+      { spec: pipeline({ ...spec, overwrite: true } as Partial<JobSpec>), artifacts: {}, workDir },
+      hooks()
+    )
+    expect(b.result.subtitle).toBe(join(outDir, 'ep01.pt-BR.ass'))
+    expect(readFileSync(join(outDir, 'ep01.pt-BR.ass'), 'utf8')).not.toBe('antiga')
+  })
+
+  it('pipeline subtitle: retomada reaproveita extract/translate e só regrava a legenda', async () => {
+    const spec = pipeline({ outputMode: 'subtitle' } as Partial<JobSpec>)
+    const first = hooks()
+    await runner().run({ spec, artifacts: {}, workDir }, first)
+    const done = first.saved.at(-1) as Artifacts
+    mkv.extract.mockClear()
+    translator.translate.mockClear()
+    const h = hooks()
+    const r = await runner().run({ spec, artifacts: done, workDir }, h)
+    expect(mkv.extract).not.toHaveBeenCalled()
+    expect(translator.translate).not.toHaveBeenCalled()
+    expect(h.steps).toEqual(['write'])
+    expect(r.result.subtitle).toBe(join(outDir, 'ep01.pt-BR (2).ass'))
+  })
+
+  it('pipeline subtitle: cancelar não deixa .partial nem toca o MKV', async () => {
+    const ac = new AbortController()
+    translator.translate.mockImplementationOnce(async () => {
+      ac.abort()
+      throw new DOMException('aborted', 'AbortError')
+    })
+    await runner()
+      .run(
+        { spec: pipeline({ outputMode: 'subtitle' } as Partial<JobSpec>), artifacts: {}, workDir },
+        hooks(ac.signal)
+      )
+      .catch(() => undefined)
+    expect(readdirSync(outDir)).toEqual([])
+    expect(readFileSync(join(root, 'ep01.mkv'), 'utf8')).toBe('MKV-SOURCE')
+  })
+
+  it('extract naming player: <base>.<lang>.<ext>; mesmo idioma ganha ordem', async () => {
+    mkv.probe.mockResolvedValue({
+      attachments: 0,
+      subtitles: [
+        {
+          id: 2,
+          codecId: 'S_TEXT/ASS',
+          format: 'ass',
+          language: 'en',
+          default: true,
+          forced: false
+        },
+        {
+          id: 3,
+          codecId: 'S_TEXT/ASS',
+          format: 'ass',
+          language: 'en',
+          default: false,
+          forced: true
+        },
+        {
+          id: 5,
+          codecId: 'S_TEXT/ASS',
+          format: 'ass',
+          language: 'pt-BR',
+          default: false,
+          forced: false
+        }
+      ]
+    })
+    const spec = {
+      kind: 'extract',
+      source: join(root, 'ep01.mkv'),
+      sourceSize: 10,
+      outputDir: outDir,
+      trackIds: [2, 3, 5],
+      naming: 'player'
+    } as JobSpec
+    const r = await runner().run({ spec, artifacts: {}, workDir }, hooks())
+    expect(r.result.outputs).toEqual([
+      join(outDir, 'ep01.en.1.ass'),
+      join(outDir, 'ep01.en.2.ass'),
+      join(outDir, 'ep01.pt-BR.ass')
+    ])
+    // reextrair: não sobrescreve as anteriores
+    const again = await runner().run({ spec, artifacts: {}, workDir }, hooks())
+    expect(again.result.outputs).toContain(join(outDir, 'ep01.pt-BR (2).ass'))
+    expect(readdirSync(outDir)).toHaveLength(6)
+  })
+
   it('faixa de imagem: falha no probe', async () => {
     const err = await runner()
       .run({ spec: pipeline({ trackId: 4 } as Partial<JobSpec>), artifacts: {}, workDir }, hooks())

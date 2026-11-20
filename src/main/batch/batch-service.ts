@@ -123,7 +123,10 @@ export const BatchCreateRequestSchema = z
       .object({
         setDefault: z.boolean().optional(),
         keepOriginalSubtitles: z.boolean().optional(),
-        alsoWriteSubtitle: z.boolean().optional()
+        outputMode: z.enum(['mux', 'subtitle', 'both']).optional(),
+        alsoWriteSubtitle: z.boolean().optional(),
+        overwrite: z.boolean().optional(),
+        extractNaming: z.enum(['player', 'track']).optional()
       })
       .optional(),
     confirmBeforeTranslate: z.boolean().optional()
@@ -375,9 +378,19 @@ export class BatchService {
       case 'mux':
         throw new AppError('INVALID_INPUT', `item ${index}: expected video + subtitles`)
       case 'extract':
-        return { kind: 'extract', ...common, trackIds: item.trackIds ?? [] }
+        return {
+          kind: 'extract',
+          ...common,
+          trackIds: item.trackIds ?? [],
+          options: { overwrite: req.options?.overwrite, naming: req.options?.extractNaming }
+        }
       case 'translate':
-        return { kind: 'translate', ...common, ...this.translation(req, item) }
+        return {
+          kind: 'translate',
+          ...common,
+          ...this.translation(req, item),
+          options: { overwrite: req.options?.overwrite }
+        }
       case 'pipeline': {
         const [trackId] = item.trackIds ?? []
         if (trackId === undefined)
@@ -387,7 +400,13 @@ export class BatchService {
           ...common,
           trackId,
           ...this.translation(req, item),
-          options: req.options
+          options: {
+            setDefault: req.options?.setDefault,
+            keepOriginalSubtitles: req.options?.keepOriginalSubtitles,
+            outputMode: req.options?.outputMode,
+            alsoWriteSubtitle: req.options?.alsoWriteSubtitle,
+            overwrite: req.options?.overwrite
+          }
         }
       }
     }

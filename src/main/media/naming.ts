@@ -26,6 +26,13 @@ export const outputNames = {
     `${stemOf(source)}.${lang}.${ext}`,
   extracted: (source: string, trackId: number, lang: string | undefined, ext: string): string =>
     `${stemOf(source)}.${trackId}.${lang ?? 'und'}.${ext}`,
+  /** Compatível com players: `<base>.<lang>.<ext>` (`index` = `<base>.<lang>.<n>.<ext>`). */
+  extractedForPlayer: (
+    source: string,
+    lang: string | undefined,
+    ext: string,
+    index?: number
+  ): string => `${stemOf(source)}.${lang ?? 'und'}${index === undefined ? '' : `.${index}`}.${ext}`,
   /** Temporário no MESMO diretório (rename atômico), oculto em Unix. */
   partial: (finalPath: string): string =>
     join(
@@ -39,6 +46,42 @@ const exists = (p: string): Promise<boolean> =>
     () => true,
     () => false
   )
+
+/**
+ * Nomes das faixas extraídas no modo `player`, na ordem dada. Idioma único na lista:
+ * `<base>.<lang>.<ext>`; repetido: `<base>.<lang>.<n>.<ext>` (n = ordem da faixa dentro do idioma,
+ * a partir de 1), de modo que duas faixas nunca resultem no mesmo nome.
+ */
+export function playerNames(
+  source: string,
+  tracks: readonly { language?: string; format: string }[]
+): string[] {
+  const key = (t: { language?: string }): string => t.language ?? 'und'
+  const total = new Map<string, number>()
+  for (const t of tracks) total.set(key(t), (total.get(key(t)) ?? 0) + 1)
+  const seen = new Map<string, number>()
+  return tracks.map((t) => {
+    const n = (seen.get(key(t)) ?? 0) + 1
+    seen.set(key(t), n)
+    return outputNames.extractedForPlayer(
+      source,
+      t.language,
+      t.format,
+      (total.get(key(t)) ?? 0) > 1 ? n : undefined
+    )
+  })
+}
+
+/** Destino da saída: com `overwrite` o nome exato (exceto se for o próprio `protect`); senão único. */
+export async function resolveOutputPath(
+  dir: string,
+  name: string,
+  opts: { overwrite?: boolean; protect?: string } = {}
+): Promise<string> {
+  const target = join(dir, name)
+  if (opts.overwrite && target !== opts.protect) return target
+  return uniquePath(dir, name)
+}
 
 /** `dir/name`, ou `name (2)`, `name (3)`… até um nome livre. */
 export async function uniquePath(dir: string, name: string): Promise<string> {
