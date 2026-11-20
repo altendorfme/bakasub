@@ -69,6 +69,19 @@ describe('GuideView', () => {
   })
 })
 
+describe('GuideView tables', () => {
+  it('renders GFM tables (the limits guide has one)', () => {
+    installFakeApi()
+    render(
+      <I18nextProvider i18n={i18n}>
+        <GuideView id="openrouter-limits" />
+      </I18nextProvider>
+    )
+    const table = screen.getByRole('table')
+    expect(table.querySelectorAll('tbody tr').length).toBe(7)
+  })
+})
+
 describe('useCountdown', () => {
   it('ticks down to zero', () => {
     vi.useFakeTimers()

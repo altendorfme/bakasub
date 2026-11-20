@@ -145,3 +145,40 @@ describe('media in the request', () => {
     expect(s.media.seeded).toBe(false)
   })
 })
+
+describe('step bar navigation', () => {
+  const d = { model: 'a/b', targetLang: 'pt-BR' }
+  it('reached steps can be revisited forward and back without "Continue"', () => {
+    let s = run(
+      { type: 'file', path: '/a/x.srt' },
+      { type: 'next' },
+      { type: 'next', defaults: d },
+      { type: 'go', step: 'file' }
+    )
+    expect(s.step).toBe('file')
+    s = wizardReducer(s, { type: 'go', step: 'output', defaults: d })
+    expect(s.step).toBe('output')
+  })
+
+  it('a step never reached cannot be jumped to', () => {
+    const s = run({ type: 'file', path: '/a/x.srt' })
+    expect(wizardReducer(s, { type: 'go', step: 'output', defaults: d }).step).toBe('file')
+  })
+
+  it('changing the file resets the reached steps and says so; the same file changes nothing', () => {
+    let s = run(
+      { type: 'file', path: '/a/x.mkv' },
+      { type: 'track', trackId: 2 },
+      { type: 'next' },
+      { type: 'next' }
+    )
+    expect(s.furthest).toBe(2)
+    expect(wizardReducer(s, { type: 'file', path: '/a/x.mkv' })).toBe(s)
+    s = wizardReducer(wizardReducer(s, { type: 'go', step: 'file' }), {
+      type: 'file',
+      path: '/a/y.mkv'
+    })
+    expect(s).toMatchObject({ furthest: 0, notice: 'file-changed', trackId: null })
+    expect(wizardReducer(s, { type: 'go', step: 'preset', defaults: d }).step).toBe('file')
+  })
+})

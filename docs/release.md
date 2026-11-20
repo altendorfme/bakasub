@@ -20,6 +20,10 @@ npm run build:all
 - `scripts/ensure-native-targets.mjs` installs the other platform's `@libsql/*` package with `--no-save --force` (npm only installs the host's optional dependencies). Rerun after a clean `npm install`; it is part of the `build:*` scripts.
 - `scripts/build-win-docker.sh` runs `electron-builder --win` inside `electronuserland/builder:wine` with a cache volume (`bakasub-ebcache`).
 
+## Icons
+
+`resources/icon.svg` is the only source. `npm run icons` (`scripts/build-icons.sh`, needs librsvg and ImageMagick) regenerates `resources/icon.png` (512 px, the Linux window icon: Electron's `nativeImage` cannot read SVG), `build/icon.png` (1024 px) and `build/icon.ico` (16–256 px) for electron-builder (`buildResources: build`). The renderer's sidebar logo is `src/renderer/src/assets/logo.svg`; the README banners are `docs/bakasub-logo-{en,pt}.svg`.
+
 ## CI (`.github/workflows/release.yml`)
 
 Triggers: `v*` tags and `workflow_dispatch` (artifacts only, no release).

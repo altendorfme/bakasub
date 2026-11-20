@@ -73,3 +73,5 @@ downloads/<sha256>.<ext>[.part|.part.json]
 - Trust root is the manifest repository: whoever can change `sidecar.json` can change what is executed. Keep the branch protected; manifest signing is a possible future step.
 - Upstream links must be versioned. Rolling links (e.g. `ffmpeg-release-essentials.7z`) break the pinned SHA-256 on the next upstream release (safe failure: `CHECKSUM_MISMATCH`).
 - Windows execution was verified with the pruned binaries under wine; native Windows execution is covered by the CI smoke test only for the app itself, not for sidecar installation.
+
+The native consent dialog follows the app language (`ui.language`, else the system locale; `src/main/services/sidecar-consent-text.ts`), in English and Brazilian Portuguese.

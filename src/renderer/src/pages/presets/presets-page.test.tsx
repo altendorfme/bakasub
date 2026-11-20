@@ -107,7 +107,7 @@ describe('Presets', () => {
     expect(await screen.findByText(/Built-in presets cannot be changed/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Save preset' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }))
-    expect(duplicate).toHaveBeenCalledWith('builtin:series')
+    expect(duplicate).toHaveBeenCalledWith('builtin:series', 'Series (copy)')
     expect(await screen.findByText('Copied from Series')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Save preset' })).toBeTruthy()
   })
@@ -127,7 +127,7 @@ describe('Presets', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save preset' }))
     expect(create).toHaveBeenCalledWith({
       name: 'Anime',
-      mediaType: 'series',
+      mediaType: 'Series',
       temperature: 0.45,
       prompt: '',
       glossary: [{ source: 'Frieren', rule: 'keep the name' }]
@@ -156,5 +156,19 @@ describe('Presets', () => {
     expect(imp).toHaveBeenCalledWith('skip')
     expect(await screen.findByText('Imported 1 preset.')).toBeTruthy()
     expect(screen.getByText('name already exists')).toBeTruthy()
+  })
+
+  it('adding and removing glossary rows never submits the form', async () => {
+    const { create } = setup()
+    await userEvent.click(await screen.findByRole('button', { name: 'New preset' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add entry' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add entry' }))
+    expect(screen.getByLabelText('Term 2')).toBeTruthy()
+    // No validation messages: nothing was submitted.
+    expect(screen.queryByText('Required.')).toBeNull()
+    expect(screen.queryByText('Enter the term.')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Remove entry 2' }))
+    expect(screen.queryByLabelText('Term 2')).toBeNull()
+    expect(create).not.toHaveBeenCalled()
   })
 })

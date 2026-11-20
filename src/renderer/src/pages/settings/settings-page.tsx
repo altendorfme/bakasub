@@ -1,3 +1,4 @@
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
 import { AboutSection } from './about-section'
@@ -18,10 +19,18 @@ const TABS = [
 
 export function SettingsPage(): React.JSX.Element {
   const { t } = useTranslation()
+  // The tab lives in the URL, so the status bar (and anything else) can link to one.
+  const { tab } = useSearch({ from: '/shell/settings' })
+  const navigate = useNavigate({ from: '/settings' })
+  const current = TABS.some(([id]) => id === tab) ? tab! : 'general'
   return (
     <div className="mx-auto grid max-w-3xl gap-5 px-6 py-7">
       <h1 className="text-xl font-semibold tracking-tight">{t('pages.settings.title')}</h1>
-      <Tabs defaultValue="general" className="grid gap-5">
+      <Tabs
+        value={current}
+        onValueChange={(v) => void navigate({ search: { tab: v }, replace: true })}
+        className="grid gap-5"
+      >
         <TabsList className="flex-wrap">
           {TABS.map(([id]) => (
             <TabsTrigger key={id} value={id}>

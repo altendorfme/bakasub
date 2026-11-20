@@ -2,6 +2,7 @@ import * as LabelPrimitive from '@radix-ui/react-label'
 import { useId, type ComponentProps, type ReactElement, type ReactNode } from 'react'
 import { cloneElement } from 'react'
 import { cn } from '@renderer/lib/utils'
+import { HelpTip } from './help-tip'
 
 export function Label({
   className,
@@ -18,20 +19,28 @@ export function Field({
   label,
   hint,
   error,
+  help,
   className,
   children
 }: {
   label: ReactNode
   hint?: ReactNode
   error?: ReactNode
+  /** Longer explanation behind a "?" (`HelpTip`). */
+  help?: ReactNode
   className?: string
   children: ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>
 }): React.JSX.Element {
   const id = useId()
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
   return (
-    <div className={cn('grid gap-1.5', className)}>
-      <Label htmlFor={id}>{label}</Label>
+    // content-start: when a neighbour in the same row is taller (longer hint, an error), the
+    // rows must not stretch, or label and control drift down.
+    <div className={cn('grid content-start gap-1.5', className)}>
+      <span className="flex items-center gap-1.5">
+        <Label htmlFor={id}>{label}</Label>
+        {help ? <HelpTip>{help}</HelpTip> : null}
+      </span>
       {cloneElement(children, {
         id,
         'aria-describedby': describedBy,

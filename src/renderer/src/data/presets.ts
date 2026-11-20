@@ -30,8 +30,11 @@ export const useSavePreset = (): UseMutationResult<
     unwrap(id ? window.api.presets.update(id, input) : window.api.presets.create(input))
   )
 
-export const useDuplicatePreset = (): UseMutationResult<Preset, Error, string> =>
-  usePresetMutation((id) => unwrap(window.api.presets.duplicate(id)))
+export const useDuplicatePreset = (): UseMutationResult<
+  Preset,
+  Error,
+  { id: string; name: string }
+> => usePresetMutation(({ id, name }) => unwrap(window.api.presets.duplicate(id, name)))
 
 export const useDeletePreset = (): UseMutationResult<{ deleted: true }, Error, string> =>
   usePresetMutation((id) => unwrap(window.api.presets.delete(id)))

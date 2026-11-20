@@ -76,6 +76,20 @@
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
   }
+  /* Tailwind v4 dropped the pointer cursor on buttons; everything clickable gets it back. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab'],
+  [role='option'],
+  [role='checkbox']:not([data-disabled]),
+  [role='switch']:not([data-disabled]),
+  [role='combobox'],
+  [cmdk-item]:not([data-disabled='true']),
+  label:has(input, button[role='checkbox'], button[role='switch']),
+  summary,
+  a[href] {
+    cursor: pointer;
+  }
 }
 
 @utility bg-brand {
@@ -84,8 +98,9 @@
 
 /* Bundled user guides (GuideView): markdown without a typography plugin. */
 @layer components {
+  /* Fills its container (dialogs are already a readable width). */
   .guide {
-    @apply grid max-w-[68ch] gap-3;
+    @apply grid w-full min-w-0 gap-3;
   }
   .guide h1 {
     @apply text-lg font-semibold;

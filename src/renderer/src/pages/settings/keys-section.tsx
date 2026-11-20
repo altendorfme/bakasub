@@ -18,7 +18,10 @@ export function KeysSection(): React.JSX.Element {
   return (
     <div className="grid gap-6">
       <section className="grid gap-2">
-        <h3 className="text-sm font-semibold">{t('settings.keys.openrouter')}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">{t('settings.keys.openrouter')}</h3>
+          <GuideDialog id="openrouter-key" />
+        </div>
         <p className="text-xs text-muted-foreground">{t('settings.keys.openrouterHint')}</p>
         <KeyForm
           label={t('welcome.key.label')}
@@ -28,11 +31,13 @@ export function KeysSection(): React.JSX.Element {
           saving={setOr.isPending}
           error={setOr.error}
           onSave={(key) => setOr.mutateAsync(key)}
-          guide={<GuideDialog id="openrouter-key" />}
         />
       </section>
       <section className="grid gap-2">
-        <h3 className="text-sm font-semibold">{t('settings.keys.tmdb')}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">{t('settings.keys.tmdb')}</h3>
+          <GuideDialog id="tmdb-key" />
+        </div>
         <p className="text-xs text-muted-foreground">{t('settings.keys.tmdbHint')}</p>
         <KeyForm
           label={t('welcome.tmdb.label')}
@@ -41,7 +46,6 @@ export function KeysSection(): React.JSX.Element {
           error={setTmdb.error}
           onSave={(key) => setTmdb.mutateAsync(key)}
           onRemove={() => setTmdb.mutate(null)}
-          guide={<GuideDialog id="tmdb-key" />}
         />
       </section>
     </div>

@@ -4,7 +4,11 @@ import { useListWithDefault } from '@renderer/data/preferences'
 
 export function LanguagesPage(): React.JSX.Element {
   const { t } = useTranslation()
-  const langs = useListWithDefault('translation.targetLangs', 'translation.defaultTargetLang')
+  const langs = useListWithDefault(
+    'translation.targetLangs',
+    'translation.defaultTargetLang',
+    t('languagesPage.keepOne')
+  )
   return (
     <div className="mx-auto grid max-w-3xl gap-5 px-6 py-7">
       <div className="grid gap-1">

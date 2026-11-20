@@ -106,4 +106,12 @@ describe('App shell', () => {
     fake.emit('jobs:progress', { id: 'a', status: 'running', progress: { step: 'probe' } })
     expect(await within(bar).findByText(/1 running/)).toBeTruthy()
   })
+
+  it('status bar: the key status opens Settings on the Keys tab', async () => {
+    setup('/translate')
+    const bar = await screen.findByRole('contentinfo')
+    await userEvent.click(await within(bar).findByRole('link', { name: /API key set/ }))
+    const tab = await screen.findByRole('tab', { name: 'Keys' })
+    expect(tab.getAttribute('aria-selected')).toBe('true')
+  })
 })

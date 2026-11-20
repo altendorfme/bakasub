@@ -1,7 +1,8 @@
 import { BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
-import icon from '../../../resources/icon.svg?asset'
+// PNG: Electron's nativeImage does not read SVG. Source: resources/icon.svg (npm run icons).
+import icon from '../../../resources/icon.png?asset'
 
 export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({

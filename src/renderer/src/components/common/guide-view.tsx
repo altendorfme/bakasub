@@ -1,4 +1,5 @@
 import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { guideIdFromHref, type GuideId } from '@renderer/guides/guides'
@@ -12,15 +13,19 @@ import { reportError } from '@renderer/lib/report-error'
  */
 export function GuideView({
   id,
-  onNavigate
+  onNavigate,
+  hideTitle = false
 }: {
   id: GuideId
   onNavigate?: (id: GuideId) => void
+  /** In a dialog the title is already the dialog's heading. */
+  hideTitle?: boolean
 }): React.JSX.Element {
   const guide = useGuide(id)
   const { t } = useTranslation()
 
   const components: Components = {
+    ...(hideTitle ? { h1: () => null } : {}),
     a: ({ href = '', children }) => {
       const target = guideIdFromHref(href)
       if (target)
@@ -57,7 +62,10 @@ export function GuideView({
 
   return (
     <article lang={guide.lang} className="guide text-sm leading-relaxed">
-      <ReactMarkdown components={components}>{guide.markdown}</ReactMarkdown>
+      {/* GFM: the guides use tables. */}
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {guide.markdown}
+      </ReactMarkdown>
     </article>
   )
 }

@@ -15,7 +15,12 @@ type DefaultKey = 'translation.defaultModel' | 'translation.defaultTargetLang'
  */
 export function useListWithDefault(
   listKey: ListKey,
-  defaultKey: DefaultKey
+  defaultKey: DefaultKey,
+  /**
+   * Refuse to empty the list (Models and Languages pages): without a default the app has
+   * nothing to translate with. The onboarding allows it while the user is still choosing.
+   */
+  keepOne?: string
 ): { value: ListWithDefault; onChange: (next: ListWithDefault) => void; ready: boolean } {
   const qc = useQueryClient()
   const settings = useSettings()
@@ -26,6 +31,10 @@ export function useListWithDefault(
     default: (s?.[defaultKey] as string | null | undefined) ?? null
   }
   const onChange = (next: ListWithDefault): void => {
+    if (keepOne && next.list.length === 0) {
+      toast.warning(keepOne)
+      return
+    }
     const before = qc.getQueryData<PublicSettings>(qk.settings.all())
     const patch = {
       [listKey]: [...next.list],

@@ -1,26 +1,25 @@
 import { BrowserWindow, dialog } from 'electron'
 import type { ConsentGate, ConsentRequest } from '../sidecars/types'
+import { consentText, type ConsentLanguage } from './sidecar-consent-text'
 
 /**
  * Diálogo nativo (fora do renderer): um renderer comprometido não consegue aprová-lo sozinho.
- * Padrão e botão de cancelar = "Cancelar".
+ * Padrão e botão de cancelar = "Cancelar". O texto segue o idioma do app.
  */
 export class NativeConsentGate implements ConsentGate {
+  constructor(private readonly language: () => Promise<ConsentLanguage>) {}
+
   async confirmDownload(request: ConsentRequest): Promise<boolean> {
+    const text = consentText(await this.language().catch(() => 'en' as const))
     const lines = request.items.map(
       (i) => `• ${i.tools.map((t) => `${t.name} ${t.version}`).join(', ')}  ←  ${i.host}`
     )
     const options: Electron.MessageBoxOptions = {
       type: 'question',
-      title: 'Componentes necessários',
-      message: 'O BakaSub precisa baixar ferramentas externas. Deseja continuar?',
-      detail: [
-        ...lines,
-        '',
-        'Os arquivos têm o SHA-256 verificado antes de serem instalados em:',
-        request.installDir
-      ].join('\n'),
-      buttons: ['Baixar e instalar', 'Cancelar'],
+      title: text.title,
+      message: text.message,
+      detail: [...lines, '', text.checksum, request.installDir].join('\n'),
+      buttons: [text.install, text.cancel],
       defaultId: 1,
       cancelId: 1,
       noLink: true

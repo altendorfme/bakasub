@@ -77,6 +77,13 @@ The wizard state is local to the page: leaving the page resets it (the job keeps
 
 Artwork backdrop (`Backdrop`): the chosen title's `backdropUrl` behind the wizard, and the job's frozen media behind the queue inspector. `Job.media` (`JobMediaSummary`: title, kind, year, poster, backdrop, episode, no synopsis) is derived by the Main from the persisted spec (`src/main/jobs/media-summary.ts`), so the queue never calls TMDB. The image fades in at 55% under a gradient; panels on top stay `bg-card/92`.
 
+### Wizard navigation and summary
+
+- The step bar (`step-bar.tsx`) is centered, with arrows between steps; done steps show a check. `furthest` in the wizard state records the furthest step reached: any reached step can be opened from the bar (forward too) without "Continue", as long as every step before it is still valid (`canGo`). Changing the file resets `furthest` and shows "The file changed, so the next steps need another look."
+- `WizardSummary` (right column, sticky) lists file, track, preset, model, target language, media and output; each row opens its step when reachable.
+- `existingTarget` (`lib/existing-subtitle.ts`) detects a subtitle already in the target language (a video track, compared by base language with ISO 639-2 codes mapped, or a subtitle file named for it). The summary warns, and "Estimate cost" asks "Translate anyway?" before creating the job.
+- A job whose lines are all cached still stops for review (see [`preflight.md`](./preflight.md)).
+
 ## Queue and status bar
 
 `pages/queue/`. Workspace layout (prototype variant D): the job list on the left (tabs All / Active / Needs you / Done with counts, `matchesFilter` in `data/jobs.ts`; "Needs you" = awaiting confirmation, failed, interrupted), the selected job on the right. The selection is the `?job=` search param, so the wizard's "Open in Queue" lands on the job and the browser history keeps it.
@@ -114,6 +121,22 @@ Single-form pages that create one job and then show it with `JobDetail` (like th
 ## Logs
 
 `pages/logs/`. The last 1,000 lines (`logs:tail`) and then live lines (`useLiveLogs`: `logs:watch` on while the page is mounted, off when leaving; at most 2,000 lines kept). Filters are local (level, area, job) so changing them never drops live lines; `?job=` filters to one job and `JobDetail` links there ("Show logs"), and each line with a `jobId` links back to the queue. Details (stderr, HTTP bodies) are collapsible. Follows the bottom while live. "Open log folder" and "Export logs" use the Main's channels.
+
+## Field help, labels and links
+
+- `HelpTip` (`components/ui/help-tip.tsx`): a "?" next to a label with a tooltip explanation (hover or keyboard focus; also the accessible description). `Field` and `SettingRow` take a `help` prop. Tooltips carry their own provider, so they work in dialogs and tests.
+- `Button` defaults to `type="button"`: a button inside a `<form>` (the glossary editor's "Add entry" and remove) must never submit it. Submit buttons say `type="submit"`.
+- `Field` uses `content-start`, so a taller neighbour (a two-line hint, an error) never pushes the label and control down.
+- Built-in presets and the four known media types are shown in the app language (`lib/preset-labels.ts`); custom names stay as typed; a duplicated preset gets a free "<name> (copy)" name in the app language.
+- Language names start with a capital ("Português (Brasil)").
+- Guides render GFM tables (`remark-gfm`); in a dialog the guide's own title is hidden. New guide: `choosing-models` (how to read prices, context, Reliable JSON, moderation, and how to choose), linked from Models and the onboarding.
+- Models: sort (OpenRouter order, price up/down, context) and filters (provider, free only, Reliable JSON, not moderated, favorites only) in `lib/model-list.ts`; favorites stay on top.
+- Queue: the job list is resizable with the mouse or arrow keys (`ResizableAside`, width kept in localStorage), names truncate with an ellipsis (full name on hover), and jobs with TMDB context show the title and episode below.
+- Sidebar: the logo (`assets/logo.svg`), Translate on its own at the top (larger, highlighted by colour and a gradient when active), then the Work and Manage groups with more spacing.
+- Status bar: queue counts and progress, the lane cooldown, the session cost, the installed tool versions (link to Settings → Video tools), the OpenRouter and TMDB key status (link to Settings → Keys), and the app version with an update hint (link to Settings → About). Settings keeps its tab in the URL (`?tab=`).
+- Models: one price range (USD per 1M tokens) that both the input and the output price must fit (`inPriceRange`, `priceStops` in `lib/model-list.ts`); with the upper end at the top, dynamic-price models stay listed. Rows never truncate: names, ids and prices wrap. On the Models and Languages pages the last favorite/language cannot be removed (the app needs a default; the onboarding still allows it while choosing).
+- Everything clickable shows the pointer cursor (Tailwind v4 removed it for buttons; restored in `styles/main.css`). Guides take the full width of their container.
+- About: version, author, "Check for updates", repository and "Buy me a coffee" (both hosts are in the Main's external-link allowlist).
 
 ## Polish
 

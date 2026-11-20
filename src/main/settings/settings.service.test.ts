@@ -29,4 +29,11 @@ describe('SettingsService', () => {
   it('set inválido lança', async () => {
     await expect(svc.set('models.cache', { fetchedAt: 'x' } as never)).rejects.toThrow()
   })
+  it('null volta ao padrão (antes falhava: a coluna é NOT NULL)', async () => {
+    await svc.set('translation.defaultModel', 'a/b')
+    await svc.set('translation.defaultModel', null)
+    expect(await svc.get('translation.defaultModel')).toBeNull()
+    await svc.set('ui.language', null)
+    expect(await svc.get('ui.language')).toBeNull()
+  })
 })

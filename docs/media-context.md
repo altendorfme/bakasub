@@ -49,12 +49,12 @@ The renderer never touches the network. Media DTOs carry `bakasub-media://tmdb/<
 
 ## IPC
 
-| Channel                                                                          | Purpose                                                                     |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `settings:set-tmdb-key` / `settings:clear-tmdb-key` / `settings:tmdb-key-status` | key management (validated before saving; `TMDB_AUTH` when rejected)         |
-| `media:identify { name }`                                                        | automatic identification from a file name (nothing is read from disk)       |
-| `media:search { query }`                                                         | manual search (title field)                                                 |
-| `media:lookup { ref, season?, episode? }`                                        | details for a chosen result, plus the episode of a series                   |
-| `app:open-external { url }`                                                      | opens HTTPS URLs on an allowlist (TMDB, OpenRouter) only; `URL_NOT_ALLOWED` |
+| Channel                                                                          | Purpose                                                                                              |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `settings:set-tmdb-key` / `settings:clear-tmdb-key` / `settings:tmdb-key-status` | key management (validated before saving; `TMDB_AUTH` when rejected)                                  |
+| `media:identify { name }`                                                        | automatic identification from a file name (nothing is read from disk)                                |
+| `media:search { query }`                                                         | manual search (title field)                                                                          |
+| `media:lookup { ref, season?, episode? }`                                        | details for a chosen result, plus the episode of a series                                            |
+| `app:open-external { url }`                                                      | opens HTTPS URLs on an allowlist (TMDB, OpenRouter, GitHub, Buy Me a Coffee) only; `URL_NOT_ALLOWED` |
 
 Attribution (TMDB terms): the UI shows "Metadata and images from TMDB" in the media panel and the full notice in Settings → About.

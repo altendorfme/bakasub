@@ -4,11 +4,13 @@ import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Job } from '@shared/ipc-contract'
 import { WaitLabel } from '@renderer/components/common/wait-label'
+import { ResizableAside } from '@renderer/components/common/resizable-aside'
 import { JobDetail } from '@renderer/components/jobs/job-detail'
 import { Backdrop } from '@renderer/components/media/backdrop'
 import { Button } from '@renderer/components/ui/button'
 import { Progress } from '@renderer/components/ui/tabs'
 import { matchesFilter, useJobs, type QueueFilter } from '@renderer/data/jobs'
+import { episodeCode } from '@renderer/lib/episode'
 import { formatUsd } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/utils'
 import { StatusPill } from './status-pill'
@@ -31,7 +33,7 @@ export function QueuePage(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="flex w-[22rem] shrink-0 flex-col border-r">
+      <ResizableAside storageKey="queue.listWidth">
         <div className="grid gap-3 border-b p-3">
           <Button variant="default" asChild>
             <Link to="/translate">
@@ -39,7 +41,7 @@ export function QueuePage(): React.JSX.Element {
               {t('queue.new')}
             </Link>
           </Button>
-          <div className="flex gap-1 text-xs" role="tablist" aria-label={t('queue.list')}>
+          <div className="flex flex-wrap gap-1 text-xs" role="tablist" aria-label={t('queue.list')}>
             {FILTERS.map((f) => {
               const count = jobs.filter((j) => matchesFilter(j, f)).length
               return (
@@ -50,7 +52,7 @@ export function QueuePage(): React.JSX.Element {
                   aria-selected={filter === f}
                   onClick={() => setFilter(f)}
                   className={cn(
-                    'rounded-md px-2 py-1',
+                    'rounded-md px-2 py-1 whitespace-nowrap',
                     filter === f
                       ? 'bg-accent font-medium text-foreground'
                       : 'text-muted-foreground hover:text-foreground'
@@ -76,14 +78,24 @@ export function QueuePage(): React.JSX.Element {
                   aria-current={j.id === selected ? 'true' : undefined}
                   onClick={() => select(j.id)}
                   className={cn(
-                    'grid w-full gap-1.5 px-3 py-2.5 text-left',
+                    'grid w-full min-w-0 gap-1.5 px-3 py-2.5 text-left',
                     j.id === selected ? 'bg-primary-soft/50' : 'hover:bg-accent/60'
                   )}
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{j.source}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium" title={j.source}>
+                      {j.source}
+                    </span>
                     <StatusPill status={j.status} />
                   </span>
+                  {j.media ? (
+                    <span className="truncate text-xs text-violet">
+                      {j.media.title}
+                      {j.media.episode
+                        ? ` · ${episodeCode(j.media.episode.season, j.media.episode.episode)}`
+                        : ''}
+                    </span>
+                  ) : null}
                   {j.status === 'running' ? (
                     <>
                       <Progress
@@ -107,7 +119,7 @@ export function QueuePage(): React.JSX.Element {
             ))}
           </ul>
         )}
-      </aside>
+      </ResizableAside>
       <section className="relative min-w-0 flex-1 overflow-y-auto">
         <Backdrop url={current?.media?.backdropUrl} />
         {current ? (

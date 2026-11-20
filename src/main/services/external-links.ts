@@ -3,7 +3,15 @@
  * hosts, HTTPS, default port, no credentials: a compromised renderer cannot use
  * `app:open-external` to launch arbitrary URLs or protocol handlers.
  */
-const ALLOWED_HOSTS = new Set(['www.themoviedb.org', 'themoviedb.org', 'openrouter.ai'])
+const ALLOWED_HOSTS = new Set([
+  'www.themoviedb.org',
+  'themoviedb.org',
+  'openrouter.ai',
+  // Settings → About: project repository and support page.
+  'github.com',
+  'buymeacoffee.com',
+  'www.buymeacoffee.com'
+])
 
 export function isAllowedExternalUrl(raw: string): boolean {
   let url: URL

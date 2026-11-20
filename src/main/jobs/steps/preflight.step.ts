@@ -24,8 +24,6 @@ export const preflightStep: Step = async (ctx) => {
       : false
   const threshold = await ctx.deps.preflight.autoConfirmBelowUsd()
   const cheap = threshold !== null && estimate.cost !== null && estimate.cost.high < threshold
-  // Nada a traduzir (tudo em cache) não tem custo: não faz sentido pedir confirmação.
-  const nothing = estimate.lines.toTranslate === 0
   // Cota free insuficiente: custo zero não pode confirmar sozinho (o usuário precisa ver o aviso).
   const shortQuota = estimate.freeQuota?.enough === false
   if (shortQuota)
@@ -37,7 +35,8 @@ export const preflightStep: Step = async (ctx) => {
     estimate: {
       ...estimate,
       decision:
-        !confirm || ((cheap || nothing) && !shortQuota) ? 'auto-confirmed' : 'needs-confirmation'
+        // Tudo em cache também para: a revisão mostra a cobertura e que nada vai ao LLM.
+        !confirm || (cheap && !shortQuota) ? 'auto-confirmed' : 'needs-confirmation'
     },
     coverage
   }

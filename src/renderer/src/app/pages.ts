@@ -26,9 +26,13 @@ export const PAGES = [
 ] as const
 export type PageKey = (typeof PAGES)[number]
 
-/** Sidebar order and grouping. */
-export const NAV: readonly { group: 'work' | 'manage'; page: PageKey; icon: LucideIcon }[] = [
-  { group: 'work', page: 'translate', icon: TranslateIcon },
+/** Sidebar order and grouping. `main` is Translate: the core of BakaSub, shown on its own. */
+export const NAV: readonly {
+  group: 'main' | 'work' | 'manage'
+  page: PageKey
+  icon: LucideIcon
+}[] = [
+  { group: 'main', page: 'translate', icon: TranslateIcon },
   { group: 'work', page: 'extract', icon: FileDown },
   { group: 'work', page: 'mux', icon: Combine },
   { group: 'work', page: 'batch', icon: FolderOpen },

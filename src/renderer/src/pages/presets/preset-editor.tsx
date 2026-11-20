@@ -10,6 +10,7 @@ import { Field } from '@renderer/components/ui/field'
 import { Input, Textarea } from '@renderer/components/ui/input'
 import { useDeletePreset, useDuplicatePreset, useSavePreset } from '@renderer/data/presets'
 import { errorMessage } from '@renderer/i18n/error-message'
+import { copyName, mediaTypeLabel, presetLabel } from '@renderer/lib/preset-labels'
 import { GlossaryEditor } from './glossary-editor'
 import {
   draftOf,
@@ -29,16 +30,25 @@ import {
 export function PresetEditor({
   preset,
   copiedFromName,
+  takenNames = [],
   onSaved,
   onDeleted
 }: {
   preset: Preset | null
   copiedFromName?: string
+  /** For the copy name ("Série (cópia 2)"). */
+  takenNames?: readonly string[]
   onSaved: (p: Preset) => void
   onDeleted: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const initial = preset ? draftOf(preset) : emptyDraft
+  const label = preset ? presetLabel(preset, t) : ''
+  // Built-ins are shown in the app language (read-only anyway).
+  const initial = preset
+    ? preset.builtin
+      ? { ...draftOf(preset), name: label, mediaType: mediaTypeLabel(preset.mediaType, t) }
+      : draftOf(preset)
+    : { ...emptyDraft, mediaType: t('mediaTypes.series') }
   const [draft, setDraft] = useState<PresetDraft>(initial)
   const [touched, setTouched] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -79,7 +89,7 @@ export function PresetEditor({
       }}
     >
       <header className="flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-semibold">{preset?.name ?? t('presets.new')}</h2>
+        <h2 className="text-base font-semibold">{preset ? label : t('presets.new')}</h2>
         {readOnly ? <Badge>{t('presets.builtin')}</Badge> : null}
         {copiedFromName ? (
           <span className="text-xs text-muted-foreground">
@@ -92,7 +102,12 @@ export function PresetEditor({
               type="button"
               size="sm"
               disabled={duplicate.isPending}
-              onClick={() => duplicate.mutate(preset.id, { onSuccess: onSaved, onError: fail })}
+              onClick={() =>
+                duplicate.mutate(
+                  { id: preset.id, name: copyName(label, takenNames, t) },
+                  { onSuccess: onSaved, onError: fail }
+                )
+              }
             >
               <Copy />
               {t('presets.duplicate')}
@@ -113,7 +128,8 @@ export function PresetEditor({
       </header>
       {readOnly ? <p className="text-sm text-muted-foreground">{t('presets.readOnly')}</p> : null}
 
-      <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
+      {/* items-start: an error under one field must not stretch or shift the others. */}
+      <div className="grid items-start gap-4 sm:grid-cols-[2fr_1fr_1fr]">
         <Field label={t('presets.field.name')} error={show('name')}>
           <Input
             value={draft.name}
@@ -122,7 +138,11 @@ export function PresetEditor({
             onChange={(e) => set({ name: e.target.value })}
           />
         </Field>
-        <Field label={t('presets.field.mediaType')} error={show('mediaType')}>
+        <Field
+          label={t('presets.field.mediaType')}
+          error={show('mediaType')}
+          help={t('help.mediaType')}
+        >
           <Input
             value={draft.mediaType}
             readOnly={readOnly}
@@ -131,7 +151,11 @@ export function PresetEditor({
             onChange={(e) => set({ mediaType: e.target.value })}
           />
         </Field>
-        <Field label={t('presets.field.temperature')} error={show('temperature')}>
+        <Field
+          label={t('presets.field.temperature')}
+          error={show('temperature')}
+          help={t('help.temperature')}
+        >
           <Input
             type="number"
             min={0}
@@ -154,6 +178,7 @@ export function PresetEditor({
 
       <Field
         label={t('presets.field.prompt')}
+        help={t('help.prompt')}
         hint={t('presets.field.promptHint', {
           count: draft.prompt.length,
           max: PRESET_LIMITS.prompt
@@ -193,7 +218,7 @@ export function PresetEditor({
 
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent
-          title={t('presets.deleteTitle', { name: preset?.name ?? '' })}
+          title={t('presets.deleteTitle', { name: label })}
           description={t('presets.deleteBody')}
         >
           <DialogFooter>

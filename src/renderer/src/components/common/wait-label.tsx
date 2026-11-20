@@ -14,7 +14,10 @@ export function WaitLabel({
   return (
     <span className="inline-flex items-center gap-1 text-xs text-warning" role="status">
       <Hourglass className="size-3.5" />
-      {t('wait.in', { label: t(`wait.${waiting.reason}`), seconds })}
+      {/* At 0 the wait is over but the next event has not arrived yet: no "0 s". */}
+      {seconds > 0
+        ? t('wait.in', { label: t(`wait.${waiting.reason}`), seconds })
+        : t(`wait.${waiting.reason}`)}
     </span>
   )
 }

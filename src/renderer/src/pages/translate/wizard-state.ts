@@ -17,6 +17,10 @@ export interface WizardState {
   outputDir: string | null
   mux: { setDefault: boolean; keepOriginalSubtitles: boolean; alsoWriteSubtitle: boolean }
   media: MediaChoice
+  /** Furthest step reached: completed steps can be revisited from the step bar. */
+  furthest: number
+  /** Something changed that made the later steps need another look. */
+  notice: 'file-changed' | null
 }
 
 export const initialWizard: WizardState = {
@@ -29,7 +33,9 @@ export const initialWizard: WizardState = {
   notes: '',
   outputDir: null,
   mux: { setDefault: true, keepOriginalSubtitles: true, alsoWriteSubtitle: false },
-  media: noMedia
+  media: noMedia,
+  furthest: 0,
+  notice: null
 }
 
 /** A subtitle file has no track to pick and nothing to mux. */
@@ -47,7 +53,8 @@ export type WizardAction =
     }
   | { type: 'mux'; patch: Partial<WizardState['mux']> }
   | { type: 'media'; patch: Partial<MediaChoice> }
-  | { type: 'go'; step: WizardStep }
+  /** Jump from the step bar: any reached step whose previous steps are all valid. */
+  | { type: 'go'; step: WizardStep; defaults?: Defaults }
   /** `defaults`: model/language from Settings, used when the user kept them. */
   | { type: 'next'; defaults?: Defaults }
   | { type: 'back' }
@@ -62,12 +69,16 @@ export function wizardReducer(s: WizardState, a: WizardAction): WizardState {
     case 'file': {
       const kind = sourceKindOf(a.path)
       if (!kind) return s
-      // A new file invalidates the track; the rest (preset, notes…) is kept.
+      if (s.file?.path === a.path) return s
+      // A new file invalidates the track and the media; preset, notes and output are kept.
+      // Later steps must be walked again, and the user is told why.
       return {
         ...s,
         file: { path: a.path, name: baseName(a.path), kind },
         trackId: null,
-        media: noMedia
+        media: noMedia,
+        furthest: 0,
+        notice: s.file ? 'file-changed' : null
       }
     }
     case 'track':
@@ -79,9 +90,11 @@ export function wizardReducer(s: WizardState, a: WizardAction): WizardState {
     case 'media':
       return { ...s, media: { ...s.media, ...a.patch } }
     case 'go':
-      return steps.includes(a.step) ? { ...s, step: a.step } : s
-    case 'next':
-      return canContinue(s, a.defaults) && i < steps.length - 1 ? { ...s, step: steps[i + 1] } : s
+      return canGo(s, a.step, a.defaults) ? { ...s, step: a.step } : s
+    case 'next': {
+      if (!canContinue(s, a.defaults) || i >= steps.length - 1) return s
+      return { ...s, step: steps[i + 1], furthest: Math.max(s.furthest, i + 1), notice: null }
+    }
     case 'back':
       return i > 0 ? { ...s, step: steps[i - 1] } : s
     case 'reset':
@@ -99,7 +112,16 @@ export function canContinue(
   s: WizardState,
   defaults: Defaults = { model: null, targetLang: null }
 ): boolean {
-  switch (s.step) {
+  return stepValid(s, s.step, defaults)
+}
+
+/** Whether a step's own fields are complete. */
+export function stepValid(
+  s: WizardState,
+  step: WizardStep,
+  defaults: Defaults = { model: null, targetLang: null }
+): boolean {
+  switch (step) {
     case 'file':
       return s.file !== null
     case 'track':
@@ -113,6 +135,18 @@ export function canContinue(
     case 'output':
       return true
   }
+}
+
+/**
+ * Step bar navigation: back to any step, forward to a step already reached, as long as every
+ * step before it is still valid (no confirmation needed when nothing changed).
+ */
+export function canGo(s: WizardState, target: WizardStep, defaults?: Defaults): boolean {
+  const steps = stepsFor(s.file?.kind)
+  const t = steps.indexOf(target)
+  if (t === -1) return false
+  if (t <= steps.indexOf(s.step)) return true
+  return t <= s.furthest && steps.slice(0, t).every((st) => stepValid(s, st, defaults))
 }
 
 /** The `jobs:create` request. Unset model/language/preset are left to the Main's defaults. */

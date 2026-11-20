@@ -1,4 +1,6 @@
-# BakaSub
+<h1 align="center">
+  <img src="./docs/bakasub-logo-pt.svg" alt="BakaSub" width="560" />
+</h1>
 
 🇬🇧 [English](./README.md) · 🇧🇷 **Português**
 

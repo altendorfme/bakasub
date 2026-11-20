@@ -135,4 +135,10 @@ describe('PreferencesService', () => {
     expect(onChanged).toHaveBeenCalledWith(['llm.rateLimit.freeRpm', 'llm.retry.chunkRounds'])
     expect(await code(prefs.reset(['models.cache']))).toBe('INVALID_INPUT')
   })
+  it('removing the last favorite clears the default model (null is stored)', async () => {
+    await prefs.update({ 'translation.defaultModel': 'a/b' })
+    const s = await prefs.update({ 'models.favorites': [], 'translation.defaultModel': null })
+    expect(s['translation.defaultModel']).toBeNull()
+    expect(await settings.get('translation.defaultModel')).toBeNull()
+  })
 })

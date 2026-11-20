@@ -1,6 +1,7 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { GuideDialog } from '@renderer/components/common/guide-dialog'
 import { ModelPicker } from '@renderer/components/pickers/model-picker'
 import { Button } from '@renderer/components/ui/button'
 import { useFreeQuota, useModels, useRefreshModels } from '@renderer/data/models'
@@ -11,7 +12,11 @@ import { formatDate } from '@renderer/lib/format'
 
 export function ModelsPage(): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const favorites = useListWithDefault('models.favorites', 'translation.defaultModel')
+  const favorites = useListWithDefault(
+    'models.favorites',
+    'translation.defaultModel',
+    t('modelsPage.keepOne')
+  )
   const catalog = useModels().data
   const refresh = useRefreshModels()
   const quota = useFreeQuota().data
@@ -20,12 +25,13 @@ export function ModelsPage(): React.JSX.Element {
   const missing = catalog ? favorites.value.list.filter((id) => !known.has(id)) : []
 
   return (
-    <div className="mx-auto grid max-w-3xl gap-5 px-6 py-7">
+    <div className="mx-auto grid max-w-5xl gap-5 px-6 py-7">
       <div className="flex flex-wrap items-start gap-3">
         <div className="grid flex-1 gap-1">
           <h1 className="text-xl font-semibold tracking-tight">{t('pages.models.title')}</h1>
           <p className="max-w-[65ch] text-sm text-muted-foreground">{t('modelsPage.body')}</p>
         </div>
+        <GuideDialog id="choosing-models" label={t('guides.choosing-models')} />
         <Button
           disabled={refresh.isPending}
           onClick={() =>

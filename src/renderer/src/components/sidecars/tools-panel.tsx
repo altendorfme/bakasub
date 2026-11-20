@@ -61,9 +61,12 @@ export function ToolsPanel(): React.JSX.Element {
             ? progress.map((p) => (
                 <div key={p.archive} className="grid gap-1 text-xs text-muted-foreground">
                   <span>
-                    {p.archive} · {p.phase}
+                    {p.archive} · {t(`welcome.tools.phase.${p.phase}`)}
                   </span>
-                  <Progress value={p.total ? p.received / p.total : undefined} />
+                  {/* "done" is full even when the last byte count never matched the total. */}
+                  <Progress
+                    value={p.phase === 'done' ? 1 : p.total ? p.received / p.total : undefined}
+                  />
                 </div>
               ))
             : null}

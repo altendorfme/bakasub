@@ -30,6 +30,9 @@ export const common = {
       set: 'API key set',
       missing: 'No API key'
     },
+    tmdb: { set: 'TMDB on', missing: 'TMDB off' },
+    version: 'v{{version}}',
+    update: 'update available',
     cooldown: 'Rate limited · {{seconds}} s',
     sessionCost: 'US$ {{value}} this session'
   },
@@ -62,6 +65,7 @@ export const common = {
     'openrouter-key': 'How to get an OpenRouter key',
     'openrouter-limits': 'Limits, waits and retries',
     'tmdb-key': 'How to get a TMDB key',
+    'choosing-models': 'How to choose a model',
     openExternal: 'Opens in your browser'
   },
   wait: {
@@ -99,6 +103,27 @@ export const common = {
     moderatedHint: 'The provider filters content; some lines may stay untranslated.',
     structured: 'Reliable JSON',
     structuredHint: 'Supports structured output, so fewer retries.',
+    sort: {
+      label: 'Sort',
+      catalog: 'OpenRouter order',
+      'price-asc': 'Cheapest first',
+      'price-desc': 'Most expensive first',
+      'context-desc': 'Largest context first'
+    },
+    price: {
+      label: 'Price per 1M tokens (input and output)',
+      min: 'Minimum price',
+      max: 'Maximum price'
+    },
+    family: 'Provider',
+    allFamilies: 'All providers',
+    filter: {
+      freeOnly: 'Free only',
+      jsonOnly: 'Reliable JSON',
+      hideModerated: 'Not moderated',
+      favoritesOnly: 'Favorites only'
+    },
+    shown: '{{shown}} of {{total}}',
     favoritesOnly: 'Favorites only',
     favoritesCount_one: '{{count}} favorite',
     favoritesCount_other: '{{count}} favorites'
@@ -147,6 +172,12 @@ export const common = {
       installing: 'Installing…',
       declined: 'Installation cancelled. You can install the tools later in Settings.',
       offline: 'The tool list could not be updated; install may fail until you are online.',
+      phase: {
+        downloading: 'Downloading',
+        extracting: 'Unpacking',
+        probing: 'Checking',
+        done: 'Installed'
+      },
       state: {
         ok: 'Installed',
         missing: 'Not installed',
@@ -163,6 +194,28 @@ export const common = {
   },
   translate: {
     steps: { file: 'File', track: 'Track', preset: 'Preset & context', output: 'Output' },
+    stepsLabel: 'Steps',
+    fileChanged: 'The file changed, so the next steps need another look.',
+    summary: {
+      title: 'Summary',
+      file: 'File',
+      track: 'Track',
+      preset: 'Preset',
+      model: 'Model',
+      language: 'Into',
+      media: 'Media',
+      mediaOff: 'Not included',
+      output: 'Output',
+      none: '—',
+      edit: 'Edit {{step}}'
+    },
+    existing: {
+      title: 'There is already a subtitle in {{language}}',
+      track: 'This video already has a {{language}} subtitle track ({{name}}). Translate anyway?',
+      file: 'The file name says this subtitle is already in {{language}}. Translate anyway?',
+      go: 'Translate anyway',
+      inline: 'Already has a {{language}} subtitle'
+    },
     next: 'Continue',
     back: 'Back',
     start: 'Estimate cost',
@@ -480,12 +533,17 @@ export const common = {
       upToDate: 'You have the latest version.',
       update: 'Version {{latest}} is available.',
       offline: 'Could not check for updates.',
+      author: 'Made by {{name}}',
+      checkUpdate: 'Check for updates',
+      repository: 'Repository',
+      coffee: 'Buy me a coffee',
       data: 'Data folder',
       tmdb: 'This product uses the TMDB API but is not endorsed or certified by TMDB. Movie and show metadata and images come from The Movie Database (TMDB).',
       openrouter: 'Translations are made by the models you choose, through OpenRouter.'
     }
   },
   modelsPage: {
+    keepOne: 'Keep at least one favorite model: it is what BakaSub translates with.',
     body: 'Star the models you want to offer when translating, and pick the default. Prices are per 1M tokens, from OpenRouter.',
     refresh: 'Refresh list',
     updated: 'List from {{date}}',
@@ -496,12 +554,47 @@ export const common = {
     quota: '{{remaining}} of {{limit}} free-model requests left today'
   },
   languagesPage: {
+    keepOne: 'Keep at least one language to translate into.',
     body: 'The languages you translate into. They are offered when translating; the default is selected first.'
   },
+  common: { resize: 'Resize the list' },
+  help: {
+    label: 'What is this?',
+    preset:
+      'A preset bundles how to translate: style instructions, glossary and temperature. Built-in presets fit common media; make your own in Presets.',
+    model:
+      'The AI model that translates. Price, speed and quality vary a lot; see “How to choose a model” in Models.',
+    language: 'The language the subtitle is translated into.',
+    notes:
+      'Sent to the AI with every part of the file. Short facts work best: who the characters are, how they speak, words to keep.',
+    temperature:
+      'How free the translation is. Low (0.1–0.3) stays literal and consistent; around 0.5 reads more natural; above 1 it starts to improvise.',
+    mediaType:
+      'What kind of media this preset is for. It is a label for you and is also given to the AI as context.',
+    prompt:
+      'Instructions about tone and register (formal, casual, keep jokes, adapt idioms…). The fixed rules that protect timing and formatting are added by BakaSub.',
+    glossary:
+      'Terms the AI must always translate the same way (names, places, techniques). Use a rule for things like “keep honorifics”.',
+    include:
+      'Gives the AI the title, genres and synopsis (and the episode synopsis) so names and tone come out right. Nothing is sent to TMDB except the title.',
+    concurrency:
+      'How many jobs run at once. Each running job sends its own requests, so more jobs reach the OpenRouter limits sooner.',
+    autoConfirm:
+      'When the highest estimated cost is below this amount, the job starts without asking. The estimate is always shown in the queue.',
+    sourceLangs:
+      'When a video has several subtitle tracks, BakaSub picks the first one in this list as the source.',
+    track:
+      'The subtitle track that will be translated. Image-based tracks (PGS, VobSub) cannot be translated.'
+  },
+  presetNames: { movie: 'Movie', series: 'Series', anime: 'Anime', documentary: 'Documentary' },
+  mediaTypes: { movie: 'Movie', series: 'Series', anime: 'Anime', documentary: 'Documentary' },
   presets: {
+    copyOf: '{{name}} (copy)',
+    copyOfN: '{{name}} (copy {{n}})',
     body: 'How the AI should translate: tone, a glossary of names and terms, and how creative it can be.',
     new: 'New preset',
     import: 'Import',
+    exportPlain: 'Export',
     export_one: 'Export {{count}} preset',
     export_other: 'Export {{count}} presets',
     exported_one: 'Exported {{count}} preset.',
@@ -540,7 +633,7 @@ export const common = {
       source: 'Term',
       target: 'Translation',
       rule: 'Rule',
-      targetPlaceholder: 'Keep as is: repeat the term',
+      targetPlaceholder: 'Same term to keep it',
       rulePlaceholder: 'e.g. keep the honorific',
       add: 'Add entry',
       remove: 'Remove entry {{n}}',

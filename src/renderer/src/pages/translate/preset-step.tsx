@@ -13,6 +13,7 @@ import { useModels } from '@renderer/data/models'
 import { usePresets } from '@renderer/data/presets'
 import { useSettings } from '@renderer/data/settings'
 import { languageName } from '@renderer/lib/languages'
+import { mediaTypeLabel, presetLabel } from '@renderer/lib/preset-labels'
 import { NOTES_MAX, type WizardState } from './wizard-state'
 
 type Patch = Partial<Pick<WizardState, 'presetId' | 'model' | 'targetLang' | 'notes'>>
@@ -40,7 +41,7 @@ export function PresetStep({
   return (
     <div className="grid gap-4">
       <div className="grid gap-2">
-        <Field label={t('translate.preset.preset')}>
+        <Field label={t('translate.preset.preset')} help={t('help.preset')}>
           <Select value={presetId} onValueChange={(v) => onChange({ presetId: v })}>
             <SelectTrigger>
               <SelectValue />
@@ -48,7 +49,7 @@ export function PresetStep({
             <SelectContent>
               {presets.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
-                  {p.name}
+                  {presetLabel(p, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -58,7 +59,7 @@ export function PresetStep({
           <dl className="grid gap-x-6 gap-y-1 rounded-md border bg-background/40 p-3 text-xs sm:grid-cols-[auto_1fr]">
             <dt className="text-muted-foreground">{t('translate.preset.mediaType')}</dt>
             <dd className="flex gap-2">
-              {preset.mediaType}
+              {mediaTypeLabel(preset.mediaType, t)}
               {preset.builtin ? <Badge>{t('translate.preset.builtin')}</Badge> : null}
             </dd>
             <dt className="text-muted-foreground">{t('translate.preset.temperature')}</dt>
@@ -76,7 +77,11 @@ export function PresetStep({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t('translate.preset.model')} hint={t('translate.preset.modelHint')}>
+        <Field
+          label={t('translate.preset.model')}
+          hint={t('translate.preset.modelHint')}
+          help={t('help.model')}
+        >
           <Select value={model} onValueChange={(v) => onChange({ model: v })}>
             <SelectTrigger>
               <SelectValue />
@@ -90,7 +95,11 @@ export function PresetStep({
             </SelectContent>
           </Select>
         </Field>
-        <Field label={t('translate.preset.language')} hint={t('translate.preset.languageHint')}>
+        <Field
+          label={t('translate.preset.language')}
+          hint={t('translate.preset.languageHint')}
+          help={t('help.language')}
+        >
           <Select value={lang} onValueChange={(v) => onChange({ targetLang: v })}>
             <SelectTrigger>
               <SelectValue />
@@ -108,6 +117,7 @@ export function PresetStep({
 
       <Field
         label={t('translate.preset.notes')}
+        help={t('help.notes')}
         hint={t('translate.preset.notesHint', { count: state.notes.length, max: NOTES_MAX })}
         error={
           state.notes.length > NOTES_MAX

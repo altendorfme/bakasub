@@ -33,6 +33,9 @@ export const common: LocaleShape<typeof en> = {
       set: 'API key salva',
       missing: 'Sem API key'
     },
+    tmdb: { set: 'TMDB ativo', missing: 'TMDB desligado' },
+    version: 'v{{version}}',
+    update: 'atualização disponível',
     cooldown: 'Limite de requisições · {{seconds}} s',
     sessionCost: 'US$ {{value}} nesta sessão'
   },
@@ -65,6 +68,7 @@ export const common: LocaleShape<typeof en> = {
     'openrouter-key': 'Como conseguir uma key do OpenRouter',
     'openrouter-limits': 'Limites, esperas e novas tentativas',
     'tmdb-key': 'Como conseguir uma key do TMDB',
+    'choosing-models': 'Como escolher um modelo',
     openExternal: 'Abre no navegador'
   },
   wait: {
@@ -102,6 +106,27 @@ export const common: LocaleShape<typeof en> = {
     moderatedHint: 'O provedor filtra conteúdo; algumas falas podem ficar sem tradução.',
     structured: 'JSON confiável',
     structuredHint: 'Suporta saída estruturada, então há menos novas tentativas.',
+    sort: {
+      label: 'Ordenar',
+      catalog: 'Ordem do OpenRouter',
+      'price-asc': 'Mais baratos primeiro',
+      'price-desc': 'Mais caros primeiro',
+      'context-desc': 'Maior contexto primeiro'
+    },
+    price: {
+      label: 'Preço por 1M tokens (entrada e saída)',
+      min: 'Preço mínimo',
+      max: 'Preço máximo'
+    },
+    family: 'Provedor',
+    allFamilies: 'Todos os provedores',
+    filter: {
+      freeOnly: 'Só gratuitos',
+      jsonOnly: 'JSON confiável',
+      hideModerated: 'Sem moderação',
+      favoritesOnly: 'Só favoritos'
+    },
+    shown: '{{shown}} de {{total}}',
     favoritesOnly: 'Só favoritos',
     favoritesCount_one: '{{count}} favorito',
     favoritesCount_other: '{{count}} favoritos'
@@ -151,6 +176,12 @@ export const common: LocaleShape<typeof en> = {
       declined: 'Instalação cancelada. Você pode instalar depois em Configurações.',
       offline:
         'Não foi possível atualizar a lista de ferramentas; a instalação pode falhar até você estar online.',
+      phase: {
+        downloading: 'Baixando',
+        extracting: 'Descompactando',
+        probing: 'Verificando',
+        done: 'Instalado'
+      },
       state: {
         ok: 'Instalada',
         missing: 'Não instalada',
@@ -167,6 +198,29 @@ export const common: LocaleShape<typeof en> = {
   },
   translate: {
     steps: { file: 'Arquivo', track: 'Faixa', preset: 'Preset e contexto', output: 'Saída' },
+    stepsLabel: 'Passos',
+    fileChanged: 'O arquivo mudou, então os próximos passos precisam ser revistos.',
+    summary: {
+      title: 'Resumo',
+      file: 'Arquivo',
+      track: 'Faixa',
+      preset: 'Preset',
+      model: 'Modelo',
+      language: 'Para',
+      media: 'Mídia',
+      mediaOff: 'Não incluída',
+      output: 'Saída',
+      none: '—',
+      edit: 'Editar {{step}}'
+    },
+    existing: {
+      title: 'Já existe uma legenda em {{language}}',
+      track:
+        'Este vídeo já tem uma faixa de legenda em {{language}} ({{name}}). Traduzir mesmo assim?',
+      file: 'O nome do arquivo indica que esta legenda já está em {{language}}. Traduzir mesmo assim?',
+      go: 'Traduzir mesmo assim',
+      inline: 'Já tem legenda em {{language}}'
+    },
     next: 'Continuar',
     back: 'Voltar',
     start: 'Estimar custo',
@@ -489,12 +543,17 @@ export const common: LocaleShape<typeof en> = {
       upToDate: 'Você está na versão mais recente.',
       update: 'A versão {{latest}} está disponível.',
       offline: 'Não foi possível verificar atualizações.',
+      author: 'Feito por {{name}}',
+      checkUpdate: 'Verificar atualização',
+      repository: 'Repositório',
+      coffee: 'Me pague um café',
       data: 'Pasta de dados',
       tmdb: 'Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Os metadados e imagens de filmes e séries vêm do The Movie Database (TMDB).',
       openrouter: 'As traduções são feitas pelos modelos que você escolhe, por meio do OpenRouter.'
     }
   },
   modelsPage: {
+    keepOne: 'Mantenha pelo menos um modelo favorito: é com ele que o BakaSub traduz.',
     body: 'Marque com estrela os modelos que devem aparecer ao traduzir e escolha o padrão. Os preços são por 1M tokens, do OpenRouter.',
     refresh: 'Atualizar lista',
     updated: 'Lista de {{date}}',
@@ -505,12 +564,47 @@ export const common: LocaleShape<typeof en> = {
     quota: '{{remaining}} de {{limit}} requisições de modelos gratuitos restantes hoje'
   },
   languagesPage: {
+    keepOne: 'Mantenha pelo menos um idioma de destino.',
     body: 'Os idiomas para os quais você traduz. Eles aparecem ao traduzir; o padrão vem selecionado.'
   },
+  common: { resize: 'Redimensionar a lista' },
+  help: {
+    label: 'O que é isto?',
+    preset:
+      'Um preset reúne como traduzir: instruções de estilo, glossário e temperatura. Os embutidos servem para tipos comuns de mídia; crie os seus em Presets.',
+    model:
+      'O modelo de IA que traduz. Preço, velocidade e qualidade variam muito; veja “Como escolher um modelo” em Modelos.',
+    language: 'O idioma para o qual a legenda é traduzida.',
+    notes:
+      'Enviadas para a IA junto com cada parte do arquivo. Fatos curtos funcionam melhor: quem são os personagens, como falam, palavras a manter.',
+    temperature:
+      'Quão livre é a tradução. Baixa (0,1–0,3) fica literal e consistente; perto de 0,5 soa mais natural; acima de 1 começa a improvisar.',
+    mediaType:
+      'Para que tipo de mídia é este preset. É um rótulo para você e também vai para a IA como contexto.',
+    prompt:
+      'Instruções de tom e registro (formal, casual, manter piadas, adaptar expressões…). As regras fixas que protegem tempo e formatação são adicionadas pelo BakaSub.',
+    glossary:
+      'Termos que a IA deve traduzir sempre do mesmo jeito (nomes, lugares, técnicas). Use uma regra para coisas como “manter honoríficos”.',
+    include:
+      'Passa para a IA o título, os gêneros e a sinopse (e a do episódio) para nomes e tom saírem certos. Só o título é enviado ao TMDB.',
+    concurrency:
+      'Quantos jobs rodam ao mesmo tempo. Cada job faz as próprias requisições, então mais jobs atingem os limites do OpenRouter antes.',
+    autoConfirm:
+      'Quando o custo máximo estimado fica abaixo deste valor, o job começa sem perguntar. A estimativa continua visível na fila.',
+    sourceLangs:
+      'Quando um vídeo tem várias faixas de legenda, o BakaSub escolhe como origem a primeira desta lista.',
+    track:
+      'A faixa de legenda que será traduzida. Faixas em imagem (PGS, VobSub) não podem ser traduzidas.'
+  },
+  presetNames: { movie: 'Filme', series: 'Série', anime: 'Anime', documentary: 'Documentário' },
+  mediaTypes: { movie: 'Filme', series: 'Série', anime: 'Anime', documentary: 'Documentário' },
   presets: {
+    copyOf: '{{name}} (cópia)',
+    copyOfN: '{{name}} (cópia {{n}})',
     body: 'Como a IA deve traduzir: tom, um glossário de nomes e termos, e quanta liberdade ela tem.',
     new: 'Novo preset',
     import: 'Importar',
+    exportPlain: 'Exportar',
     export_one: 'Exportar {{count}} preset',
     export_other: 'Exportar {{count}} presets',
     exported_one: '{{count}} preset exportado.',
@@ -549,7 +643,7 @@ export const common: LocaleShape<typeof en> = {
       source: 'Termo',
       target: 'Tradução',
       rule: 'Regra',
-      targetPlaceholder: 'Para manter, repita o termo',
+      targetPlaceholder: 'Repita para manter',
       rulePlaceholder: 'ex.: manter o honorífico',
       add: 'Adicionar entrada',
       remove: 'Remover entrada {{n}}',

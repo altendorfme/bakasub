@@ -7,6 +7,7 @@ import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { useExportPresets, usePresets } from '@renderer/data/presets'
 import { errorMessage } from '@renderer/i18n/error-message'
+import { mediaTypeLabel, presetLabel } from '@renderer/lib/preset-labels'
 import { cn } from '@renderer/lib/utils'
 import { ImportDialog } from './import-dialog'
 import { PresetEditor } from './preset-editor'
@@ -29,7 +30,7 @@ export function PresetsPage(): React.JSX.Element {
   const item = (p: Preset): React.JSX.Element => (
     <li key={p.id} className="flex items-center gap-2">
       <Checkbox
-        aria-label={`${t('presets.select')}: ${p.name}`}
+        aria-label={`${t('presets.select')}: ${presetLabel(p, t)}`}
         checked={marked.includes(p.id)}
         onCheckedChange={(on) =>
           setMarked((m) => (on ? [...m, p.id] : m.filter((x) => x !== p.id)))
@@ -44,8 +45,10 @@ export function PresetsPage(): React.JSX.Element {
           editing === p.id ? 'bg-primary-soft/60 text-foreground' : 'hover:bg-accent'
         )}
       >
-        <span className="truncate">{p.name}</span>
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{p.mediaType}</span>
+        <span className="truncate">{presetLabel(p, t)}</span>
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+          {mediaTypeLabel(p.mediaType, t)}
+        </span>
       </button>
     </li>
   )
@@ -70,7 +73,7 @@ export function PresetsPage(): React.JSX.Element {
           }
         >
           <Download />
-          {t('presets.export', { count: marked.length })}
+          {marked.length ? t('presets.export', { count: marked.length }) : t('presets.exportPlain')}
         </Button>
       </div>
 
@@ -98,7 +101,11 @@ export function PresetsPage(): React.JSX.Element {
             <PresetEditor
               key={editing}
               preset={current}
-              copiedFromName={presets.find((p) => p.id === current?.copiedFrom)?.name}
+              copiedFromName={(() => {
+                const src = presets.find((p) => p.id === current?.copiedFrom)
+                return src ? presetLabel(src, t) : undefined
+              })()}
+              takenNames={presets.map((p) => p.name)}
               onSaved={(p) => setSelected(p.id)}
               onDeleted={() => {
                 setMarked((m) => m.filter((x) => x !== current?.id))

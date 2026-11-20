@@ -29,9 +29,17 @@ export function Button({
   variant,
   size,
   asChild = false,
+  type = 'button',
   ...props
 }: ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & { asChild?: boolean }): React.JSX.Element {
   const Comp = asChild ? Slot : 'button'
-  return <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />
+  // `type` defaults to "button": inside a <form>, a plain Button must not submit it.
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...(asChild ? {} : { type })}
+      {...props}
+    />
+  )
 }

@@ -11,7 +11,15 @@ export class SettingsRepository {
     return row?.value
   }
 
+  /**
+   * `null` deletes the row: the column is NOT NULL (Drizzle's JSON mode writes `null` as SQL
+   * NULL), and every nullable setting defaults to `null`, so a missing row reads back the same.
+   */
   async set(key: string, value: unknown): Promise<void> {
+    if (value === null || value === undefined) {
+      await this.db.delete(settings).where(eq(settings.key, key))
+      return
+    }
     const updatedAt = new Date()
     await this.db
       .insert(settings)

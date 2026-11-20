@@ -34,7 +34,7 @@ export function GuideDialog({ id, label }: { id: GuideId; label?: string }): Rea
           </Button>
         ) : null}
         <Suspense fallback={null}>
-          <GuideView id={current} onNavigate={(next) => setStack((s) => [...s, next])} />
+          <GuideView id={current} hideTitle onNavigate={(next) => setStack((s) => [...s, next])} />
         </Suspense>
       </DialogContent>
     </Dialog>

@@ -2,7 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { Job } from '@shared/ipc-contract'
 import { jobCounts, useJobs } from '@renderer/data/jobs'
-import { useApiKeyStatus } from '@renderer/data/settings'
+import { useAppInfo, useAppUpdate } from '@renderer/data/app'
+import { useApiKeyStatus, useTmdbKeyStatus } from '@renderer/data/settings'
 import { useSidecarReport } from '@renderer/data/sidecars'
 import { cooldownUntil, sessionCost } from '@renderer/data/jobs'
 import { formatUsd } from '@renderer/lib/format'
@@ -43,6 +44,15 @@ export function StatusBar(): React.JSX.Element {
   const avg = running.length ? running.reduce((s, j) => s + jobFraction(j), 0) / running.length : 0
   const tools = useSidecarReport()
   const apiKey = useApiKeyStatus()
+  const tmdb = useTmdbKeyStatus()
+  const info = useAppInfo()
+  const update = useAppUpdate()
+  // "mkvmerge 88.0 · ffmpeg 7.1": the installed versions, so a bug report can quote them.
+  const installed = tools.data?.tools.filter((x) => x.installedVersion) ?? []
+  const toolVersions = installed.map((x) => `${x.name} ${x.installedVersion}`).join(' · ')
+  const toolTitle = tools.data?.tools
+    .map((x) => `${x.name}: ${x.installedVersion ?? '—'}`)
+    .join('\n')
   const cost = sessionCost(jobs)
   const cooldown = cooldownUntil(jobs)
 
@@ -77,18 +87,45 @@ export function StatusBar(): React.JSX.Element {
       )}
       {cooldown ? <Cooldown until={cooldown} /> : null}
       {cost > 0 ? <span>{t('status.sessionCost', { value: formatUsd(cost) })}</span> : null}
-      <span className="ml-auto flex items-center gap-1.5">
+      <Link
+        to="/settings"
+        search={{ tab: 'tools' }}
+        className="ml-auto flex items-center gap-1.5 hover:text-foreground"
+        title={toolTitle}
+      >
         <Dot tone={tools.data ? (tools.data.ready ? 'ok' : 'bad') : 'idle'} />
         {tools.data
-          ? t(tools.data.ready ? 'status.tools.ok' : 'status.tools.missing')
+          ? tools.data.ready
+            ? toolVersions || t('status.tools.ok')
+            : t('status.tools.missing')
           : t('status.tools.checking')}
-      </span>
-      {apiKey.data && (
-        <span className="flex items-center gap-1.5">
-          <Dot tone={apiKey.data.present ? 'ok' : 'bad'} />
-          {t(apiKey.data.present ? 'status.apiKey.set' : 'status.apiKey.missing')}
-        </span>
-      )}
+      </Link>
+      <Link
+        to="/settings"
+        search={{ tab: 'keys' }}
+        className="flex items-center gap-1.5 hover:text-foreground"
+      >
+        {apiKey.data ? (
+          <>
+            <Dot tone={apiKey.data.present ? 'ok' : 'bad'} />
+            {t(apiKey.data.present ? 'status.apiKey.set' : 'status.apiKey.missing')}
+          </>
+        ) : null}
+        {tmdb.data ? (
+          <>
+            <Dot tone={tmdb.data.present ? 'ok' : 'idle'} />
+            {t(tmdb.data.present ? 'status.tmdb.set' : 'status.tmdb.missing')}
+          </>
+        ) : null}
+      </Link>
+      {info.data ? (
+        <Link to="/settings" search={{ tab: 'about' }} className="hover:text-foreground">
+          {t('status.version', { version: info.data.version })}
+          {update.data?.updateAvailable ? (
+            <span className="ml-1 text-primary">{t('status.update')}</span>
+          ) : null}
+        </Link>
+      ) : null}
     </footer>
   )
 }

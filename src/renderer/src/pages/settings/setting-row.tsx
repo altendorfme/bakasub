@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inputClass } from '@renderer/components/ui/input'
+import { HelpTip } from '@renderer/components/ui/help-tip'
 import { cn } from '@renderer/lib/utils'
 
 /** Label + description on the left, the control on the right; stacks on narrow windows. */
@@ -9,19 +10,24 @@ export function SettingRow({
   label,
   description,
   htmlFor,
+  help,
   children
 }: {
   label: ReactNode
   description?: ReactNode
   htmlFor?: string
+  help?: ReactNode
   children: ReactNode
 }): React.JSX.Element {
   return (
     <div className="grid gap-2 py-3 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-6">
       <div className="grid gap-0.5">
-        <label htmlFor={htmlFor} className="text-sm font-medium">
-          {label}
-        </label>
+        <span className="flex items-center gap-1.5">
+          <label htmlFor={htmlFor} className="text-sm font-medium">
+            {label}
+          </label>
+          {help ? <HelpTip>{help}</HelpTip> : null}
+        </span>
         {description ? (
           <p className="max-w-[60ch] text-xs text-muted-foreground">{description}</p>
         ) : null}
@@ -45,6 +51,8 @@ export function NumberSetting({
   unit,
   nullable = false,
   emptyLabel,
+  inputClassName = 'w-28',
+  help,
   onSave
 }: {
   label: ReactNode
@@ -56,6 +64,9 @@ export function NumberSetting({
   unit?: string
   nullable?: boolean
   emptyLabel?: string
+  /** Width of the field (wider when the placeholder is a phrase). */
+  inputClassName?: string
+  help?: ReactNode
   onSave: (v: number | null) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -82,6 +93,7 @@ export function NumberSetting({
     <SettingRow
       label={label}
       htmlFor={id}
+      help={help}
       description={
         <>
           {description}
@@ -105,7 +117,7 @@ export function NumberSetting({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && commit()}
-          className={cn(inputClass, 'w-28 text-right tabular-nums')}
+          className={cn(inputClass, inputClassName, 'text-right tabular-nums')}
         />
         {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
       </span>

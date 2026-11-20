@@ -11,7 +11,12 @@ const files = import.meta.glob<string>('./*/*.md', {
   eager: true
 })
 
-export const GUIDE_IDS = ['openrouter-key', 'openrouter-limits', 'tmdb-key'] as const
+export const GUIDE_IDS = [
+  'choosing-models',
+  'openrouter-key',
+  'openrouter-limits',
+  'tmdb-key'
+] as const
 export type GuideId = (typeof GUIDE_IDS)[number]
 
 /** Guides exist in every app language (the test enforces it). */

@@ -5,6 +5,7 @@ import { GuideDialog } from '@renderer/components/common/guide-dialog'
 import { KeyForm } from '@renderer/components/forms/key-form'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
+import { HelpTip } from '@renderer/components/ui/help-tip'
 import { useIdentify, useMediaLookup } from '@renderer/data/media'
 import { useSetTmdbKey } from '@renderer/data/settings'
 import { episodeCode } from '@renderer/lib/episode'
@@ -165,6 +166,7 @@ export function MediaPanel({
             {t('media.include')}
           </label>
         ) : null}
+        {details ? <HelpTip>{t('help.include')}</HelpTip> : null}
         <span className="ml-auto text-[11px] text-muted-foreground">{t('media.attribution')}</span>
       </div>
     </section>

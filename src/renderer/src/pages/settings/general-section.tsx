@@ -1,5 +1,6 @@
 import { ArrowUp, Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@renderer/components/ui/button'
 import { LanguageSelect } from '@renderer/components/common/language-select'
 import { Switch } from '@renderer/components/ui/checkbox'
 import {
@@ -12,6 +13,7 @@ import {
 import { useSetting } from '@renderer/data/preferences'
 import { usePresets } from '@renderer/data/presets'
 import { languageName, TARGET_LANGUAGES } from '@renderer/lib/languages'
+import { presetLabel } from '@renderer/lib/preset-labels'
 import { NumberSetting, SettingRow } from './setting-row'
 
 export function GeneralSection(): React.JSX.Element {
@@ -42,7 +44,7 @@ export function GeneralSection(): React.JSX.Element {
           <SelectContent>
             {presets.map((p) => (
               <SelectItem key={p.id} value={p.id}>
-                {p.name}
+                {presetLabel(p, t)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -52,6 +54,7 @@ export function GeneralSection(): React.JSX.Element {
       <NumberSetting
         label={t('settings.general.concurrency')}
         description={t('settings.general.concurrencyHint')}
+        help={t('help.concurrency')}
         value={concurrency}
         min={1}
         max={4}
@@ -61,6 +64,7 @@ export function GeneralSection(): React.JSX.Element {
       <NumberSetting
         label={t('settings.general.autoConfirm')}
         description={t('settings.general.autoConfirmHint')}
+        help={t('help.autoConfirm')}
         value={autoConfirm}
         min={0}
         max={1000}
@@ -68,6 +72,7 @@ export function GeneralSection(): React.JSX.Element {
         unit="US$"
         nullable
         emptyLabel={t('settings.general.always')}
+        inputClassName="w-48"
         onSave={setAutoConfirm}
       />
 
@@ -97,44 +102,44 @@ function SourceLangs(): React.JSX.Element {
     <SettingRow
       label={t('settings.general.sourceLangs')}
       description={t('settings.general.sourceLangsHint')}
+      help={t('help.sourceLangs')}
     >
-      <div className="grid justify-items-end gap-2">
-        <ol className="flex flex-wrap justify-end gap-1.5">
+      {/* An ordered list: position matters (first match wins), so it reads as a ranking. */}
+      <div className="grid w-64 gap-2">
+        <ol className="grid divide-y rounded-md border bg-background/40">
           {langs.map((tag, i) => (
-            <li
-              key={tag}
-              className="flex items-center gap-1 rounded-full border bg-background/40 py-0.5 pr-1 pl-2.5 text-xs"
-            >
-              {name(tag)}
-              {i > 0 ? (
-                <button
-                  type="button"
-                  aria-label={t('settings.general.up', { name: name(tag) })}
-                  className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-                  onClick={() =>
-                    setLangs([...langs.slice(0, i - 1), tag, langs[i - 1], ...langs.slice(i + 1)])
-                  }
-                >
-                  <ArrowUp className="size-3" />
-                </button>
-              ) : null}
-              {langs.length > 1 ? (
-                <button
-                  type="button"
-                  aria-label={t('settings.general.remove', { name: name(tag) })}
-                  className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => setLangs(langs.filter((l) => l !== tag))}
-                >
-                  <X className="size-3" />
-                </button>
-              ) : null}
+            <li key={tag} className="flex items-center gap-2 px-2.5 py-1.5 text-sm">
+              <span className="w-4 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate">{name(tag)}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                disabled={i === 0}
+                aria-label={t('settings.general.up', { name: name(tag) })}
+                onClick={() =>
+                  setLangs([...langs.slice(0, i - 1), tag, langs[i - 1], ...langs.slice(i + 1)])
+                }
+              >
+                <ArrowUp />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                disabled={langs.length <= 1}
+                aria-label={t('settings.general.remove', { name: name(tag) })}
+                onClick={() => setLangs(langs.filter((l) => l !== tag))}
+              >
+                <X />
+              </Button>
             </li>
           ))}
         </ol>
         <Select value="" onValueChange={(v) => setLangs([...langs, v])}>
-          <SelectTrigger className="h-8 w-44 text-xs" aria-label={t('settings.general.add')}>
-            <span className="flex items-center gap-1.5">
-              <Plus className="size-3.5" />
+          <SelectTrigger aria-label={t('settings.general.add')}>
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Plus className="size-4" />
               {t('settings.general.add')}
             </span>
           </SelectTrigger>

@@ -16,6 +16,7 @@ import { paths } from './config/paths'
 import { createSidecarModule } from './sidecars/create-sidecar-manager'
 import { AppUpdateService } from './services/app-update.service'
 import { NativeConsentGate } from './services/sidecar-consent'
+import { consentLanguage } from './services/sidecar-consent-text'
 import { path7za } from '7zip-bin'
 import { AppInfoService } from './services/app-info.service'
 import { bootFailureMessage } from './services/boot-failure'
@@ -67,7 +68,10 @@ if (!app.requestSingleInstanceLock()) {
         cacheDir: paths.cache(),
         // 7za precisa estar fora do asar (ver asarUnpack).
         sevenZipPath: path7za.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1'),
-        consent: new NativeConsentGate(),
+        // `jobModule` is created below; the dialog only opens later, on a user action.
+        consent: new NativeConsentGate(async () =>
+          consentLanguage(await jobModule.settings.get('ui.language'), app.getLocale())
+        ),
         emitProgress: (p) => emitToRenderers('sidecars:progress', p),
         log: logger.sidecar
       })

@@ -1,5 +1,5 @@
 import { useCallback, useReducer, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { FileDrop } from '@renderer/components/files/file-drop'
@@ -9,27 +9,37 @@ import type { MediaChoice } from '@renderer/components/media/media-choice'
 import { MediaPanel } from '@renderer/components/media/media-panel'
 import { TrackPicker } from '@renderer/components/media/track-picker'
 import { Button } from '@renderer/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogFooter } from '@renderer/components/ui/dialog'
 import { useCreateJob, useJob } from '@renderer/data/jobs'
-import { useMediaLookup } from '@renderer/data/media'
+import { useMediaLookup, useProbe } from '@renderer/data/media'
+import { usePresets } from '@renderer/data/presets'
 import { useSettings } from '@renderer/data/settings'
 import { errorMessage } from '@renderer/i18n/error-message'
-import { cn } from '@renderer/lib/utils'
+import { existingTarget } from '@renderer/lib/existing-subtitle'
+import { languageName } from '@renderer/lib/languages'
 import { OutputStep } from './output-step'
 import { PresetStep } from './preset-step'
+import { StepBar } from './step-bar'
+import { WizardSummary } from './wizard-summary'
 import {
   buildJobRequest,
   canContinue,
+  canGo,
   initialWizard,
   stepsFor,
-  wizardReducer
+  stepValid,
+  wizardReducer,
+  type WizardStep
 } from './wizard-state'
 
 /** "Translate a file": file → track (video) → preset & context → output → job (preflight, progress). */
 export function TranslatePage(): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [state, dispatch] = useReducer(wizardReducer, initialWizard)
   const [jobId, setJobId] = useState<string | null>(null)
+  const [confirmExisting, setConfirmExisting] = useState(false)
   const settings = useSettings().data
+  const presets = usePresets().data ?? []
   const create = useCreateJob()
   const onTrack = useCallback(
     (ids: number[]) => ids[0] !== undefined && dispatch({ type: 'track', trackId: ids[0] }),
@@ -39,34 +49,59 @@ export function TranslatePage(): React.JSX.Element {
     (patch: Partial<MediaChoice>) => dispatch({ type: 'media', patch }),
     []
   )
-  // Artwork: the chosen title while editing, the job's frozen media afterwards.
-  const chosen = useMediaLookup(state.media.include ? state.media.ref : null, null).data
-  const created = useJob(jobId).data
-  const backdrop = jobId ? created?.media?.backdropUrl : chosen?.details.backdropUrl
 
-  const steps = stepsFor(state.file?.kind)
-  const index = steps.indexOf(state.step)
-  const last = index === steps.length - 1
   const defaults = {
     model: settings?.['translation.defaultModel'] ?? null,
     targetLang: settings?.['translation.defaultTargetLang'] ?? null
   }
-  const ready = canContinue(state, defaults)
+  const model = state.model ?? defaults.model
+  const targetLang = state.targetLang ?? defaults.targetLang
+  const presetId = state.presetId ?? settings?.['translation.defaultPresetId']
+  const preset = presets.find((p) => p.id === presetId)
 
-  const start = (): void =>
+  // Cached queries: the same keys the steps already use.
+  const video = state.file?.kind === 'video' ? state.file.path : null
+  const probe = useProbe(video).data
+  const track = probe?.subtitles.find((tr) => tr.id === state.trackId)
+  const chosen = useMediaLookup(state.media.include ? state.media.ref : null, null).data
+  const created = useJob(jobId).data
+  // Artwork: the chosen title while editing, the job's frozen media afterwards.
+  const backdrop = jobId ? created?.media?.backdropUrl : chosen?.details.backdropUrl
+  const existing = state.file
+    ? existingTarget(targetLang, {
+        path: state.file.path,
+        kind: state.file.kind,
+        tracks: probe?.subtitles
+      })
+    : null
+  const targetName = targetLang ? languageName(targetLang, i18n.language) : ''
+
+  const steps = stepsFor(state.file?.kind)
+  const index = steps.indexOf(state.step)
+  const last = index === steps.length - 1
+  const ready = canContinue(state, defaults)
+  const reachable = (s: WizardStep): boolean => canGo(state, s, defaults)
+  const go = (s: WizardStep): void => dispatch({ type: 'go', step: s, defaults })
+
+  const createJob = (): void =>
     create.mutate(buildJobRequest(state), {
-      onSuccess: (job) => setJobId(job.id),
+      onSuccess: (job) => {
+        setConfirmExisting(false)
+        setJobId(job.id)
+      },
       onError: (err) => toast.error(errorMessage(err))
     })
+  // Already has a subtitle in the target language: ask first (never silently).
+  const start = (): void => (existing ? setConfirmExisting(true) : createJob())
 
   return (
     <div className="relative min-h-full">
       <Backdrop url={backdrop} />
-      <div className="relative mx-auto grid max-w-3xl gap-5 px-6 py-7">
+      <div className="relative mx-auto grid max-w-6xl gap-5 px-6 py-7">
         <h1 className="text-xl font-semibold tracking-tight">{t('pages.translate.title')}</h1>
 
         {jobId ? (
-          <section className="rounded-xl border bg-card/92 p-5">
+          <section className="mx-auto w-full max-w-3xl rounded-xl border bg-card/92 p-5">
             <JobDetail
               id={jobId}
               showQueueLink
@@ -78,97 +113,134 @@ export function TranslatePage(): React.JSX.Element {
           </section>
         ) : (
           <>
-            <ol className="flex flex-wrap gap-1" aria-label={t('pages.translate.title')}>
-              {steps.map((s, i) => (
-                <li key={s}>
-                  <button
-                    type="button"
-                    disabled={i > index}
-                    aria-current={i === index ? 'step' : undefined}
-                    onClick={() => dispatch({ type: 'go', step: s })}
-                    className={cn(
-                      'flex items-center gap-2 rounded-full px-3 py-1 text-xs disabled:opacity-40',
-                      i === index
-                        ? 'bg-primary-soft text-primary'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <span className="grid size-4 place-items-center rounded-full border border-current text-[10px]">
-                      {i < index ? <Check className="size-2.5" strokeWidth={3} /> : i + 1}
-                    </span>
-                    {t(`translate.steps.${s}`)}
-                  </button>
-                </li>
-              ))}
-            </ol>
-
-            {state.step === 'preset' && state.file ? (
-              <MediaPanel fileName={state.file.name} value={state.media} onChange={onMedia} />
+            <StepBar
+              steps={steps}
+              current={state.step}
+              done={(s) => steps.indexOf(s) <= state.furthest && stepValid(state, s, defaults)}
+              reachable={reachable}
+              onGo={go}
+            />
+            {state.notice === 'file-changed' ? (
+              <p
+                role="status"
+                className="mx-auto flex items-center gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning"
+              >
+                <Info className="size-4 shrink-0" />
+                {t('translate.fileChanged')}
+              </p>
             ) : null}
 
-            <section
-              className="grid gap-4 rounded-xl border bg-card/92 p-5"
-              aria-labelledby="translate-step"
-            >
-              <h2 id="translate-step" className="text-base font-semibold">
-                {t(`translate.${state.step}.heading`)}
-              </h2>
-              {state.step === 'file' ? (
-                <>
-                  <p className="-mt-2 text-sm text-muted-foreground">{t('translate.file.body')}</p>
-                  <FileDrop
-                    path={state.file?.path ?? null}
-                    onFile={(path) => dispatch({ type: 'file', path })}
-                  />
-                </>
-              ) : null}
-              {state.step === 'track' && state.file ? (
-                <TrackPicker
-                  path={state.file.path}
-                  mode="single"
-                  value={state.trackId === null ? [] : [state.trackId]}
-                  onChange={onTrack}
-                />
-              ) : null}
-              {state.step === 'preset' ? (
-                <PresetStep state={state} onChange={(patch) => dispatch({ type: 'set', patch })} />
-              ) : null}
-              {state.step === 'output' ? (
-                <OutputStep
-                  state={state}
-                  onFolder={(outputDir) => dispatch({ type: 'set', patch: { outputDir } })}
-                  onMux={(patch) => dispatch({ type: 'mux', patch })}
-                />
-              ) : null}
-
-              <div className="flex items-center justify-end gap-2 border-t pt-4">
-                {index > 0 ? (
-                  <Button
-                    variant="ghost"
-                    className="mr-auto"
-                    onClick={() => dispatch({ type: 'back' })}
-                  >
-                    {t('translate.back')}
-                  </Button>
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+              <div className="grid min-w-0 gap-5">
+                {state.step === 'preset' && state.file ? (
+                  <MediaPanel fileName={state.file.name} value={state.media} onChange={onMedia} />
                 ) : null}
-                {last ? (
-                  <Button variant="default" disabled={create.isPending} onClick={start}>
-                    {create.isPending ? t('translate.starting') : t('translate.start')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="default"
-                    disabled={!ready}
-                    onClick={() => dispatch({ type: 'next', defaults })}
-                  >
-                    {t('translate.next')}
-                  </Button>
-                )}
+
+                <section
+                  className="grid gap-4 rounded-xl border bg-card/92 p-5"
+                  aria-labelledby="translate-step"
+                >
+                  <h2 id="translate-step" className="text-base font-semibold">
+                    {t(`translate.${state.step}.heading`)}
+                  </h2>
+                  {state.step === 'file' ? (
+                    <>
+                      <p className="-mt-2 text-sm text-muted-foreground">
+                        {t('translate.file.body')}
+                      </p>
+                      <FileDrop
+                        path={state.file?.path ?? null}
+                        onFile={(path) => dispatch({ type: 'file', path })}
+                      />
+                    </>
+                  ) : null}
+                  {state.step === 'track' && state.file ? (
+                    <TrackPicker
+                      path={state.file.path}
+                      mode="single"
+                      value={state.trackId === null ? [] : [state.trackId]}
+                      onChange={onTrack}
+                    />
+                  ) : null}
+                  {state.step === 'preset' ? (
+                    <PresetStep
+                      state={state}
+                      onChange={(patch) => dispatch({ type: 'set', patch })}
+                    />
+                  ) : null}
+                  {state.step === 'output' ? (
+                    <OutputStep
+                      state={state}
+                      onFolder={(outputDir) => dispatch({ type: 'set', patch: { outputDir } })}
+                      onMux={(patch) => dispatch({ type: 'mux', patch })}
+                    />
+                  ) : null}
+
+                  <div className="flex items-center justify-end gap-2 border-t pt-4">
+                    {index > 0 ? (
+                      <Button
+                        variant="ghost"
+                        className="mr-auto"
+                        onClick={() => dispatch({ type: 'back' })}
+                      >
+                        {t('translate.back')}
+                      </Button>
+                    ) : null}
+                    {last ? (
+                      <Button variant="default" disabled={create.isPending} onClick={start}>
+                        {create.isPending ? t('translate.starting') : t('translate.start')}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        disabled={!ready}
+                        onClick={() => dispatch({ type: 'next', defaults })}
+                      >
+                        {t('translate.next')}
+                      </Button>
+                    )}
+                  </div>
+                </section>
               </div>
-            </section>
+
+              <WizardSummary
+                state={state}
+                preset={preset}
+                model={model}
+                targetLang={targetLang}
+                track={track}
+                media={chosen}
+                existing={existing}
+                canGo={reachable}
+                onGo={go}
+              />
+            </div>
           </>
         )}
       </div>
+
+      <Dialog open={confirmExisting} onOpenChange={setConfirmExisting}>
+        <DialogContent
+          title={t('translate.existing.title', { language: targetName })}
+          description={
+            existing?.where === 'track'
+              ? t('translate.existing.track', {
+                  language: targetName,
+                  name: existing.track.name ?? `#${existing.track.id}`
+                })
+              : t('translate.existing.file', { language: targetName })
+          }
+        >
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button>{t('actions.cancel')}</Button>
+            </DialogClose>
+            <Button variant="default" disabled={create.isPending} onClick={createJob}>
+              {t('translate.existing.go')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

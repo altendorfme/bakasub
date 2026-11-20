@@ -106,6 +106,26 @@ describe('Models', () => {
   })
 })
 
+describe('Models: guard and price range', () => {
+  it('the last favorite cannot be removed here (the app needs a model)', async () => {
+    const { update } = setup('/models', onboardedSettings)
+    await userEvent.click(await screen.findByText('Model AB'))
+    expect(update).not.toHaveBeenCalled()
+    expect(await screen.findByText(/Keep at least one favorite model/)).toBeTruthy()
+  })
+
+  it('the price range hides models outside it (input and output)', async () => {
+    setup('/models', onboardedSettings)
+    expect(await screen.findByText('Model AB')).toBeTruthy()
+    const max = screen.getByRole('slider', { name: 'Maximum price' })
+    max.focus()
+    // Stops: 0, 0.05, 0.1, 0.25, 0.5, 1, 2 → down to $1: Model AB ($1 in, $2 out) leaves.
+    await userEvent.keyboard('{ArrowLeft}')
+    expect(screen.queryByText('Model AB')).toBeNull()
+    expect(screen.getByText('$0 – $1')).toBeTruthy()
+  })
+})
+
 describe('Languages', () => {
   it('adding a language keeps the default', async () => {
     const { update } = setup('/languages', onboardedSettings)

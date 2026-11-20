@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@renderer/components/ui/button'
+import { HelpTip } from '@renderer/components/ui/help-tip'
 import { Input } from '@renderer/components/ui/input'
 import { PRESET_LIMITS, type DraftErrors, type PresetDraft } from './preset-draft'
 
@@ -24,7 +25,10 @@ export function GlossaryEditor({
 
   return (
     <fieldset className="grid gap-2">
-      <legend className="text-sm font-medium">{t('presets.glossary.title')}</legend>
+      <legend className="flex items-center gap-1.5 text-sm font-medium">
+        {t('presets.glossary.title')}
+        <HelpTip>{t('help.glossary')}</HelpTip>
+      </legend>
       <p className="text-xs text-muted-foreground">{t('presets.glossary.hint')}</p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('presets.glossary.empty')}</p>

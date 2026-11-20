@@ -58,7 +58,10 @@ export function languageName(tag: string, uiLang: string): string {
     cache.set(uiLang, names)
   }
   try {
-    return names.of(tag) ?? tag
+    const name = names.of(tag) ?? tag
+    // Portuguese, Spanish, French… names are lowercase in CLDR ("português"); as a label they
+    // start with a capital ("Português (Brasil)").
+    return name.charAt(0).toLocaleUpperCase(uiLang) + name.slice(1)
   } catch {
     return tag
   }

@@ -597,7 +597,7 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError 
 export interface IpcInvokeContract {
   'app:get-info': { req: void; res: AppInfo }
   'app:check-update': { req: void; res: AppUpdateInfo }
-  /** Só HTTPS para hosts da allowlist do Main (TMDB, OpenRouter); senão `URL_NOT_ALLOWED`. */
+  /** Só HTTPS para hosts da allowlist do Main (TMDB, OpenRouter, GitHub, Buy Me a Coffee); senão `URL_NOT_ALLOWED`. */
   'app:open-external': { req: { url: string }; res: { opened: true } }
   'sidecars:check': { req: void; res: SidecarReport }
   /** O Main exibe diálogo nativo de consentimento; sem aceite, nada é baixado. */

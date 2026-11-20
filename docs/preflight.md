@@ -25,9 +25,10 @@ It simulates the real requests with the **same production code**: Job Memory loo
 | Condition                                                                      | Decision             |
 | ------------------------------------------------------------------------------ | -------------------- |
 | `confirmBeforeTranslate: false` (job option, default `true`)                   | `auto-confirmed`     |
-| nothing to translate (all lines cached)                                        | `auto-confirmed`     |
 | setting `preflight.autoConfirmBelowUsd` set and `cost.high` below it (per job) | `auto-confirmed`     |
 | otherwise                                                                      | `needs-confirmation` |
+
+A job whose lines are all in the cache still stops for review (unless the threshold applies): the screen says nothing will be sent to the AI and shows the coverage.
 
 `jobs:confirm` sets it to `confirmed` and re-queues the job; the runner resumes at `translate` from the stored artifacts (no re-extraction, no new estimate). `awaiting-confirmation` is not running: it frees the queue slot and survives an app restart unchanged.
 

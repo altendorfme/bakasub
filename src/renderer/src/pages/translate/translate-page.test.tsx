@@ -9,7 +9,8 @@ import type {
   Job,
   JobCreateRequest,
   PreflightEstimate,
-  Preset
+  Preset,
+  SubtitleTrackInfo
 } from '@shared/ipc-contract'
 import { App } from '@renderer/app/app'
 import { createAppRouter } from '@renderer/app/router'
@@ -78,7 +79,10 @@ const job = (over: Partial<Job>): Job => ({
   ...over
 })
 
-function setup(path: string): {
+function setup(
+  path: string,
+  tracks?: SubtitleTrackInfo[]
+): {
   fake: FakeApi
   create: ReturnType<typeof vi.fn>
   confirm: ReturnType<typeof vi.fn>
@@ -140,7 +144,7 @@ function setup(path: string): {
       probe: () =>
         ok({
           attachments: 2,
-          subtitles: [
+          subtitles: tracks ?? [
             {
               id: 1,
               codecId: 'S_HDMV/PGS',
@@ -181,16 +185,17 @@ describe('Translate a file', () => {
   it('subtitle: no track step, defaults prefilled, preflight review, confirm, live progress', async () => {
     const { fake, create, confirm } = setup('/subs/ep01.en.srt')
     await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
-    expect(await screen.findByText('ep01.en.srt')).toBeTruthy()
-    const steps = screen.getByRole('list', { name: 'Translate a file' })
+    expect((await screen.findAllByText('ep01.en.srt')).length).toBeGreaterThan(0)
+    const steps = screen.getByRole('list', { name: 'Steps' })
     expect(within(steps).queryByText('Track')).toBeNull()
     await next()
 
     expect(await screen.findByRole('heading', { name: 'How to translate' })).toBeTruthy()
     expect(await screen.findByText('Natural dialogue.')).toBeTruthy()
     expect(screen.getByText('1 glossary entry')).toBeTruthy()
-    expect(screen.getByText('Model AB')).toBeTruthy()
-    expect(screen.getByText('Brazilian Portuguese')).toBeTruthy()
+    // In the selects and in the summary.
+    expect(screen.getAllByText('Model AB').length).toBe(2)
+    expect(screen.getAllByText('Brazilian Portuguese').length).toBe(2)
     await userEvent.type(screen.getByLabelText('Notes for the translator (optional)'), 'Elf mage')
     await next()
 
@@ -246,5 +251,51 @@ describe('Translate a file', () => {
         options: { setDefault: false, keepOriginalSubtitles: true, alsoWriteSubtitle: false }
       })
     )
+  })
+
+  it('a video that already has a subtitle in the target language asks before translating', async () => {
+    const { create } = setup('/v/ep01.mkv', [
+      {
+        id: 2,
+        codecId: 'S_TEXT/ASS',
+        format: 'ass',
+        language: 'en',
+        default: false,
+        forced: false
+      },
+      {
+        id: 5,
+        codecId: 'S_TEXT/ASS',
+        format: 'ass',
+        language: 'por',
+        name: 'Fansub',
+        default: false,
+        forced: false
+      }
+    ])
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await next()
+    await next()
+    expect(await screen.findByText('Already has a Brazilian Portuguese subtitle')).toBeTruthy()
+    await next()
+    await userEvent.click(await screen.findByRole('button', { name: 'Estimate cost' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/Brazilian Portuguese subtitle track \(Fansub\)/)).toBeTruthy()
+    expect(create).not.toHaveBeenCalled()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Translate anyway' }))
+    expect(create).toHaveBeenCalled()
+  })
+
+  it('reached steps can be revisited from the step bar without Continue', async () => {
+    setup('/subs/ep01.en.srt')
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await next()
+    await next()
+    expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
+    const steps = screen.getByRole('list', { name: 'Steps' })
+    await userEvent.click(within(steps).getByRole('button', { name: /File/ }))
+    expect(await screen.findByRole('heading', { name: 'Choose what to translate' })).toBeTruthy()
+    await userEvent.click(within(steps).getByRole('button', { name: /Output/ }))
+    expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
   })
 })
