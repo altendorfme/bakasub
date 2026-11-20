@@ -22,7 +22,9 @@ describe('outputNames', () => {
     expect(outputNames.subtitle('/v/ep01.ass', 'pt-BR', 'srt')).toBe('ep01.pt-BR.srt')
     expect(outputNames.extracted('/v/ep01.mkv', 3, 'en', 'ass')).toBe('ep01.3.en.ass')
     expect(outputNames.extracted('/v/ep01.mkv', 3, undefined, 'srt')).toBe('ep01.3.und.srt')
-    expect(outputNames.partial('/out/ep01.pt-BR.mkv')).toBe('/out/.ep01.pt-BR.bakasub-partial.mkv')
+    expect(outputNames.partial(join('/out', 'ep01.pt-BR.mkv'))).toBe(
+      join('/out', '.ep01.pt-BR.bakasub-partial.mkv')
+    )
   })
 })
 
