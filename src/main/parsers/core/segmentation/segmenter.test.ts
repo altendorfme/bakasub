@@ -110,9 +110,10 @@ describe('classify: blocos não parseados', () => {
 describe('fragmentos de karaokê tipografado', () => {
   const status = (body: string): string => classify(cueOf(body)).status
   it('sílaba posicionada e animada é ignorada', () => {
-    expect(
-      classify(cueOf('{\\fscx100\\pos(1440.2,22.5)\\t(0,480,\\1c&HFFFFFF&)}shii'))
-    ).toEqual({ status: 'skipped', reason: 'SKIPPED_FRAGMENT' })
+    expect(classify(cueOf('{\\fscx100\\pos(1440.2,22.5)\\t(0,480,\\1c&HFFFFFF&)}shii'))).toEqual({
+      status: 'skipped',
+      reason: 'SKIPPED_FRAGMENT'
+    })
   })
   it('letra única com \\move é ignorada', () => {
     expect(status('{\\move(1,2,3,4)}k')).toBe('skipped')

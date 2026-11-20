@@ -9,7 +9,8 @@ export interface TranslationUnit {
   readonly skeleton: Skeleton
 }
 
-export type SkipReason = 'SKIPPED_NO_LETTERS' | 'SKIPPED_EMPTY_BLOCK' | 'SKIPPED_DRAWING' | 'SKIPPED_FRAGMENT'
+export type SkipReason =
+  'SKIPPED_NO_LETTERS' | 'SKIPPED_EMPTY_BLOCK' | 'SKIPPED_DRAWING' | 'SKIPPED_FRAGMENT'
 export type UntranslatedReason =
   | 'UNTRANSLATED_ORPHAN_TEXT'
   | 'UNTRANSLATED_BAD_TIMING'
