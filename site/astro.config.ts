@@ -1,6 +1,10 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'astro/config'
 import tailwindcss from '@tailwindcss/vite'
+import starlight from '@astrojs/starlight'
+import { docsDir, repoUrl } from './src/docs/paths'
+import { docsSidebar } from './src/docs/sidebar'
+import { remarkRepoDocs } from './src/docs/remark-repo-docs'
 
 const fromSite = (path: string): string => fileURLToPath(new URL(path, import.meta.url))
 
@@ -9,7 +13,8 @@ const fromSite = (path: string): string => fileURLToPath(new URL(path, import.me
  * - `@brand`     -> src/shared/brand (tokens.css, fonts.css, theme.css; shared with the renderer)
  * - `@resources` -> resources (app icon)
  * - `@assets`    -> src/renderer/src/assets (logo lockup)
- * - `@docs`      -> docs (README logos, screenshots for later phases)
+ * - `@docs`      -> docs (README logos)
+ * The docs pages read docs/*.md in place too: src/content.config.ts + src/docs/.
  */
 const brandDirs = {
   '@brand': fromSite('../src/shared/brand'),
@@ -28,15 +33,41 @@ const fontPackages = [
   '@fontsource-variable/jetbrains-mono'
 ]
 
+const base = '/bakasub'
+
 export default defineConfig({
   site: 'https://lsilvatti.github.io',
-  base: '/bakasub',
+  base,
   trailingSlash: 'ignore',
-  // Keep in sync with `locales` in src/i18n/index.ts. English at the root, Portuguese under /pt/.
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en', 'pt'],
-    routing: { prefixDefaultLocale: false }
+  // Starlight turns prefetch-on-hover on for every page when unset; keep the landing's JS unchanged.
+  prefetch: false,
+  /*
+   * No Astro `i18n` block: Starlight cannot share it with its own `locales`, and inferring them from it
+   * would generate `/pt/docs/*` fallback pages. The landing builds its locale URLs itself
+   * (src/i18n/index.ts, English at the root, Portuguese under /pt/); the docs are English only.
+   */
+  integrations: [
+    starlight({
+      title: 'BakaSub Docs',
+      description: 'User guide and developer documentation for BakaSub.',
+      locales: { root: { label: 'English', lang: 'en' } },
+      logo: { src: '@resources/icon.svg', alt: 'BakaSub' },
+      social: [{ icon: 'github', label: 'GitHub', href: repoUrl }],
+      sidebar: docsSidebar(),
+      customCss: ['@brand/fonts.css', '@brand/tokens.css', './src/styles/docs.css'],
+      components: {
+        ThemeProvider: './src/components/docs/ThemeProvider.astro',
+        ThemeSelect: './src/components/docs/ThemeSelect.astro'
+      },
+      routeMiddleware: './src/docs/route-middleware.ts',
+      // GitHub Pages serves one 404.html for the whole site; Starlight's would replace the landing's look.
+      disable404Route: true,
+      expressiveCode: { themes: ['github-dark'] }
+    })
+  ],
+  markdown: {
+    // Scoped to files directly in docs/: other Markdown is left untouched.
+    remarkPlugins: [[remarkRepoDocs, { base }]]
   },
   vite: {
     plugins: [tailwindcss()],
@@ -53,7 +84,7 @@ export default defineConfig({
     },
     server: {
       fs: {
-        allow: [fromSite('.'), ...Object.values(brandDirs)]
+        allow: [fromSite('.'), ...Object.values(brandDirs), docsDir]
       }
     }
   }

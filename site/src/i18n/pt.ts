@@ -9,6 +9,8 @@ export const pt = {
   'meta.description':
     'Extraia, traduza com IA e remuxe as legendas dos seus vídeos .mkv, num app desktop, na sua própria máquina.',
   'nav.home': 'Início do BakaSub',
+  'nav.docs': 'Docs',
+  'nav.docsLabel': 'Docs (em inglês)',
   'nav.github': 'GitHub',
   'nav.githubLabel': 'BakaSub no GitHub',
   'nav.primary': 'Principal',
@@ -43,6 +45,7 @@ export const pt = {
   'screenshots.presets.caption': 'Presets e glossário',
   'screenshots.presets.alt': 'Um preset de tradução com as regras do glossário.',
   'footer.license': 'Software livre e de código aberto, sob a licença',
+  'footer.docs': 'Documentação (em inglês)',
   'footer.releases': 'Todas as versões',
   'footer.coffee': 'Me pague um café',
   'footer.source': 'Código-fonte',

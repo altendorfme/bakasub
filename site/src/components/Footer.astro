@@ -1,6 +1,6 @@
 ---
 import iconUrl from '@resources/icon.svg?url'
-import { useTranslations, links, type Locale } from '../i18n'
+import { useTranslations, links, sitePath, type Locale } from '../i18n'
 
 interface Props {
   locale?: Locale
@@ -20,6 +20,7 @@ const linkClass = 'rounded-sm text-muted-foreground transition-colors hover:text
       </p>
     </div>
     <ul class="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+      <li><a href={sitePath('docs/')} hreflang="en" class={linkClass}>{t('footer.docs')}</a></li>
       <li><a href={links.releases} class={linkClass}>{t('footer.releases')}</a></li>
       <li><a href={links.repo} class={linkClass}>{t('footer.source')}</a></li>
       <li>

@@ -7,6 +7,8 @@ export const en = {
   'meta.description':
     'Extract, translate with AI and re-mux the subtitles of your .mkv videos, from a desktop app, on your own machine.',
   'nav.home': 'BakaSub home',
+  'nav.docs': 'Docs',
+  'nav.docsLabel': 'Docs',
   'nav.github': 'GitHub',
   'nav.githubLabel': 'BakaSub on GitHub',
   'nav.primary': 'Main',
@@ -43,6 +45,7 @@ export const en = {
   'screenshots.presets.caption': 'Presets & glossary',
   'screenshots.presets.alt': 'A translation preset with its glossary rules.',
   'footer.license': 'Free and open source software, licensed under',
+  'footer.docs': 'Documentation',
   'footer.releases': 'All releases',
   'footer.coffee': 'Buy me a coffee',
   'footer.source': 'Source code',

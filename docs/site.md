@@ -5,8 +5,8 @@ The landing page lives in `site/`: Astro 5 + Tailwind CSS v4, static output, pub
 ```bash
 cd site
 npm install
-npm run dev      # http://localhost:4321/bakasub/
-npm run build    # astro check + static build into site/dist
+npm run dev      # http://localhost:4321/bakasub/ (docs at /bakasub/docs/)
+npm run build    # astro check + static build into site/dist (+ Pagefind search index)
 npm run preview  # serves site/dist under /bakasub/
 ```
 
@@ -19,7 +19,7 @@ The site has no copy of the palette, the fonts or the logos. `site/astro.config.
 | `@brand`     | `src/shared/brand`        | `fonts.css`, `tokens.css`, `theme.css` (see [brand tokens](./brand-tokens.md)) |
 | `@resources` | `resources`               | `icon.svg`: favicon, nav and footer mark                                       |
 | `@assets`    | `src/renderer/src/assets` | `logo.svg`: hero lockup                                                        |
-| `@docs`      | `docs`                    | README logos                                       |
+| `@docs`      | `docs`                    | README logos                                                                   |
 
 `site/tsconfig.json` mirrors the aliases for `astro check`. In dev, Vite serves these files from their origin (`/@fs/...`); in the build they are emitted as hashed files in `dist/_astro/`. `build.assetsInlineLimit: 0` keeps SVGs as files instead of data URIs.
 
@@ -40,20 +40,21 @@ The site has no copy of the palette, the fonts or the logos. `site/astro.config.
 - `src/styles/global.css`: Tailwind, then the shared brand files, then base rules. No token value is defined here.
 - `src/components/HomePage.astro`: the whole page for one locale; `src/pages/index.astro` (EN) and `src/pages/pt/index.astro` (PT) only pass `locale`.
 - `src/i18n/`: see [Languages](#languages). Components take a `locale` prop.
+- `src/docs/`, `src/content.config.ts`, `src/components/docs/`, `src/styles/docs.css`: the documentation pages, see [Documentation](#documentation).
 
 Download buttons are `components/DownloadButtons.astro` (in the hero), fed by `src/lib/release.ts`; see [Downloads](#downloads).
 
 ## Languages
 
-Astro's native i18n routing (`i18n` in `astro.config.ts`, `prefixDefaultLocale: false`): English at `/bakasub/`, Brazilian Portuguese at `/bakasub/pt/`.
+English at `/bakasub/`, Brazilian Portuguese at `/bakasub/pt/` (`src/pages/pt/`). The config has **no** Astro `i18n` block: Starlight refuses to run next to one that has its own `locales`, and inferring its locales from it would generate `/pt/docs/*` fallback pages for the English-only docs. Locale URLs are therefore built by `src/i18n/index.ts` (`localeHomePath`, `localeHomeUrl`, `sitePath`), never by `astro:i18n`.
 
 - `src/i18n/en.ts` is the reference dictionary; `Dictionary` derives from its keys. `src/i18n/pt.ts` is declared `satisfies Dictionary`, so a missing key **or** a key `en.ts` does not have fails `astro check` / `tsc` (hence `npm run build`).
-- `src/i18n/index.ts`: `locales` (must match the Astro config), `localeInfo` (BCP 47 tag `en` / `pt-BR`, `og:locale`, endonym, short code), `useTranslations(locale)`, `format()`. `links.ts` holds the language-independent URLs.
-- `Base.astro` sets `<html lang>` from the tag and emits reciprocal `<link rel="alternate" hreflang>` for every locale plus `x-default` (EN); URLs come from `astro:i18n` (`getAbsoluteLocaleUrl`), so they follow `site` + `base`.
+- `src/i18n/index.ts`: `locales`, `localeInfo` (BCP 47 tag `en` / `pt-BR`, `og:locale`, endonym, short code), `useTranslations(locale)`, `format()`. `links.ts` holds the language-independent URLs.
+- `Base.astro` sets `<html lang>` from the tag and emits reciprocal `<link rel="alternate" hreflang>` for every locale plus `x-default` (EN); URLs come from `localeHomeUrl()`, so they follow `site` + `base`.
 - The `Nav` switcher is two plain links (`EN` / `PT`, no JS) to each locale's home, with `hreflang`, `lang` and the endonym as accessible name; the current one carries `aria-current="page"`. The brand link also goes to the current locale's home.
-- PT wording follows `README-pt.md`. The hero keeps the transparent lockup in both languages; the tagline is the translated HTML kicker (see [Logos](#logos)). Links to the user guide say it is in English.
+- PT wording follows `README-pt.md`. The hero keeps the transparent lockup in both languages; the tagline is the translated HTML kicker (see [Logos](#logos)). Links to the user guide and to `/docs` say they are in English (`Docs (em inglês)` as the accessible name in the nav, `Documentação (em inglês)` in the footer).
 
-**Adding a locale**: add it to `locales` and `localeInfo` in `src/i18n/index.ts` and to `i18n.locales` in the config, write `src/i18n/<code>.ts` with `satisfies Dictionary`, and add `src/pages/<code>/index.astro` rendering `<HomePage locale="<code>" />`.
+**Adding a locale**: add it to `locales` and `localeInfo` in `src/i18n/index.ts`, write `src/i18n/<code>.ts` with `satisfies Dictionary`, and add `src/pages/<code>/index.astro` rendering `<HomePage locale="<code>" />`.
 
 ## Screenshot carousel
 
@@ -82,6 +83,20 @@ node scripts/screenshots/capture.mjs --only=cost,queue --chrome=/path/to/chrome
 
 Scenes find elements by their English labels ("Browse files", "Continue", "Estimate cost"); renaming one of them in the app means updating `capture.mjs`. A failing scene saves the page to the OS temp folder and the script exits non-zero. Re-run it after visible UI changes.
 
+## Documentation
+
+`/bakasub/docs/` publishes every `docs/*.md` with [Starlight](https://starlight.astro.build) (0.37, the last line that supports Astro 5). English only. The files are read in place; nothing is copied into `site/` and the docs keep no frontmatter, so they still read well on GitHub.
+
+- **Loader** (`src/docs/loader.ts`, used by `src/content.config.ts`): Astro's `glob` loader on `../docs/*.md` (subfolders are not published). Ids are slugs: `user-guide.md` is the index (`docs`), anything else `docs/<name>`. It derives the frontmatter Starlight requires: `title` from the first `# Heading`, `description` from the first paragraph, `editUrl` to the GitHub editor. Frontmatter written in a doc still wins.
+- **Remark plugin** (`src/docs/remark-repo-docs.ts`, only for files directly in `docs/`): drops the leading `# Heading` (Starlight renders the title) and rewrites links: `./jobs.md#x` → `/bakasub/docs/jobs/#x`, any other relative link (`../src/...`, `../README.md`) → its GitHub URL on `main`. Heading ids follow github-slugger as on GitHub, so anchors written for GitHub keep working.
+- **Sidebar** (`src/docs/sidebar.ts`): **Guide** (`user-guide`, `reporting-issues`) and **Development** (every other file, in a reading order; a new `docs/*.md` not listed there is appended alphabetically). The build fails if the list names a file that no longer exists.
+- **Theme**: `src/styles/docs.css` maps Starlight's `--sl-*` variables onto the brand tokens (after `@brand/fonts.css` and `@brand/tokens.css`). Dark only: `components/docs/ThemeProvider.astro` pins `data-theme="dark"` and `ThemeSelect.astro` removes the picker.
+- **Route middleware** (`src/docs/route-middleware.ts`): Starlight only takes a favicon from `public/`, so the `<link rel="icon">` is pointed at the bundled `resources/icon.svg`; it also adds the landing's `og.png`.
+- **Search**: Pagefind index, built by Starlight at `npm run build` (not available in `npm run dev`). Starlight also writes `sitemap-index.xml`.
+- **Effects on the landing**: Starlight forces `scopedStyleStrategy: 'where'` for the whole site (scoped styles become `:where(.astro-xxx)` instead of `[data-astro-cid-xxx]`; no visual change, checked against screenshots). `prefetch: false` in the config keeps Starlight from adding its prefetch script to every page. `disable404Route: true` keeps Starlight's 404 off GitHub Pages' site-wide `404.html`.
+
+Nav (`Docs`) and footer link to `/bakasub/docs/`. To add a page, create `docs/<name>.md` starting with `# Title`, link it from other docs with `./<name>.md`, and add it to the order in `src/docs/sidebar.ts` if it is user-facing or needs a specific place.
+
 ## Content sections
 
 `Features` (7 cards, the README "What it does" list), `Pipeline` (Extract → Translate → Re-mux, an `<ol>` with inline SVG arrows) and `Privacy` (no account, no telemetry, local key and files, plus what does leave the machine) take every string from `features.*`, `pipeline.*` and `privacy.*` in `en.ts`. Each section is a `<section aria-labelledby>` on its `<h2>`, items are `<h3>`; anchors `#features`, `#how-it-works`, `#privacy`.
@@ -104,7 +119,7 @@ The version is baked in at build time, which is why a release triggers a deploy 
 
 | Trigger                    | When                                                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `push` to `main`           | Paths: `site/**`, `docs/*.svg`, `resources/icon.svg`, the brand sources (`src/shared/brand/**`, `logo.svg`) |
+| `push` to `main`           | Paths: `site/**`, `docs/**` (pages and logos), `resources/icon.svg`, the brand sources (`src/shared/brand/**`, `logo.svg`) |
 | `release: [published]`     | Refreshes the version and links of the download buttons                                                      |
 | `workflow_dispatch`        | Manual redeploy                                                                                              |
 

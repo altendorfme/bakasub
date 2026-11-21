@@ -5,7 +5,8 @@ on:
     branches: [main]
     paths:
       - 'site/**'
-      - 'docs/*.svg'
+      # docs/*.md are rendered under /docs (Starlight); docs/*.svg are the README logos.
+      - 'docs/**'
       - 'resources/icon.svg'
       # Brand sources the site reads in place (see docs/site.md).
       - 'src/shared/brand/**'
