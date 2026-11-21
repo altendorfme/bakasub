@@ -1,9 +1,18 @@
 import { randomUUID } from 'node:crypto'
-import { chmod, mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
+import { chmod, mkdir, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AppError } from '../errors'
 import { buildRuntimeEnv, probeArgs, resolveInside } from './binary-path'
 import { downloadVerified } from './downloader'
+import {
+  bestEffortRm,
+  defaultRenameDelays,
+  describeError,
+  realFs,
+  renameWithRetry,
+  sleep,
+  type FsOps
+} from './fs-resilient'
 import { copyPruned } from './prune'
 import type { Extractor } from './extractors/extractor'
 import type { InstalledRegistry } from './installed-registry'
@@ -24,8 +33,16 @@ export class SidecarInstaller {
       registry: InstalledRegistry
       idleTimeoutMs: number
       log: Log
+      /** Injetáveis para teste. */
+      fs?: FsOps
+      sleep?: (ms: number) => Promise<void>
+      renameDelaysMs?: number[]
     }
   ) {}
+
+  private get fs(): FsOps {
+    return this.d.fs ?? realFs
+  }
 
   archiveDir(sha256: string): string {
     return join(this.d.dirs.archives, sha256.toLowerCase())
@@ -62,13 +79,12 @@ export class SidecarInstaller {
         progress('extracting')
         await mkdir(staging)
         const fullRoot = await this.d.extractors[unit.archiveType].extract(file, staging, signal)
-        const root = await this.tryPrune(fullRoot, prunedDir, unit, signal)
-        await rm(final, { recursive: true, force: true })
-        await rename(root, final)
+        const pruned = await this.tryPrune(fullRoot, prunedDir, unit, signal)
+        await this.adopt(pruned, fullRoot, final)
       } finally {
-        await rm(staging, { recursive: true, force: true })
-        await rm(prunedDir, { recursive: true, force: true })
-        await rm(file, { force: true })
+        await bestEffortRm(this.fs, staging, this.d.log)
+        await bestEffortRm(this.fs, prunedDir, this.d.log)
+        await bestEffortRm(this.fs, file, this.d.log)
       }
     }
 
@@ -76,7 +92,7 @@ export class SidecarInstaller {
     try {
       await this.probeAll(final, unit, signal)
     } catch (err) {
-      if (!reused) await rm(final, { recursive: true, force: true })
+      if (!reused) await bestEffortRm(this.fs, final, this.d.log)
       throw err
     }
 
@@ -95,7 +111,10 @@ export class SidecarInstaller {
     progress('done')
   }
 
-  /** Remove diretórios de artefatos que nenhuma ferramenta registrada referencia + restos de staging. */
+  /**
+   * Remove diretórios de artefatos que nenhuma ferramenta registrada referencia + restos de staging
+   * (`.partial-*`). Best-effort: um arquivo ainda travado (EBUSY) fica para o próximo boot.
+   */
   async collectGarbage(): Promise<void> {
     const referenced = new Set(
       Object.values(await this.d.registry.read()).map((e) => e.archiveSha256)
@@ -104,15 +123,56 @@ export class SidecarInstaller {
     for (const name of entries) {
       if (referenced.has(name)) continue
       this.d.log.info(`sidecar gc: removendo ${name}`)
-      await rm(join(this.d.dirs.archives, name), { recursive: true, force: true })
+      await bestEffortRm(this.fs, join(this.d.dirs.archives, name), this.d.log)
     }
     // Downloads parciais (.part) são mantidos por 7 dias para permitir resume.
     const maxAgeMs = 7 * 24 * 3600 * 1000
     for (const name of await readdir(this.d.dirs.downloads).catch(() => [] as string[])) {
       const full = join(this.d.dirs.downloads, name)
       const st = await stat(full).catch(() => null)
-      if (st && Date.now() - st.mtimeMs > maxAgeMs) await rm(full, { force: true })
+      if (st && Date.now() - st.mtimeMs > maxAgeMs) await bestEffortRm(this.fs, full, this.d.log)
     }
+  }
+
+  /**
+   * Escada de recuo para publicar em `final` (handles transitórios no Windows):
+   * rename com backoff -> cópia da árvore podada -> mesma coisa com a árvore completa (nunca executada).
+   */
+  private async adopt(pruned: string | null, fullRoot: string, final: string): Promise<void> {
+    const candidates = pruned ? [pruned, fullRoot] : [fullRoot]
+    const wait = this.d.sleep ?? sleep
+    const delays = this.d.renameDelaysMs ?? defaultRenameDelays()
+    let first: unknown
+    for (const src of candidates) {
+      const kind = src === fullRoot ? 'árvore completa' : 'árvore podada'
+      await bestEffortRm(this.fs, final, this.d.log)
+      try {
+        await renameWithRetry(this.fs, src, final, delays, wait, this.d.log)
+        return
+      } catch (err) {
+        first ??= err
+        this.d.log.warn(
+          `sidecar install: rename (${kind}) falhou -> ${final}; copiando`,
+          describeError(err)
+        )
+      }
+      try {
+        await bestEffortRm(this.fs, final, this.d.log)
+        await this.fs.cp(src, final)
+        // Origem possivelmente travada: o finally/GC cuidam dela.
+        await bestEffortRm(this.fs, src, this.d.log)
+        return
+      } catch (err) {
+        first ??= err
+        this.d.log.warn(`sidecar install: cópia (${kind}) falhou -> ${final}`, describeError(err))
+        await bestEffortRm(this.fs, final, this.d.log)
+      }
+    }
+    throw new AppError(
+      'EXTRACT_FAILED',
+      `Não foi possível instalar em ${final}: ${describeError(first)}`,
+      { cause: first }
+    )
   }
 
   /** Executa cada ferramenta (chmod + sonda) a partir de `root`. */
@@ -143,7 +203,7 @@ export class SidecarInstaller {
     prunedDir: string,
     unit: InstallUnit,
     signal: AbortSignal
-  ): Promise<string> {
+  ): Promise<string | null> {
     try {
       const stats = await copyPruned(fullRoot, prunedDir, unit.archiveType, unit.tools)
       await this.probeAll(prunedDir, unit, signal)
@@ -154,8 +214,8 @@ export class SidecarInstaller {
     } catch (err) {
       if (err instanceof AppError && err.code === 'CANCELLED') throw err
       this.d.log.warn('sidecar prune falhou; mantendo árvore completa', err)
-      await rm(prunedDir, { recursive: true, force: true })
-      return fullRoot
+      await bestEffortRm(this.fs, prunedDir, this.d.log)
+      return null
     }
   }
 

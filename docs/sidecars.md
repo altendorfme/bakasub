@@ -30,18 +30,31 @@ sidecars:install { tools }
   └─ group by sha256 into InstallUnits (mkvextract+mkvmerge share one)
   └─ ConsentGate.confirmDownload()   ← native dialog in Main, default = Cancel
         declined ─► { outcome: 'declined' }, nothing touches the disk
-  └─ per unit:
+  └─ per unit (independent: one failing unit does not stop the others; the result carries `failures[]`):
        1. reuse bin/archives/<sha>/ if all binaries already exist
        2. downloadVerified()  → bin/downloads/<sha>.<ext>
        3. extract into bin/archives/.partial-<sha>-<uuid>
        4. tryPrune(): copy only needed files, probe the copy, adopt it (fallback: full tree)
-       5. rename → bin/archives/<sha>/
+       5. adopt → bin/archives/<sha>/ (rename ladder, see “Windows file locks”)
        6. probeAll(): chmod + run `--version` (`-version` for ffmpeg)
        7. InstalledRegistry.update() → bin/installed.json (atomic write)
   └─ collectGarbage(): drop archives no tool references; drop downloads older than 7 days
 ```
 
 Cancellation (`sidecars:cancel` or shutdown) aborts the shared `AbortController`, which reaches `fetch` and the `ProcessRunner`.
+
+## Windows file locks (`fs-resilient.ts`)
+
+A freshly executed `.exe` (the probe of the pruned copy) can keep a handle open for several seconds (Defender real-time scan, Search Indexer, the exiting process), so `rename` of a folder containing it fails with `EPERM`/`EBUSY`/`EACCES`. `SidecarInstaller.adopt()` therefore climbs a ladder, logging the original error before each step:
+
+1. `rename(pruned, final)` with backoff on EPERM/EBUSY/EACCES (~10 s total on Windows, ~0.7 s elsewhere).
+2. Recursive copy of the pruned tree to `final` (the locked source is left to cleanup/GC).
+3. Same two steps with the **full** tree, which was never executed by the app and has no probe handle.
+4. Fail with `EXTRACT_FAILED`, message carrying the original error code and the destination path.
+
+All `finally` cleanups (staging, pruned dir, downloaded archive) and `collectGarbage()` are best-effort (`rm` with `maxRetries`) and never throw, so they cannot mask the install error. Leftover `.partial-*` folders are removed by `collectGarbage()` at app boot and after every install.
+
+Tip (optional, never required): excluding `%APPDATA%\bakasub\bin` from Windows Defender real-time scanning avoids the delays.
 
 ## Download (`downloader.ts`)
 

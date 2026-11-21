@@ -93,8 +93,17 @@ export interface SidecarReport {
   ready: boolean
 }
 
+/** Unidade (artefato) que falhou; as demais seguem instaladas. */
+export interface SidecarInstallFailure {
+  tools: string[]
+  code: string
+  message: string
+}
+
 export type SidecarInstallResult =
-  { outcome: 'installed'; tools: string[] } | { outcome: 'declined' } | { outcome: 'cancelled' }
+  | { outcome: 'installed'; tools: string[]; failures?: SidecarInstallFailure[] }
+  | { outcome: 'declined' }
+  | { outcome: 'cancelled' }
 
 export type SidecarPhase = 'downloading' | 'extracting' | 'probing' | 'done'
 

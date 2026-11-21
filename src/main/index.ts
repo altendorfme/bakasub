@@ -76,6 +76,8 @@ if (!app.requestSingleInstanceLock()) {
         emitProgress: (p) => emitToRenderers('sidecars:progress', p),
         log: logger.sidecar
       })
+      // Remove `.partial-*` e artefatos órfãos de instalações anteriores (best-effort, não bloqueia o boot).
+      void sidecarModule.manager.collectGarbage()
       shutdown.register('sidecars', async () => {
         sidecarModule.manager.dispose()
         await sidecarModule.runner.disposeAll()

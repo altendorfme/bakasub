@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises'
 import { remote } from '../config/remote'
 import { AppError } from '../errors'
 import type {
+  SidecarInstallFailure,
   SidecarInstallResult,
   SidecarProgress,
   SidecarReport,
@@ -132,16 +133,48 @@ export class SidecarManager {
       })
       if (!accepted) return { outcome: 'declined' }
 
-      for (const unit of units) {
-        await this.d.installer.installUnit(unit, ctrl.signal, this.d.emitProgress)
+      // Cada unidade é independente: a falha de uma não impede as demais.
+      const installed: string[] = []
+      const failures: SidecarInstallFailure[] = []
+      let firstError: unknown
+      try {
+        for (const unit of units) {
+          const names = unit.tools.map((t) => t.name)
+          try {
+            await this.d.installer.installUnit(unit, ctrl.signal, this.d.emitProgress)
+            installed.push(...names)
+          } catch (err) {
+            if (err instanceof AppError && err.code === 'CANCELLED') throw err
+            this.d.log.error(`sidecar install falhou: ${names.join('+')}`, err)
+            firstError ??= err
+            failures.push({
+              tools: names,
+              code: err instanceof AppError ? err.code : 'UNKNOWN',
+              message: err instanceof Error ? err.message : String(err)
+            })
+          }
+        }
+      } finally {
+        await this.collectGarbage()
       }
-      await this.d.installer.collectGarbage()
-      return { outcome: 'installed', tools: pending }
+      if (installed.length === 0 && failures.length > 0) throw firstError
+      return failures.length > 0
+        ? { outcome: 'installed', tools: installed, failures }
+        : { outcome: 'installed', tools: installed }
     } catch (err) {
       if (err instanceof AppError && err.code === 'CANCELLED') return { outcome: 'cancelled' }
       throw err
     } finally {
       this.active = null
+    }
+  }
+
+  /** Best-effort (boot e fim de instalação): sobras `.partial-*` travadas ficam para a próxima vez. */
+  async collectGarbage(): Promise<void> {
+    try {
+      await this.d.installer.collectGarbage()
+    } catch (err) {
+      this.d.log.warn('sidecar gc falhou', err)
     }
   }
 
