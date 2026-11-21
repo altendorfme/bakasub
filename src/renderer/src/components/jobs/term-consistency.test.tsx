@@ -70,15 +70,30 @@ const report = (presetId = 'p1'): TermConsistencyReport => ({
   ]
 })
 
+let presetsListed = false
+
 function renderWith(
   presets: Preset[],
   r: TermConsistencyReport,
   calls: { update?: (...a: unknown[]) => void; create?: (...a: unknown[]) => void } = {},
   mediaTitle?: string
 ): void {
+  renderWithContainer(presets, r, calls, mediaTitle)
+}
+
+function renderWithContainer(
+  presets: Preset[],
+  r: TermConsistencyReport,
+  calls: { update?: (...a: unknown[]) => void; create?: (...a: unknown[]) => void } = {},
+  mediaTitle?: string
+): { container: HTMLElement } {
+  presetsListed = false
   installFakeApi({
     presets: {
-      list: () => ok(presets),
+      list: () => {
+        presetsListed = true
+        return ok(presets)
+      },
       update: (id: string, preset: PresetInput) => {
         calls.update?.(id, preset)
         return ok({ ...mine, ...preset })
@@ -89,7 +104,7 @@ function renderWith(
       }
     }
   })
-  render(
+  return render(
     <QueryClientProvider client={new QueryClient()}>
       <TermConsistency report={r} mediaTitle={mediaTitle} />
     </QueryClientProvider>
@@ -100,7 +115,7 @@ describe('TermConsistency', () => {
   it('own preset: adds the chosen renderings (most used by default) to its glossary', async () => {
     const update = vi.fn()
     renderWith([mine], report(), { update })
-    expect(screen.getByText('2 terms translated in different ways')).toBeTruthy()
+    expect(await screen.findByText('2 terms translated in different ways')).toBeTruthy()
     expect(screen.getByText('in 46 lines')).toBeTruthy()
     expect(screen.getByText('2 lines rephrased it')).toBeTruthy()
     expect(screen.getByText('00:01:01 · Valeu, mano.')).toBeTruthy()
@@ -122,10 +137,69 @@ describe('TermConsistency', () => {
     })
   })
 
-  it('own preset: renderings already pinned are preselected and not re-added', async () => {
-    renderWith([{ ...mine, glossary: [{ source: 'Bro', target: 'mano' }] }], report())
-    expect(await screen.findByText('In the glossary')).toBeTruthy()
+  it('own preset: terms already in the glossary are not suggested (with or without target)', async () => {
+    renderWith(
+      [
+        {
+          ...mine,
+          glossary: [
+            { source: 'bro', target: 'mano' },
+            { source: ' Simon ', target: 'Simon' }
+          ]
+        }
+      ],
+      {
+        ...report(),
+        terms: [
+          ...report().terms,
+          {
+            term: 'Simon',
+            cues: 20,
+            unmatched: 0,
+            variants: [
+              { text: 'Simon', cues: 18, kept: true, examples: [] },
+              { text: 'Simão', cues: 2, kept: false, examples: [] }
+            ]
+          }
+        ]
+      }
+    )
+    expect(await screen.findByText('1 term translated in different ways')).toBeTruthy()
+    expect(screen.getByRole('group', { name: 'Shire' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Bro' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Simon' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Add 1 term to the glossary' })).toBeTruthy()
+  })
+
+  it('hides the section when every term is in the glossary (entry without target too)', async () => {
+    const { container } = renderWithContainer(
+      [
+        {
+          ...mine,
+          glossary: [
+            { source: 'Bro', target: 'mano' },
+            { source: 'shire', rule: 'keep as in the original' }
+          ]
+        }
+      ],
+      report()
+    )
+    await vi.waitFor(() => expect(presetsListed).toBe(true))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(container.textContent).toBe('')
+  })
+
+  it('pinned terms the model still varied show only as a warning, without adding', async () => {
+    const r = report()
+    renderWith([{ ...mine, glossary: [{ source: 'Bro', target: 'mano' }] }], {
+      ...r,
+      terms: [{ ...r.terms[0], glossaryTarget: 'mano' }]
+    })
+    expect(await screen.findByText('The AI did not follow the glossary for 1 term')).toBeTruthy()
+    expect(screen.getByText('Glossary says “mano”')).toBeTruthy()
+    expect(screen.getByText('mano ×40, Bro ×4')).toBeTruthy()
+    expect(screen.queryByText(/translated in different ways/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Add .* to the glossary/ })).toBeNull()
   })
 
   it('built-in preset: suggests a new preset named after the media, same type and style', async () => {

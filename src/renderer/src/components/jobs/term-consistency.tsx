@@ -1,4 +1,4 @@
-import { BookmarkCheck, BookmarkPlus, Shuffle } from 'lucide-react'
+import { BookmarkPlus, ShieldAlert, Shuffle } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -9,29 +9,24 @@ import { Input } from '@renderer/components/ui/input'
 import { usePresets, useSavePreset } from '@renderer/data/presets'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { formatTimecode } from '@renderer/lib/format'
-import { freePresetName, isPinned, pinTerms } from '@renderer/lib/glossary-pin'
+import { freePresetName, pinTerms, splitByGlossary } from '@renderer/lib/glossary-pin'
 import { copyName, mediaTypeLabel, presetLabel } from '@renderer/lib/preset-labels'
 import { cn } from '@renderer/lib/utils'
 
 /** The rendering chosen per term (`null` = leave this term out). */
 type Choices = Readonly<Record<string, string | null>>
 
-/** Already pinned rendering, else the most used one. */
-function initialChoices(report: TermConsistencyReport, glossary: Preset['glossary']): Choices {
-  return Object.fromEntries(
-    report.terms.map((term) => [
-      term.term,
-      term.variants.find((v) => isPinned(glossary, term.term, v.text))?.text ??
-        term.variants[0]?.text ??
-        null
-    ])
-  )
+/** The most used rendering of each term. */
+function initialChoices(terms: readonly TermVariation[]): Choices {
+  return Object.fromEntries(terms.map((term) => [term.term, term.variants[0]?.text ?? null]))
 }
 
 /**
  * Terms of the source translated in more than one way in this file (local check, no AI). The
  * user picks a rendering per term and pins them in the job's preset glossary; a built-in preset
  * is read-only, so the choices go into a new preset named after the media, with the same style.
+ * Terms the preset's current glossary already has are not suggested again; those the job's
+ * glossary pinned and the model still varied show only as a warning.
  */
 export function TermConsistency({
   report,
@@ -48,14 +43,17 @@ export function TermConsistency({
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [choices, setChoices] = useState<Choices | null>(null)
   const [name, setName] = useState<string | null>(null)
-  if (!report.terms.length) return null
+  // Wait for the glossary: suggestions that vanish once it loads would only flash.
+  if (!report.terms.length || presets.isPending) return null
 
   const preset = presets.data?.find((p) => p.id === (createdId ?? report.preset.id))
-  const glossary = preset?.glossary ?? []
-  const chosen = choices ?? initialChoices(report, glossary)
-  const pins = report.terms.flatMap((term) => {
+  const { suggestions, ignored } = splitByGlossary(report.terms, preset?.glossary ?? [])
+  if (!suggestions.length && !ignored.length) return null
+
+  const chosen = choices ?? initialChoices(suggestions)
+  const pins = suggestions.flatMap((term) => {
     const target = chosen[term.term]
-    return target && !isPinned(glossary, term.term, target) ? [{ term: term.term, target }] : []
+    return target ? [{ term: term.term, target }] : []
   })
   const label = preset ? presetLabel(preset, t) : report.preset.name
   const suggestedName =
@@ -118,26 +116,35 @@ export function TermConsistency({
   return (
     <section
       className="grid gap-2"
-      aria-label={t('termConsistency.heading', { count: report.terms.length })}
+      aria-label={
+        suggestions.length
+          ? t('termConsistency.heading', { count: suggestions.length })
+          : t('termConsistency.ignoredHeading', { count: ignored.length })
+      }
     >
-      <p className="flex items-center gap-1.5 text-sm text-warning">
-        <Shuffle className="size-4 shrink-0" />
-        {t('termConsistency.heading', { count: report.terms.length })}
-      </p>
-      <p className="text-xs text-muted-foreground">{t('termConsistency.hint')}</p>
-      <ul className="grid max-h-80 gap-1 overflow-y-auto rounded-md border bg-background/40 p-1.5">
-        {report.terms.map((term) => (
-          <TermRow
-            key={term.term}
-            term={term}
-            glossary={glossary}
-            chosen={chosen[term.term] ?? null}
-            onChoose={(target) => choose(term.term, target)}
-          />
-        ))}
-      </ul>
+      {suggestions.length ? (
+        <>
+          <p className="flex items-center gap-1.5 text-sm text-warning">
+            <Shuffle className="size-4 shrink-0" />
+            {t('termConsistency.heading', { count: suggestions.length })}
+          </p>
+          <p className="text-xs text-muted-foreground">{t('termConsistency.hint')}</p>
+          <ul className="grid max-h-80 gap-1 overflow-y-auto rounded-md border bg-background/40 p-1.5">
+            {suggestions.map((term) => (
+              <TermRow
+                key={term.term}
+                term={term}
+                chosen={chosen[term.term] ?? null}
+                onChoose={(target) => choose(term.term, target)}
+              />
+            ))}
+          </ul>
+        </>
+      ) : null}
 
-      {presets.isPending || (createdId && !preset) ? null : !preset ? (
+      {ignored.length ? <IgnoredTerms terms={ignored} /> : null}
+
+      {!suggestions.length || (createdId && !preset) ? null : !preset ? (
         <p className="text-xs text-warning">
           {t('termConsistency.presetGone', { name: report.preset.name })}
         </p>
@@ -178,7 +185,7 @@ export function TermConsistency({
           <span className="text-xs text-muted-foreground">
             {pins.length
               ? t('termConsistency.target', { name: label })
-              : t('termConsistency.allPinned', { name: label })}
+              : t('termConsistency.noneChosen')}
           </span>
           <Button
             size="sm"
@@ -195,14 +202,38 @@ export function TermConsistency({
   )
 }
 
+/** Terms the job's glossary pinned and the model still translated in other ways. */
+function IgnoredTerms({ terms }: { terms: readonly TermVariation[] }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="grid gap-1 rounded-md border border-warning/30 bg-warning/5 p-2 text-xs">
+      <p className="flex items-center gap-1.5 text-warning">
+        <ShieldAlert className="size-3.5 shrink-0" />
+        {t('termConsistency.ignoredHeading', { count: terms.length })}
+      </p>
+      <ul className="grid gap-0.5">
+        {terms.map((term) => (
+          <li key={term.term} className="flex min-w-0 flex-wrap items-center gap-x-2">
+            <span className="font-medium text-foreground">{term.term}</span>
+            <span className="text-muted-foreground">
+              {t('termConsistency.glossaryIgnored', { target: term.glossaryTarget })}
+            </span>
+            <span className="min-w-0 truncate font-mono text-muted-foreground">
+              {term.variants.map((v) => `${v.text} ×${v.cues}`).join(', ')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function TermRow({
   term,
-  glossary,
   chosen,
   onChoose
 }: {
   term: TermVariation
-  glossary: Preset['glossary']
   chosen: string | null
   onChoose: (target: string) => void
 }): React.JSX.Element {
@@ -227,7 +258,6 @@ function TermRow({
       </span>
       <ul className="grid gap-1" role="group" aria-label={term.term}>
         {term.variants.map((v) => {
-          const pinned = isPinned(glossary, term.term, v.text)
           const selected = chosen === v.text
           const ex = v.examples[0]
           return (
@@ -254,12 +284,6 @@ function TermRow({
               </button>
               <span className="shrink-0 text-muted-foreground">×{v.cues}</span>
               {v.kept ? <Badge>{t('termConsistency.kept')}</Badge> : null}
-              {pinned ? (
-                <span className="flex shrink-0 items-center gap-1 text-success">
-                  <BookmarkCheck className="size-3.5" />
-                  {t('termConsistency.inGlossary')}
-                </span>
-              ) : null}
               {ex ? (
                 <span
                   className="min-w-0 flex-1 truncate text-muted-foreground"

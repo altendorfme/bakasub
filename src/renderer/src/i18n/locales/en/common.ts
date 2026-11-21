@@ -631,7 +631,7 @@ export const common = {
     created_one: 'Preset “{{name}}” created with {{count}} term. Choose it in your next jobs.',
     created_other: 'Preset “{{name}}” created with {{count}} terms. Choose it in your next jobs.',
     target: 'Glossary of “{{name}}”',
-    allPinned: 'The chosen renderings are already in the glossary of “{{name}}”.',
+    noneChosen: 'No rendering chosen.',
     add_one: 'Add {{count}} term to the glossary',
     add_other: 'Add {{count}} terms to the glossary',
     added_one: '{{count}} term added to “{{name}}”',
@@ -644,7 +644,8 @@ export const common = {
     glossaryIgnored: 'Glossary says “{{target}}”',
     kept: 'kept as in the original',
     choose: 'Use “{{target}}” for “{{term}}”',
-    inGlossary: 'In the glossary'
+    ignoredHeading_one: 'The AI did not follow the glossary for {{count}} term',
+    ignoredHeading_other: 'The AI did not follow the glossary for {{count}} terms'
   },
   fileCheck: {
     heading: 'File check',

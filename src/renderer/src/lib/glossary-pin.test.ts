@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { freePresetName, isPinned, pinTerm, pinTerms } from './glossary-pin'
+import type { TermVariation } from '@shared/ipc-contract'
+import { freePresetName, inGlossary, pinTerm, pinTerms, splitByGlossary } from './glossary-pin'
 
 describe('pinTerm', () => {
   it('appends a new entry', () => {
@@ -16,12 +17,34 @@ describe('pinTerm', () => {
   })
 })
 
-describe('isPinned', () => {
-  it('matches term and target ignoring case', () => {
-    const g = [{ source: 'Bro', target: 'Mano' }]
-    expect(isPinned(g, 'bro', 'mano')).toBe(true)
-    expect(isPinned(g, 'Bro', 'Bro')).toBe(false)
-    expect(isPinned([{ source: 'Bro', rule: 'keep' }], 'Bro', 'mano')).toBe(false)
+describe('inGlossary', () => {
+  it('matches the term ignoring case and spaces, with a target or only a rule', () => {
+    expect(inGlossary([{ source: ' bro ', target: 'mano' }], 'Bro')).toBe(true)
+    expect(inGlossary([{ source: 'Simon', rule: 'keep' }], 'simon')).toBe(true)
+    expect(inGlossary([{ source: 'Simon', target: 'Simon' }], 'Simon')).toBe(true)
+    expect(inGlossary([{ source: 'Simon' }], 'Bro')).toBe(false)
+  })
+})
+
+describe('splitByGlossary', () => {
+  const term = (name: string, glossaryTarget?: string): TermVariation => ({
+    term: name,
+    cues: 3,
+    unmatched: 0,
+    variants: [],
+    ...(glossaryTarget ? { glossaryTarget } : {})
+  })
+
+  it('suggests only terms without an entry; warns about pinned terms the model varied', () => {
+    const r = splitByGlossary(
+      [term('Bro', 'mano'), term('Simon'), term('Kamina'), term('Shire', 'Condado')],
+      [
+        { source: 'bro', target: 'mano' },
+        { source: 'Simon', rule: 'keep' }
+      ]
+    )
+    expect(r.suggestions.map((t) => t.term)).toEqual(['Kamina', 'Shire'])
+    expect(r.ignored.map((t) => t.term)).toEqual(['Bro'])
   })
 })
 

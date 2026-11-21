@@ -90,6 +90,27 @@ describe('analyzeTermConsistency', () => {
     ])
   })
 
+  it('does not filter by glossary: the renderer hides terms by the current preset glossary', () => {
+    // "Bro" varia em todos os casos; o relatório só anota o alvo do glossário do job.
+    const { source, translated } = docs(BRO_FIXTURE)
+    const withTarget = analyzeTermConsistency(source, translated, PRESET, {
+      glossary: [{ source: ' BRO ', target: 'mano' }]
+    })
+    expect(withTarget.terms.map((t) => [t.term, t.glossaryTarget])).toEqual([['Bro', 'mano']])
+
+    const ruleOnly = analyzeTermConsistency(source, translated, PRESET, {
+      glossary: [{ source: 'Bro', rule: 'keep as in the original' }]
+    })
+    expect(ruleOnly.terms.map((t) => t.term)).toEqual(['Bro'])
+    expect(ruleOnly.terms[0]).not.toHaveProperty('glossaryTarget')
+
+    const absent = analyzeTermConsistency(source, translated, PRESET, {
+      glossary: [{ source: 'Kamina', target: 'Kamina' }]
+    })
+    expect(absent.terms.map((t) => t.term)).toEqual(['Bro'])
+    expect(absent.terms[0]).not.toHaveProperty('glossaryTarget')
+  })
+
   it('reports nothing when every occurrence uses the same rendering', () => {
     const { source, translated } = docs([
       ['Bro, wait!', 'Mano, espera!'],

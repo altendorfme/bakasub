@@ -641,7 +641,7 @@ export const common: LocaleShape<typeof en> = {
     created_one: 'Preset “{{name}}” criado com {{count}} termo. Escolha-o nos próximos jobs.',
     created_other: 'Preset “{{name}}” criado com {{count}} termos. Escolha-o nos próximos jobs.',
     target: 'Glossário de “{{name}}”',
-    allPinned: 'As formas escolhidas já estão no glossário de “{{name}}”.',
+    noneChosen: 'Nenhuma forma escolhida.',
     add_one: 'Adicionar {{count}} termo ao glossário',
     add_other: 'Adicionar {{count}} termos ao glossário',
     added_one: '{{count}} termo adicionado a “{{name}}”',
@@ -654,7 +654,8 @@ export const common: LocaleShape<typeof en> = {
     glossaryIgnored: 'Glossário diz “{{target}}”',
     kept: 'mantido como no original',
     choose: 'Usar “{{target}}” para “{{term}}”',
-    inGlossary: 'No glossário'
+    ignoredHeading_one: 'A IA não seguiu o glossário em {{count}} termo',
+    ignoredHeading_other: 'A IA não seguiu o glossário em {{count}} termos'
   },
   fileCheck: {
     heading: 'Verificação do arquivo',

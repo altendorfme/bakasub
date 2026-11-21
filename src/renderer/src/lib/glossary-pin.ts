@@ -1,17 +1,31 @@
-import type { GlossaryEntry } from '@shared/ipc-contract'
+import type { GlossaryEntry, TermVariation } from '@shared/ipc-contract'
 
 const same = (a: string, b: string): boolean =>
   a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
 
-/** The glossary already pins `term` to `target` (case-insensitive). */
-export function isPinned(
-  glossary: readonly GlossaryEntry[],
-  term: string,
-  target: string
-): boolean {
-  return glossary.some(
-    (e) => same(e.source, term) && e.target !== undefined && same(e.target, target)
-  )
+/** The glossary has an entry for `term`, with a target or only a rule (case-insensitive). */
+export function inGlossary(glossary: readonly GlossaryEntry[], term: string): boolean {
+  return glossary.some((e) => same(e.source, term))
+}
+
+/**
+ * Splits the reported terms by the CURRENT glossary of the preset (not the one of the job, so
+ * edits made after the job count):
+ * - `suggestions`: terms without an entry, offered for pinning;
+ * - `ignored`: terms with an entry that the job's glossary already pinned (`glossaryTarget`) and
+ *   the model still varied — a warning only, there is nothing to add.
+ * Other terms with an entry (pinned after the job) are dropped.
+ */
+export function splitByGlossary(
+  terms: readonly TermVariation[],
+  glossary: readonly GlossaryEntry[]
+): { suggestions: TermVariation[]; ignored: TermVariation[] } {
+  const suggestions: TermVariation[] = []
+  const ignored: TermVariation[] = []
+  for (const term of terms)
+    if (!inGlossary(glossary, term.term)) suggestions.push(term)
+    else if (term.glossaryTarget) ignored.push(term)
+  return { suggestions, ignored }
 }
 
 /**
