@@ -106,6 +106,7 @@ const api: BakaSubApi = {
     remove: (id) => invoke('jobs:remove', { id }),
     clearCompleted: () => invoke('jobs:clear-completed'),
     confirm: (id) => invoke('jobs:confirm', { id }),
+    dismissConsistency: (id) => invoke('jobs:dismiss-consistency', { id }),
     preflight: (id) => invoke('jobs:preflight', { id })
   },
   files: {

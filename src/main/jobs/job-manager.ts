@@ -170,6 +170,19 @@ export class JobManager {
     return this.get(id)
   }
 
+  /**
+   * Dispensa as sugestões de consistência de termos de um job terminal: grava a flag no
+   * resultado (idempotente). O preset não é tocado; um retry gera um relatório novo, sem a flag.
+   */
+  async dismissConsistency(id: string): Promise<Job> {
+    const row = await this.row(id)
+    if (!TERMINAL.has(row.status) || this.running.has(id) || !row.result?.consistency)
+      throw new AppError('JOB_INVALID_STATE', `Job ${id} is ${row.status}`)
+    if (!row.result.consistencyDismissed)
+      await this.deps.repo.update(id, { result: { ...row.result, consistencyDismissed: true } })
+    return this.get(id)
+  }
+
   /** Estimativa + cobertura completa guardadas pela etapa de preflight. */
   async preflight(id: string): Promise<Artifacts['preflight'] | null> {
     const row = await this.row(id)

@@ -1,21 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TermVariation } from '@shared/ipc-contract'
-import { freePresetName, inGlossary, pinTerm, pinTerms, splitByGlossary } from './glossary-pin'
-
-describe('pinTerm', () => {
-  it('appends a new entry', () => {
-    expect(pinTerm([{ source: 'Simon', rule: 'keep' }], 'Bro', 'mano')).toEqual([
-      { source: 'Simon', rule: 'keep' },
-      { source: 'Bro', target: 'mano' }
-    ])
-  })
-
-  it('replaces the target of the same term, keeping its rule', () => {
-    expect(pinTerm([{ source: 'bro', target: 'irmão', rule: 'informal' }], 'Bro', 'mano')).toEqual([
-      { source: 'bro', target: 'mano', rule: 'informal' }
-    ])
-  })
-})
+import { addNewTerms, freePresetName, inGlossary, splitByGlossary } from './glossary-pin'
 
 describe('inGlossary', () => {
   it('matches the term ignoring case and spaces, with a target or only a rule', () => {
@@ -48,18 +33,24 @@ describe('splitByGlossary', () => {
   })
 })
 
-describe('pinTerms', () => {
-  it('pins every chosen term without duplicating', () => {
+describe('addNewTerms', () => {
+  it('appends only terms without an entry, never overwriting or duplicating', () => {
     expect(
-      pinTerms(
-        [{ source: 'bro', target: 'irmão' }],
+      addNewTerms(
+        [
+          { source: 'bro', target: 'irmão', rule: 'informal' },
+          { source: 'Simon', rule: 'keep' }
+        ],
         [
           { term: 'Bro', target: 'mano' },
-          { term: 'Gunmen', target: 'Gunmen' }
+          { term: 'simon', target: 'Simão' },
+          { term: 'Gunmen', target: 'Gunmen' },
+          { term: 'gunmen', target: 'Gunmens' }
         ]
       )
     ).toEqual([
-      { source: 'bro', target: 'mano' },
+      { source: 'bro', target: 'irmão', rule: 'informal' },
+      { source: 'Simon', rule: 'keep' },
       { source: 'Gunmen', target: 'Gunmen' }
     ])
   })

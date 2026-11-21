@@ -29,25 +29,18 @@ export function splitByGlossary(
 }
 
 /**
- * Pins `term` → `target`: replaces the target of an existing entry for the term (keeping its
- * rule) or appends a new entry. Never duplicates the term.
+ * Appends `term` → `target` for each pin the glossary does not have yet (case-insensitive, also
+ * among the pins). Existing entries are never touched: their target and rule stay as they are,
+ * even when the preset gained the term after the suggestions were computed.
  */
-export function pinTerm(
-  glossary: readonly GlossaryEntry[],
-  term: string,
-  target: string
-): GlossaryEntry[] {
-  const i = glossary.findIndex((e) => same(e.source, term))
-  if (i < 0) return [...glossary, { source: term, target }]
-  return glossary.map((e, j) => (j === i ? { ...e, target } : e))
-}
-
-/** Pins several terms at once (see `pinTerm`). */
-export function pinTerms(
+export function addNewTerms(
   glossary: readonly GlossaryEntry[],
   pins: readonly { term: string; target: string }[]
 ): GlossaryEntry[] {
-  return pins.reduce<GlossaryEntry[]>((g, p) => pinTerm(g, p.term, p.target), [...glossary])
+  return pins.reduce<GlossaryEntry[]>(
+    (g, p) => (inGlossary(g, p.term) ? g : [...g, { source: p.term, target: p.target }]),
+    [...glossary]
+  )
 }
 
 /** `base`, or "base (2)", "base (3)"… avoiding names already taken (case-insensitive). */

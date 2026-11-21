@@ -301,6 +301,32 @@ describe('JobManager', () => {
     expect(pending[2].input.artifacts.preflight?.estimate.decision).toBe('confirmed')
   })
 
+  it('dismissConsistency grava a flag no resultado de um job terminal com relatório', async () => {
+    const consistency = {
+      analyzedCues: 1,
+      candidates: 1,
+      terms: [],
+      preset: { id: 'p', name: 'P' }
+    }
+    await manager.create(req())
+    await manager.create(req())
+    await until(() => pending.length === 2)
+    pending[0].resolve({ status: 'completed', result: { outputs: [], warnings: [], consistency } })
+    await until(async () => (await manager.get('job-1')).status === 'completed')
+    await expect(manager.dismissConsistency('job-2')).rejects.toMatchObject({
+      code: 'JOB_INVALID_STATE'
+    })
+    const j = await manager.dismissConsistency('job-1')
+    expect(j.result).toMatchObject({ consistency, consistencyDismissed: true })
+    expect((await manager.dismissConsistency('job-1')).result?.consistencyDismissed).toBe(true)
+    done(pending[1])
+    await until(async () => (await manager.get('job-2')).status === 'completed')
+    // Sem relatório de consistência não há o que dispensar.
+    await expect(manager.dismissConsistency('job-2')).rejects.toMatchObject({
+      code: 'JOB_INVALID_STATE'
+    })
+  })
+
   it('awaiting-confirmation sobrevive ao reinício (não vira interrupted) e pode ser cancelado', async () => {
     await manager.create(req())
     await until(() => pending.length === 1)

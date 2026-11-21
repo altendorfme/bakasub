@@ -54,8 +54,8 @@ export function JobResult({ job }: { job: Job }): React.JSX.Element {
         </p>
       ) : null}
       {r?.failedLines?.length ? <FailedLines lines={r.failedLines} /> : null}
-      {r?.consistency?.terms.length ? (
-        <TermConsistency report={r.consistency} mediaTitle={job.media?.title} />
+      {r?.consistency?.terms.length && !r.consistencyDismissed ? (
+        <TermConsistency jobId={job.id} report={r.consistency} mediaTitle={job.media?.title} />
       ) : null}
       {r?.warnings.length ? (
         <details className="text-xs text-muted-foreground">

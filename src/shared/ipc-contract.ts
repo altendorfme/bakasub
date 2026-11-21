@@ -558,6 +558,8 @@ export interface JobResult {
   failedLines?: FailedLine[]
   /** Termos traduzidos de formas diferentes (ausente em jobs anteriores a esta passada). */
   consistency?: TermConsistencyReport
+  /** O usuário dispensou as sugestões de `consistency` neste job (`jobs:dismiss-consistency`). */
+  consistencyDismissed?: boolean
   /** Estimativa do preflight (a cobertura completa vem de `jobs:preflight`). */
   preflight?: PreflightEstimate
 }
@@ -1042,6 +1044,8 @@ export interface IpcInvokeContract {
   'jobs:clear-completed': { req: void; res: { removed: string[] } }
   /** `awaiting-confirmation` -> fila; retoma na tradução, sem reextrair nem reestimar. */
   'jobs:confirm': { req: { id: string }; res: Job }
+  /** Esconde as sugestões de consistência de termos deste job (job terminal; não toca no preset). */
+  'jobs:dismiss-consistency': { req: { id: string }; res: Job }
   /**
    * Inspeciona uma legenda (.srt/.ass/.ssa/.vtt) sem custo de LLM e sem criar job: diagnósticos
    * do parser, cobertura e encoding detectado. Caminho revalidado no Main.
@@ -1142,6 +1146,7 @@ export const INVOKE_CHANNELS = [
   'batches:remove',
   'batches:confirm',
   'jobs:confirm',
+  'jobs:dismiss-consistency',
   'jobs:preflight',
   'files:inspect'
 ] as const satisfies readonly InvokeChannel[]
@@ -1237,6 +1242,7 @@ export interface BakaSubApi {
     remove(id: string): Promise<IpcResult<{ removed: true }>>
     clearCompleted(): Promise<IpcResult<{ removed: string[] }>>
     confirm(id: string): Promise<IpcResult<Job>>
+    dismissConsistency(id: string): Promise<IpcResult<Job>>
     preflight(
       id: string
     ): Promise<IpcResult<{ estimate: PreflightEstimate; coverage: CoverageReport } | null>>

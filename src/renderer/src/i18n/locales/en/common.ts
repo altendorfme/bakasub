@@ -620,7 +620,7 @@ export const common = {
   termConsistency: {
     heading_one: '{{count}} term translated in different ways',
     heading_other: '{{count}} terms translated in different ways',
-    hint: 'Checked locally, without the AI. Pick the right rendering of each term (click again to leave it out) and save them in a glossary: the next jobs will use them.',
+    hint: 'Checked locally, without the AI. Pick the right rendering of each term, or “Do not add” to leave it out, and save them in a glossary: the next jobs will use them. Terms already in the glossary are not shown.',
     builtin:
       '“{{name}}” is a built-in preset and cannot be edited. Save the chosen terms in a new preset of your own:',
     newName: 'New preset name',
@@ -644,6 +644,9 @@ export const common = {
     glossaryIgnored: 'Glossary says “{{target}}”',
     kept: 'kept as in the original',
     choose: 'Use “{{target}}” for “{{term}}”',
+    skip: 'Do not add to the glossary',
+    skipTerm: 'Do not add “{{term}}” to the glossary',
+    dismiss: 'Dismiss',
     ignoredHeading_one: 'The AI did not follow the glossary for {{count}} term',
     ignoredHeading_other: 'The AI did not follow the glossary for {{count}} terms'
   },

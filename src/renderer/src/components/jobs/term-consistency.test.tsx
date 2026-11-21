@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Preset, PresetInput, TermConsistencyReport } from '@shared/ipc-contract'
+import type { Job, Preset, PresetInput, TermConsistencyReport } from '@shared/ipc-contract'
 import '@renderer/i18n'
 import { installFakeApi, ok } from '@renderer/test/fake-api'
 import { TermConsistency } from './term-consistency'
@@ -72,10 +72,16 @@ const report = (presetId = 'p1'): TermConsistencyReport => ({
 
 let presetsListed = false
 
+type Calls = {
+  update?: (...a: unknown[]) => void
+  create?: (...a: unknown[]) => void
+  dismiss?: (id: string) => void
+}
+
 function renderWith(
   presets: Preset[],
   r: TermConsistencyReport,
-  calls: { update?: (...a: unknown[]) => void; create?: (...a: unknown[]) => void } = {},
+  calls: Calls = {},
   mediaTitle?: string
 ): void {
   renderWithContainer(presets, r, calls, mediaTitle)
@@ -84,7 +90,7 @@ function renderWith(
 function renderWithContainer(
   presets: Preset[],
   r: TermConsistencyReport,
-  calls: { update?: (...a: unknown[]) => void; create?: (...a: unknown[]) => void } = {},
+  calls: Calls = {},
   mediaTitle?: string
 ): { container: HTMLElement } {
   presetsListed = false
@@ -102,11 +108,17 @@ function renderWithContainer(
         calls.create?.(preset)
         return ok({ ...mine, id: 'new', ...preset })
       }
+    },
+    jobs: {
+      dismissConsistency: (id: string) => {
+        calls.dismiss?.(id)
+        return ok({ id } as Job)
+      }
     }
   })
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <TermConsistency report={r} mediaTitle={mediaTitle} />
+      <TermConsistency jobId="job-1" report={r} mediaTitle={mediaTitle} />
     </QueryClientProvider>
   )
 }
@@ -200,6 +212,74 @@ describe('TermConsistency', () => {
     expect(screen.getByText('mano ×40, Bro ×4')).toBeTruthy()
     expect(screen.queryByText(/translated in different ways/)).toBeNull()
     expect(screen.queryByRole('button', { name: /Add .* to the glossary/ })).toBeNull()
+  })
+
+  it('own preset: "Do not add" on one of two terms saves only the other', async () => {
+    const update = vi.fn()
+    renderWith([mine], report(), { update })
+    const skipBro = await screen.findByRole('button', { name: 'Do not add “Bro” to the glossary' })
+    expect(skipBro.getAttribute('aria-pressed')).toBe('false')
+    await userEvent.click(skipBro)
+    expect(skipBro.getAttribute('aria-pressed')).toBe('true')
+    expect(
+      screen.getByRole('button', { name: 'Use “mano” for “Bro”' }).getAttribute('aria-pressed')
+    ).toBe('false')
+
+    // Another rendering undoes "Do not add", and "Do not add" again undoes it.
+    await userEvent.click(screen.getByRole('button', { name: 'Use “Bro” for “Bro”' }))
+    expect(skipBro.getAttribute('aria-pressed')).toBe('false')
+    await userEvent.click(skipBro)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add 1 term to the glossary' }))
+    await vi.waitFor(() => expect(update).toHaveBeenCalled())
+    expect((update.mock.calls[0][1] as PresetInput).glossary).toEqual([
+      { source: 'Simon', rule: 'keep' },
+      { source: 'Shire', target: 'Condado' }
+    ])
+  })
+
+  it('own preset: every term on "Do not add" disables adding', async () => {
+    renderWith([mine], report())
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Do not add “Bro” to the glossary' })
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Do not add “Shire” to the glossary' })
+    )
+    const add = screen.getByRole('button', { name: 'Add 0 terms to the glossary' })
+    expect((add as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('No rendering chosen.')).toBeTruthy()
+  })
+
+  it('dismiss hides the section for the job without touching the preset', async () => {
+    const update = vi.fn()
+    const dismiss = vi.fn()
+    const { container } = renderWithContainer([mine], report(), { update, dismiss })
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+    await vi.waitFor(() => expect(dismiss).toHaveBeenCalledWith('job-1'))
+    await vi.waitFor(() => expect(container.textContent).toBe(''))
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('built-in preset: "Do not add" and dismiss work there too', async () => {
+    const create = vi.fn()
+    const dismiss = vi.fn()
+    renderWith([builtin], report('builtin:movie'), { create, dismiss }, 'Gurren Lagann')
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Do not add “Shire” to the glossary' })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Create preset with 1 term' }))
+    await vi.waitFor(() => expect(create).toHaveBeenCalled())
+    expect((create.mock.calls[0][0] as PresetInput).glossary).toEqual([
+      { source: 'Bro', target: 'mano' }
+    ])
+  })
+
+  it('built-in preset: dismiss is offered next to "Create preset"', async () => {
+    const dismiss = vi.fn()
+    renderWith([builtin], report('builtin:movie'), { dismiss })
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+    await vi.waitFor(() => expect(dismiss).toHaveBeenCalledWith('job-1'))
   })
 
   it('built-in preset: suggests a new preset named after the media, same type and style', async () => {

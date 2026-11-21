@@ -630,7 +630,7 @@ export const common: LocaleShape<typeof en> = {
   termConsistency: {
     heading_one: '{{count}} termo traduzido de formas diferentes',
     heading_other: '{{count}} termos traduzidos de formas diferentes',
-    hint: 'Verificado localmente, sem a IA. Escolha a forma certa de cada termo (clique de novo para deixá-lo de fora) e salve num glossário: os próximos jobs vão usá-las.',
+    hint: 'Verificado localmente, sem a IA. Escolha a forma certa de cada termo, ou “Não adicionar” para deixá-lo de fora, e salve num glossário: os próximos jobs vão usá-las. Termos que já estão no glossário não aparecem.',
     builtin:
       '“{{name}}” é um preset embutido e não pode ser editado. Salve os termos escolhidos num preset seu:',
     newName: 'Nome do novo preset',
@@ -654,6 +654,9 @@ export const common: LocaleShape<typeof en> = {
     glossaryIgnored: 'Glossário diz “{{target}}”',
     kept: 'mantido como no original',
     choose: 'Usar “{{target}}” para “{{term}}”',
+    skip: 'Não adicionar ao glossário',
+    skipTerm: 'Não adicionar “{{term}}” ao glossário',
+    dismiss: 'Dispensar',
     ignoredHeading_one: 'A IA não seguiu o glossário em {{count}} termo',
     ignoredHeading_other: 'A IA não seguiu o glossário em {{count}} termos'
   },

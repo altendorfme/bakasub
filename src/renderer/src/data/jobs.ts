@@ -53,9 +53,9 @@ export function useCreateJob(): UseMutationResult<Job, Error, JobCreateRequest> 
   })
 }
 
-export type JobAction = 'confirm' | 'cancel' | 'retry'
+export type JobAction = 'confirm' | 'cancel' | 'retry' | 'dismissConsistency'
 
-/** Confirm / cancel / retry: the Main answers with the updated job. */
+/** Confirm / cancel / retry / dismiss the term suggestions: the Main answers with the updated job. */
 export function useJobAction(): UseMutationResult<Job, Error, { id: string; action: JobAction }> {
   const qc = useQueryClient()
   return useMutation({
