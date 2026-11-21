@@ -33,14 +33,27 @@ The site has no copy of the palette, the fonts or the logos. `site/astro.config.
 
 ## Structure
 
-- `src/layouts/Base.astro`: `<head>` (title, description, favicon, canonical, Open Graph), global stylesheet.
+- `src/layouts/Base.astro`: `<html lang>`, `<head>` (title, description, favicon, canonical, `hreflang` alternates, Open Graph with `og:locale`), global stylesheet.
 - `src/components/`: `Nav`, `Hero`, `Screenshots`, `Features`, `Pipeline`, `Privacy`, `Footer`, `GitHubIcon`, `carousel/`; shared pieces `SectionHeader` (kicker, `<h2>`, lead) and `Icon`.
 - `src/data/screenshots.ts`: the carousel slides (see below).
 - `src/data/features.ts`: the feature grid, the three pipeline steps and the privacy points, as `{ id, icon, title, body }` where `title`/`body` are `TranslationKey`s (no text in components). `src/data/icons.ts`: the stroke icons (24×24 paths) that `Icon.astro` draws.
 - `src/styles/global.css`: Tailwind, then the shared brand files, then base rules. No token value is defined here.
-- `src/i18n/`: `en.ts` is the reference dictionary (`Dictionary` derives from it, so another locale missing a key fails type checking), `links.ts` holds the external URLs, `index.ts` exposes `useTranslations(locale)`. Components take a `locale` prop.
+- `src/components/HomePage.astro`: the whole page for one locale; `src/pages/index.astro` (EN) and `src/pages/pt/index.astro` (PT) only pass `locale`.
+- `src/i18n/`: see [Languages](#languages). Components take a `locale` prop.
 
 Download buttons point to the GitHub Releases page; resolving the per-OS asset comes with the release integration.
+
+## Languages
+
+Astro's native i18n routing (`i18n` in `astro.config.ts`, `prefixDefaultLocale: false`): English at `/bakasub/`, Brazilian Portuguese at `/bakasub/pt/`.
+
+- `src/i18n/en.ts` is the reference dictionary; `Dictionary` derives from its keys. `src/i18n/pt.ts` is declared `satisfies Dictionary`, so a missing key **or** a key `en.ts` does not have fails `astro check` / `tsc` (hence `npm run build`).
+- `src/i18n/index.ts`: `locales` (must match the Astro config), `localeInfo` (BCP 47 tag `en` / `pt-BR`, `og:locale`, endonym, short code), `useTranslations(locale)`, `format()`. `links.ts` holds the language-independent URLs.
+- `Base.astro` sets `<html lang>` from the tag and emits reciprocal `<link rel="alternate" hreflang>` for every locale plus `x-default` (EN); URLs come from `astro:i18n` (`getAbsoluteLocaleUrl`), so they follow `site` + `base`.
+- The `Nav` switcher is two plain links (`EN` / `PT`, no JS) to each locale's home, with `hreflang`, `lang` and the endonym as accessible name; the current one carries `aria-current="page"`. The brand link also goes to the current locale's home.
+- PT wording follows `README-pt.md`. The hero keeps the transparent lockup in both languages; the tagline is the translated HTML kicker (see [Logos](#logos)). Links to the user guide say it is in English.
+
+**Adding a locale**: add it to `locales` and `localeInfo` in `src/i18n/index.ts` and to `i18n.locales` in the config, write `src/i18n/<code>.ts` with `satisfies Dictionary`, and add `src/pages/<code>/index.astro` rendering `<HomePage locale="<code>" />`.
 
 ## Screenshot carousel
 

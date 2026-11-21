@@ -32,6 +32,12 @@ export default defineConfig({
   site: 'https://lsilvatti.github.io',
   base: '/bakasub',
   trailingSlash: 'ignore',
+  // Keep in sync with `locales` in src/i18n/index.ts. English at the root, Portuguese under /pt/.
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'pt'],
+    routing: { prefixDefaultLocale: false }
+  },
   vite: {
     plugins: [tailwindcss()],
     // Keep SVGs as real files: the icon is used three times per page and must stay cacheable.

@@ -1,0 +1,29 @@
+---
+/* The whole landing page for one locale; `pages/index.astro` and `pages/pt/index.astro` only pick the locale. */
+import Base from '../layouts/Base.astro'
+import Nav from './Nav.astro'
+import Hero from './Hero.astro'
+import Footer from './Footer.astro'
+import Screenshots from './Screenshots.astro'
+import Features from './Features.astro'
+import Pipeline from './Pipeline.astro'
+import Privacy from './Privacy.astro'
+import type { Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+}
+const { locale } = Astro.props
+---
+
+<Base locale={locale}>
+  <Nav locale={locale} />
+  <main>
+    <Hero locale={locale} />
+    <Screenshots locale={locale} />
+    <Features locale={locale} />
+    <Pipeline locale={locale} />
+    <Privacy locale={locale} />
+  </main>
+  <Footer locale={locale} />
+</Base>

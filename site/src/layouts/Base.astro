@@ -1,7 +1,8 @@
 ---
 import '../styles/global.css'
 import iconUrl from '@resources/icon.svg?url'
-import { useTranslations, type Locale } from '../i18n'
+import { getAbsoluteLocaleUrl } from 'astro:i18n'
+import { useTranslations, locales, localeInfo, defaultLocale, type Locale } from '../i18n'
 
 interface Props {
   locale?: Locale
@@ -13,10 +14,13 @@ const { locale = 'en', title, description } = Astro.props
 const t = useTranslations(locale)
 const pageTitle = title ?? t('meta.title')
 const pageDescription = description ?? t('meta.description')
+// Every locale page lists all of them (itself included) so the hreflang annotations are reciprocal.
+const alternates = locales.map((code) => ({ hreflang: localeInfo[code].tag, href: getAbsoluteLocaleUrl(code) }))
+const canonical = getAbsoluteLocaleUrl(locale)
 ---
 
 <!doctype html>
-<html lang={locale}>
+<html lang={localeInfo[locale].tag}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -25,8 +29,17 @@ const pageDescription = description ?? t('meta.description')
     <title>{pageTitle}</title>
     <meta name="description" content={pageDescription} />
     <link rel="icon" type="image/svg+xml" href={iconUrl} />
-    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <link rel="canonical" href={canonical} />
+    {alternates.map((alt) => <link rel="alternate" hreflang={alt.hreflang} href={alt.href} />)}
+    <link rel="alternate" hreflang="x-default" href={getAbsoluteLocaleUrl(defaultLocale)} />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={localeInfo[locale].ogLocale} />
+    {
+      locales
+        .filter((code) => code !== locale)
+        .map((code) => <meta property="og:locale:alternate" content={localeInfo[code].ogLocale} />)
+    }
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={pageDescription} />
     <meta name="generator" content={Astro.generator} />

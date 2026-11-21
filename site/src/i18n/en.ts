@@ -1,5 +1,5 @@
 /**
- * English strings, the reference dictionary. Other locales (PT-BR in F4) must provide the same keys:
+ * English strings, the reference dictionary. Other locales (`pt.ts`) must provide the same keys:
  * `Dictionary` is derived from this object so a missing key is a type error.
  */
 export const en = {
@@ -10,6 +10,7 @@ export const en = {
   'nav.github': 'GitHub',
   'nav.githubLabel': 'BakaSub on GitHub',
   'nav.primary': 'Main',
+  'nav.language': 'Language',
   'hero.kicker': 'AI subtitle translator',
   // U+2011 non-breaking hyphen: keeps "re‑mux" on one line at narrow widths.
   'hero.titleStrong': 'Extract, translate with AI and re\u2011mux',
