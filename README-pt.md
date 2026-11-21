@@ -6,7 +6,7 @@
 
 **Extraia, traduza com IA e remuxe as legendas dos seus vídeos `.mkv`**, num app desktop, na sua própria máquina.
 
-Windows x64 e Linux x64 · [GPL-3.0](./LICENSE)
+Windows x64 e Linux x64 · [GPL-3.0](./LICENSE) · [Site](https://lsilvatti.github.io/bakasub/pt/)
 
 <p align="center">
   <a href="https://buymeacoffee.com/leosilvatto"><img src="https://img.shields.io/badge/Me%20pague%20um%20caf%C3%A9-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Me pague um café" /></a>
@@ -58,7 +58,7 @@ A documentação detalhada está em inglês.
 
 - **Usando o app**: [Guia do usuário](./docs/user-guide.md) · [Reportar um problema](./docs/reporting-issues.md)
 - **Contribuindo**: [CONTRIBUTING.md](./CONTRIBUTING.md) · [Desenvolvimento](./docs/development.md) · [Arquitetura](./docs/architecture.md)
-- **Internos**: [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build e release](./docs/release.md)
+- **Internos**: [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Tokens de marca](./docs/brand-tokens.md) · [Site](./docs/site.md) · [Build e release](./docs/release.md)
 
 ## Suporte e contribuição
 

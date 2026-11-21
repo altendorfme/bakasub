@@ -1,0 +1,12 @@
+---
+/*
+ * Starlight override. The brand is dark only (docs/brand-tokens.md): pin the theme instead of reading
+ * `prefers-color-scheme` / localStorage. `StarlightThemeProvider` stays defined because Starlight's
+ * scripts call it.
+ */
+---
+
+<script is:inline>
+  document.documentElement.dataset.theme = 'dark'
+  window.StarlightThemeProvider = { updatePickers() {} }
+</script>

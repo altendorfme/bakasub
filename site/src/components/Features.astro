@@ -1,0 +1,47 @@
+---
+import Icon from './Icon.astro'
+import SectionHeader from './SectionHeader.astro'
+import { features } from '../data/features'
+import { useTranslations, type Locale } from '../i18n'
+
+interface Props {
+  locale?: Locale
+}
+const { locale = 'en' } = Astro.props
+const t = useTranslations(locale)
+---
+
+<section id="features" class="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28" aria-labelledby="features-title">
+  <div class="mx-auto max-w-6xl">
+    <SectionHeader id="features-title" kicker={t('features.kicker')} title={t('features.title')} lead={t('features.lead')} />
+
+    <ul class="mt-12 grid gap-4 sm:mt-16 sm:grid-cols-2 lg:grid-cols-4" role="list">
+      {
+        features.map((feature, index) => (
+          <li
+            class:list={[
+              'group relative flex flex-col rounded-xl border border-border bg-card p-6 transition-colors hover:border-violet/50',
+              index === 0 && 'feature-lead sm:col-span-2'
+            ]}
+          >
+            <span class="inline-flex size-11 items-center justify-center rounded-lg bg-primary-soft text-primary ring-1 ring-primary/25 ring-inset">
+              <Icon name={feature.icon} class="size-6" />
+            </span>
+            <h3 class="mt-5 text-lg leading-snug font-semibold tracking-tight">{t(feature.title)}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-pretty text-muted-foreground">{t(feature.body)}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  /* The first card (cost) spans two columns: give it the brand glow so the wider tile reads as intended. */
+  .feature-lead {
+    background:
+      radial-gradient(28rem 12rem at 0% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%),
+      radial-gradient(24rem 12rem at 100% 100%, color-mix(in srgb, var(--violet) 10%, transparent), transparent 70%),
+      var(--card);
+  }
+</style>

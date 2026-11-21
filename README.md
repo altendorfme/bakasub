@@ -6,7 +6,7 @@
 
 **Extract, translate with AI and re-mux the subtitles of your `.mkv` videos**, from a desktop app, on your own machine.
 
-Windows x64 and Linux x64 · [GPL-3.0](./LICENSE)
+Windows x64 and Linux x64 · [GPL-3.0](./LICENSE) · [Website](https://lsilvatti.github.io/bakasub/)
 
 <p align="center">
   <a href="https://buymeacoffee.com/leosilvatto"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" /></a>
@@ -56,7 +56,7 @@ Progress, cost and results are in the **Queue**. A full walkthrough is in the [u
 
 - **Using the app**: [User guide](./docs/user-guide.md) · [Reporting a problem](./docs/reporting-issues.md)
 - **Contributing**: [CONTRIBUTING.md](./CONTRIBUTING.md) · [Development](./docs/development.md) · [Architecture](./docs/architecture.md)
-- **Internals** (English): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Rate limits](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Media context](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Build and release](./docs/release.md)
+- **Internals** (English): [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Database](./docs/database.md) · [Subtitle parsing](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [LLM translation](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Rate limits](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Media context](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Brand tokens](./docs/brand-tokens.md) · [Website](./docs/site.md) · [Build and release](./docs/release.md)
 
 ## Support and contributing
 

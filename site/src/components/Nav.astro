@@ -1,0 +1,66 @@
+---
+import iconUrl from '@resources/icon.svg?url'
+import GitHubIcon from './GitHubIcon.astro'
+import { useTranslations, links, locales, localeInfo, localeHomePath, sitePath, type Locale } from '../i18n'
+
+interface Props {
+  locale?: Locale
+}
+const { locale = 'en' } = Astro.props
+const t = useTranslations(locale)
+const home = localeHomePath(locale)
+const docs = sitePath('docs/')
+---
+
+<header class="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
+  <nav aria-label={t('nav.primary')} class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+    <a href={home} class="flex items-center gap-2.5 rounded-md font-semibold tracking-tight" aria-label={t('nav.home')}>
+      <img src={iconUrl} alt="" width="28" height="28" class="size-7" />
+      <span class="text-lg">Baka<span class="text-primary">Sub</span></span>
+    </a>
+    <div class="flex items-center gap-2">
+      {/* Plain links (no JS): each points to the home page of its locale. Codes are shown, endonyms announced. */}
+      <ul class="flex items-center rounded-md border border-border p-0.5 text-xs font-medium" aria-label={t('nav.language')}>
+        {
+          locales.map((code) => {
+            const info = localeInfo[code]
+            const current = code === locale
+            return (
+              <li>
+                <a
+                  href={localeHomePath(code)}
+                  hreflang={info.tag}
+                  lang={info.tag}
+                  aria-label={info.name}
+                  aria-current={current ? 'page' : undefined}
+                  class:list={[
+                    'inline-flex h-7 min-w-9 items-center justify-center rounded-sm px-2 font-mono tracking-wider transition-colors',
+                    current ? 'bg-primary-soft text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ]}
+                >
+                  {info.short}
+                </a>
+              </li>
+            )
+          })
+        }
+      </ul>
+      <a
+        href={docs}
+        hreflang="en"
+        class="inline-flex h-9 items-center rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label={t('nav.docsLabel')}
+      >
+        {t('nav.docs')}
+      </a>
+      <a
+        href={links.repo}
+        class="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label={t('nav.githubLabel')}
+      >
+        <GitHubIcon class="size-4" />
+        <span class="hidden sm:inline">{t('nav.github')}</span>
+      </a>
+    </div>
+  </nav>
+</header>

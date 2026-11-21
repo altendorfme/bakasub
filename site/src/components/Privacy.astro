@@ -1,0 +1,64 @@
+---
+import Icon from './Icon.astro'
+import SectionHeader from './SectionHeader.astro'
+import { privacyPoints, privacySent } from '../data/features'
+import { useTranslations, links, type Locale } from '../i18n'
+
+interface Props {
+  locale?: Locale
+}
+const { locale = 'en' } = Astro.props
+const t = useTranslations(locale)
+---
+
+<section id="privacy" class="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28" aria-labelledby="privacy-title">
+  <div class="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1fr_minmax(0,26rem)] lg:gap-16">
+    <div>
+      <SectionHeader
+        id="privacy-title"
+        align="start"
+        kicker={t('privacy.kicker')}
+        title={t('privacy.title')}
+        lead={t('privacy.lead')}
+      />
+      <ul class="mt-10 grid gap-6 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3" role="list">
+        {
+          privacyPoints.map((point) => (
+            <li class="flex gap-4 sm:flex-col lg:flex-row xl:flex-col">
+              <span class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                <Icon name={point.icon} class="size-5" />
+              </span>
+              <div>
+                <h3 class="font-semibold tracking-tight">{t(point.title)}</h3>
+                <p class="mt-1.5 text-sm leading-relaxed text-pretty text-muted-foreground">{t(point.body)}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <div class="self-start rounded-xl border border-border bg-card p-6 sm:p-8">
+      <h3 id="privacy-sent-title" class="text-lg font-semibold tracking-tight">{t('privacy.sentTitle')}</h3>
+      <ul class="mt-5 space-y-4 text-sm leading-relaxed text-muted-foreground" role="list">
+        {
+          privacySent.map((key) => (
+            <li class="flex gap-3">
+              <span class="mt-2 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+              <span class="text-pretty">{t(key)}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <a
+        href={links.privacyGuide}
+        class="mt-6 inline-block rounded-sm text-sm font-medium text-primary underline decoration-primary/40 underline-offset-4 transition-colors hover:decoration-primary"
+      >
+        {t('privacy.guideLink')}
+        <svg viewBox="0 0 24 24" class="ml-1 inline size-4 align-[-0.2em]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M5 12h14m-6-6 6 6-6 6"></path>
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>

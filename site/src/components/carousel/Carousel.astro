@@ -1,0 +1,229 @@
+---
+/*
+ * Accessible screenshot carousel, no library.
+ * Without JS it is a horizontal scroll-snap strip (touch, trackpad, keyboard once focused).
+ * `carousel.ts` adds previous/next buttons, dots, arrow keys and the active slide.
+ */
+import type { Screenshot } from '../../data/screenshots'
+import { useTranslations, format, type Locale } from '../../i18n'
+
+interface Props {
+  slides: readonly Screenshot[]
+  locale?: Locale
+}
+const { slides, locale = 'en' } = Astro.props
+const t = useTranslations(locale)
+const total = slides.length
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/')
+const srcOf = (file: string): string => `${base}screenshots/${file}`
+const navButton =
+  'inline-flex size-10 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:border-violet/60 hover:bg-muted disabled:pointer-events-none disabled:opacity-40'
+---
+
+<section aria-roledescription="carousel" aria-label={t('carousel.label')} class="carousel" data-carousel>
+  <div class="carousel-track" tabindex="0" data-carousel-track>
+    {
+      slides.map((slide, i) => (
+        <figure
+          role="group"
+          aria-roledescription="slide"
+          aria-label={format(t('carousel.slide'), { index: i + 1, total })}
+          class="carousel-slide"
+          data-carousel-slide
+        >
+          <div class="window">
+            <div class="window-bar" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div class="window-body">
+              {slide.src ? (
+                <img
+                  src={srcOf(slide.src)}
+                  alt={t(slide.alt)}
+                  width="1600"
+                  height="1000"
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  class="size-full object-cover object-top"
+                />
+              ) : (
+                <div class="placeholder">
+                  {slide.icon && (
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                      class="size-14 sm:size-20"
+                    >
+                      <path d={slide.icon} />
+                    </svg>
+                  )}
+                  <span class="font-mono text-xs tracking-[0.2em] uppercase" aria-hidden="true">
+                    {t(slide.caption)}
+                  </span>
+                  <span class="sr-only">{t('carousel.placeholder')}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <figcaption class="mt-4 text-center text-sm font-medium text-muted-foreground">{t(slide.caption)}</figcaption>
+        </figure>
+      ))
+    }
+  </div>
+
+  <div class="mt-6 flex items-center justify-center gap-4" role="group" aria-label={t('carousel.controls')} hidden data-carousel-controls>
+    <button type="button" class={navButton} aria-label={t('carousel.prev')} data-carousel-prev>
+      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m15 18-6-6 6-6"></path>
+      </svg>
+    </button>
+    <div class="flex items-center gap-1">
+      {
+        slides.map((_, i) => (
+          <button
+            type="button"
+            class="dot"
+            aria-label={format(t('carousel.goTo'), { index: i + 1 })}
+            aria-current={i === 0 ? 'true' : undefined}
+            data-carousel-dot
+          />
+        ))
+      }
+    </div>
+    <button type="button" class={navButton} aria-label={t('carousel.next')} data-carousel-next>
+      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m9 18 6-6-6-6"></path>
+      </svg>
+    </button>
+  </div>
+</section>
+
+<script>
+  import { initCarousels } from './carousel'
+  initCarousels()
+</script>
+
+<style>
+  .carousel-track {
+    position: relative; /* offsetParent of the slides, used by scrollTo */
+    display: flex;
+    gap: 1.5rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    padding-bottom: 0.75rem;
+    border-radius: var(--radius);
+  }
+
+  .carousel-slide {
+    flex: 0 0 100%;
+    margin: 0;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+
+  /* App window frame with a pink -> violet gradient border. */
+  .window {
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xl, calc(var(--radius) + 4px));
+    background:
+      linear-gradient(var(--card), var(--card)) padding-box,
+      var(--brand-gradient) border-box;
+    /* Kept inside the slide box: the track's overflow would clip a wider glow at the sides. */
+    box-shadow: 0 18px 32px -24px color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+
+  .window-bar {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    height: 2rem;
+    padding-inline: 0.875rem;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--muted) 60%, transparent);
+  }
+
+  .window-bar span {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    background: var(--border);
+  }
+
+  .window-bar span:nth-child(1) {
+    background: color-mix(in srgb, var(--primary) 70%, transparent);
+  }
+
+  .window-bar span:nth-child(2) {
+    background: color-mix(in srgb, var(--violet) 70%, transparent);
+  }
+
+  .window-body {
+    aspect-ratio: 16 / 10;
+  }
+
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+    background:
+      radial-gradient(60% 60% at 50% 40%, color-mix(in srgb, var(--violet) 10%, transparent), transparent 70%),
+      var(--card);
+  }
+
+  .dot {
+    position: relative;
+    width: 1.5rem;
+    height: 1.5rem; /* 24px hit area around an 8px pill */
+    border-radius: 9999px;
+  }
+
+  .dot::after {
+    content: '';
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--border);
+    transform: translate(-50%, -50%);
+    transition:
+      width 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .dot:hover::after {
+    background: var(--muted-foreground);
+  }
+
+  .dot[aria-current='true']::after {
+    width: 1.25rem;
+    background: var(--brand-gradient);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .carousel-track {
+      scroll-behavior: auto;
+    }
+
+    .dot::after {
+      transition: none;
+    }
+  }
+</style>

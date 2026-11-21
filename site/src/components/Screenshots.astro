@@ -1,0 +1,19 @@
+---
+import Carousel from './carousel/Carousel.astro'
+import { screenshots } from '../data/screenshots'
+import { useTranslations, type Locale } from '../i18n'
+
+interface Props {
+  locale?: Locale
+}
+const { locale = 'en' } = Astro.props
+const t = useTranslations(locale)
+---
+
+<div id="screenshots" class="mx-auto max-w-5xl scroll-mt-20 px-4 pb-20 sm:px-6 sm:pb-28">
+  <div class="mb-10 text-center">
+    <h2 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{t('screenshots.title')}</h2>
+    <p class="mx-auto mt-3 max-w-2xl text-pretty text-muted-foreground">{t('screenshots.lead')}</p>
+  </div>
+  <Carousel slides={screenshots} locale={locale} />
+</div>
