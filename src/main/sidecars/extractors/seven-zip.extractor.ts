@@ -44,14 +44,19 @@ export class SevenZipExtractor implements Extractor {
    */
   private async ensureExecutable(): Promise<string> {
     if (process.platform === 'win32') return this.bundledPath
-    try {
-      await access(this.bundledPath, constants.X_OK)
-      return this.bundledPath
-    } catch {
-      /* segue para a cópia */
+    // access(X_OK) não é confiável em FUSE/squashfs (AppImage): responde OK e o spawn falha com
+    // EACCES. O bit de execução do mode é a fonte da verdade.
+    const bundled = await stat(this.bundledPath)
+    if ((bundled.mode & 0o111) !== 0) {
+      try {
+        await access(this.bundledPath, constants.X_OK)
+        return this.bundledPath
+      } catch {
+        /* segue para a cópia */
+      }
     }
     const target = join(this.toolsDir, basename(this.bundledPath))
-    const [src, dst] = await Promise.all([stat(this.bundledPath), stat(target).catch(() => null)])
+    const [src, dst] = [bundled, await stat(target).catch(() => null)]
     if (!dst || dst.size !== src.size) {
       await mkdir(this.toolsDir, { recursive: true })
       await copyFile(this.bundledPath, target)
