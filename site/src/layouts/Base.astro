@@ -1,0 +1,37 @@
+---
+import '../styles/global.css'
+import iconUrl from '@resources/icon.svg?url'
+import { useTranslations, type Locale } from '../i18n'
+
+interface Props {
+  locale?: Locale
+  title?: string
+  description?: string
+}
+
+const { locale = 'en', title, description } = Astro.props
+const t = useTranslations(locale)
+const pageTitle = title ?? t('meta.title')
+const pageDescription = description ?? t('meta.description')
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#120c18" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDescription} />
+    <link rel="icon" type="image/svg+xml" href={iconUrl} />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta name="generator" content={Astro.generator} />
+  </head>
+  <body class="bg-background text-foreground font-sans">
+    <slot />
+  </body>
+</html>

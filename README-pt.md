@@ -58,7 +58,7 @@ A documentação detalhada está em inglês.
 
 - **Usando o app**: [Guia do usuário](./docs/user-guide.md) · [Reportar um problema](./docs/reporting-issues.md)
 - **Contribuindo**: [CONTRIBUTING.md](./CONTRIBUTING.md) · [Desenvolvimento](./docs/development.md) · [Arquitetura](./docs/architecture.md)
-- **Internos**: [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Tokens de marca](./docs/brand-tokens.md) · [Build e release](./docs/release.md)
+- **Internos**: [IPC](./docs/ipc.md) · [Sidecars](./docs/sidecars.md) · [Banco de dados](./docs/database.md) · [Parsing de legendas](./docs/parsing.md) · [Job Memory](./docs/job-memory.md) · [Tradução LLM](./docs/llm.md) · [Jobs](./docs/jobs.md) · [Preflight](./docs/preflight.md) · [Limites e retries](./docs/rate-limits.md) · [Presets](./docs/presets.md) · [Contexto de mídia](./docs/media-context.md) · [Logging](./docs/logging.md) · [Renderer](./docs/renderer.md) · [Tokens de marca](./docs/brand-tokens.md) · [Site](./docs/site.md) · [Build e release](./docs/release.md)
 
 ## Suporte e contribuição
 

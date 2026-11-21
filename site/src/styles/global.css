@@ -1,0 +1,34 @@
+/*
+ * Site stylesheet. Palette, radius, font stacks and gradient come from the shared brand files
+ * (src/shared/brand, see docs/brand-tokens.md): no token value is redefined here.
+ */
+@import 'tailwindcss';
+@import '@brand/fonts.css';
+@import '@brand/tokens.css';
+@import '@brand/theme.css';
+
+@layer base {
+  html {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--brand-font-sans);
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100dvh;
+    overflow-x: clip;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}

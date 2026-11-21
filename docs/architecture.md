@@ -62,7 +62,7 @@ docs/              detailed system flows
 - **Sidecars**: remote manifest, verified download, pruning. See [`sidecars.md`](./sidecars.md).
 - **Database**: SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), Drizzle migrations applied on boot (`drizzle/` ships in `resources/`). See [`database.md`](./database.md).
 - **Native notifications**: emitted by the Main, only in the background, per-category settings. See [`notifications.md`](./notifications.md).
-- **Renderer**: [`renderer.md`](./renderer.md). **Brand tokens** (shared with the site): [`brand-tokens.md`](./brand-tokens.md). **Logging**: [`logging.md`](./logging.md). **Build and release**: [`release.md`](./release.md).
+- **Renderer**: [`renderer.md`](./renderer.md). **Brand tokens** (shared with the site): [`brand-tokens.md`](./brand-tokens.md). **Website** (`site/`): [`site.md`](./site.md). **Logging**: [`logging.md`](./logging.md). **Build and release**: [`release.md`](./release.md).
 
 ## User data
 

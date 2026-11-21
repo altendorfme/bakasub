@@ -36,9 +36,9 @@ Import order matters: Tailwind first, then fonts, tokens, theme.
 ```
 
 - **Renderer**: `src/renderer/src/styles/main.css`, through the existing `@shared` Vite alias (`electron.vite.config.ts`). `@tailwindcss/vite` resolves CSS `@import` with Vite's resolver, so aliases work.
-- **Site**: add a Vite alias (for example `@brand` → `../src/shared/brand`) and import the same files. With Tailwind v4 import all three; without Tailwind, import `fonts.css` and `tokens.css` only. The site has no copy of these values.
+- **Site**: `site/src/styles/global.css`, through the `@brand` alias (`site/astro.config.ts`, which also pins the Fontsource packages to `site/node_modules`). The site has no copy of these values. See [website](./site.md).
 
-`fonts.css` resolves `@fontsource-variable/*` from the repository root `node_modules` (Node resolution walks up from `src/shared/brand/`). A consumer with its own `node_modules` either keeps the root install or declares the two packages itself.
+`fonts.css` resolves `@fontsource-variable/*` from the repository root `node_modules` (Node resolution walks up from `src/shared/brand/`). A consumer with its own `node_modules` declares the two packages and aliases them to its install, as the site does.
 
 ## Rules
 
