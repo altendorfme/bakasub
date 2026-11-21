@@ -1,13 +1,13 @@
 # Website
 
-The landing page lives in `site/`: Astro 5 + Tailwind CSS v4, static output, published under `base: '/bakasub'` (GitHub Pages). It is a separate npm project, outside the root package: its CI installs only `site/`, so the app's `postinstall` (sidecars, native rebuilds) never runs there.
+The landing page lives in `site/`: Astro 5 + Tailwind CSS v4, static output, published at the root of `https://bakasub.silvatti.com.br` (GitHub Pages with a custom domain, `base: '/'`; the domain is set in the repository's Pages settings, and `public/CNAME` keeps it on every deploy). It is a separate npm project, outside the root package: its CI installs only `site/`, so the app's `postinstall` (sidecars, native rebuilds) never runs there.
 
 ```bash
 cd site
 npm install
-npm run dev      # http://localhost:4321/bakasub/ (docs at /bakasub/docs/)
+npm run dev      # http://localhost:4321/ (docs at /docs/)
 npm run build    # astro check + static build into site/dist (+ Pagefind search index)
-npm run preview  # serves site/dist under /bakasub/
+npm run preview  # serves site/dist at /
 ```
 
 ## Brand sources, read in place
@@ -46,7 +46,7 @@ Download buttons are `components/DownloadButtons.astro` (in the hero), fed by `s
 
 ## Languages
 
-English at `/bakasub/`, Brazilian Portuguese at `/bakasub/pt/` (`src/pages/pt/`). The config has **no** Astro `i18n` block: Starlight refuses to run next to one that has its own `locales`, and inferring its locales from it would generate `/pt/docs/*` fallback pages for the English-only docs. Locale URLs are therefore built by `src/i18n/index.ts` (`localeHomePath`, `localeHomeUrl`, `sitePath`), never by `astro:i18n`.
+English at `/`, Brazilian Portuguese at `/pt/` (`src/pages/pt/`). The config has **no** Astro `i18n` block: Starlight refuses to run next to one that has its own `locales`, and inferring its locales from it would generate `/pt/docs/*` fallback pages for the English-only docs. Locale URLs are therefore built by `src/i18n/index.ts` (`localeHomePath`, `localeHomeUrl`, `sitePath`), never by `astro:i18n`.
 
 - `src/i18n/en.ts` is the reference dictionary; `Dictionary` derives from its keys. `src/i18n/pt.ts` is declared `satisfies Dictionary`, so a missing key **or** a key `en.ts` does not have fails `astro check` / `tsc` (hence `npm run build`).
 - `src/i18n/index.ts`: `locales`, `localeInfo` (BCP 47 tag `en` / `pt-BR`, `og:locale`, endonym, short code), `useTranslations(locale)`, `format()`. `links.ts` holds the language-independent URLs.
@@ -85,17 +85,17 @@ Scenes find elements by their English labels ("Browse files", "Continue", "Estim
 
 ## Documentation
 
-`/bakasub/docs/` publishes every `docs/*.md` with [Starlight](https://starlight.astro.build) (0.37, the last line that supports Astro 5). English only. The files are read in place; nothing is copied into `site/` and the docs keep no frontmatter, so they still read well on GitHub.
+`/docs/` publishes every `docs/*.md` with [Starlight](https://starlight.astro.build) (0.37, the last line that supports Astro 5). English only. The files are read in place; nothing is copied into `site/` and the docs keep no frontmatter, so they still read well on GitHub.
 
 - **Loader** (`src/docs/loader.ts`, used by `src/content.config.ts`): Astro's `glob` loader on `../docs/*.md` (subfolders are not published). Ids are slugs: `user-guide.md` is the index (`docs`), anything else `docs/<name>`. It derives the frontmatter Starlight requires: `title` from the first `# Heading`, `description` from the first paragraph, `editUrl` to the GitHub editor. Frontmatter written in a doc still wins.
-- **Remark plugin** (`src/docs/remark-repo-docs.ts`, only for files directly in `docs/`): drops the leading `# Heading` (Starlight renders the title) and rewrites links: `./jobs.md#x` → `/bakasub/docs/jobs/#x`, any other relative link (`../src/...`, `../README.md`) → its GitHub URL on `main`. Heading ids follow github-slugger as on GitHub, so anchors written for GitHub keep working.
+- **Remark plugin** (`src/docs/remark-repo-docs.ts`, only for files directly in `docs/`): drops the leading `# Heading` (Starlight renders the title) and rewrites links: `./jobs.md#x` → `/docs/jobs/#x`, any other relative link (`../src/...`, `../README.md`) → its GitHub URL on `main`. Heading ids follow github-slugger as on GitHub, so anchors written for GitHub keep working.
 - **Sidebar** (`src/docs/sidebar.ts`): **Guide** (`user-guide`, `reporting-issues`) and **Development** (every other file, in a reading order; a new `docs/*.md` not listed there is appended alphabetically). The build fails if the list names a file that no longer exists.
 - **Theme**: `src/styles/docs.css` maps Starlight's `--sl-*` variables onto the brand tokens (after `@brand/fonts.css` and `@brand/tokens.css`). Dark only: `components/docs/ThemeProvider.astro` pins `data-theme="dark"` and `ThemeSelect.astro` removes the picker.
 - **Route middleware** (`src/docs/route-middleware.ts`): Starlight only takes a favicon from `public/`, so the `<link rel="icon">` is pointed at the bundled `resources/icon.svg`; it also adds the landing's `og.png`.
 - **Search**: Pagefind index, built by Starlight at `npm run build` (not available in `npm run dev`). Starlight also writes `sitemap-index.xml`.
 - **Effects on the landing**: Starlight forces `scopedStyleStrategy: 'where'` for the whole site (scoped styles become `:where(.astro-xxx)` instead of `[data-astro-cid-xxx]`; no visual change, checked against screenshots). `prefetch: false` in the config keeps Starlight from adding its prefetch script to every page. `disable404Route: true` keeps Starlight's 404 off GitHub Pages' site-wide `404.html`.
 
-Nav (`Docs`) and footer link to `/bakasub/docs/`. To add a page, create `docs/<name>.md` starting with `# Title`, link it from other docs with `./<name>.md`, and add it to the order in `src/docs/sidebar.ts` if it is user-facing or needs a specific place.
+Nav (`Docs`) and footer link to `/docs/`. To add a page, create `docs/<name>.md` starting with `# Title`, link it from other docs with `./<name>.md`, and add it to the order in `src/docs/sidebar.ts` if it is user-facing or needs a specific place.
 
 ## Content sections
 

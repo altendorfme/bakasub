@@ -21,15 +21,15 @@ export const localeInfo = {
   pt: { tag: 'pt-BR', ogLocale: 'pt_BR', name: 'Português', short: 'PT' }
 } as const satisfies Record<Locale, { tag: string; ogLocale: string; name: string; short: string }>
 
-/** `import.meta.env.BASE_URL` with exactly one trailing slash (`/bakasub/`). */
+/** `import.meta.env.BASE_URL` with exactly one trailing slash (`/`). */
 const base = `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/`
 
-/** Path of a site page, under the base: `sitePath('docs/')` -> `/bakasub/docs/`. */
+/** Path of a site page, under the base: `sitePath('docs/')` -> `/docs/`. */
 export function sitePath(path = ''): string {
   return `${base}${path.replace(/^\/+/, '')}`
 }
 
-/** Home page of `locale`, relative to the domain: `/bakasub/` or `/bakasub/pt/`. */
+/** Home page of `locale`, relative to the domain: `/` or `/pt/`. */
 export function localeHomePath(locale: Locale): string {
   return sitePath(locale === defaultLocale ? '' : `${locale}/`)
 }

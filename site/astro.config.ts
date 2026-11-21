@@ -33,10 +33,11 @@ const fontPackages = [
   '@fontsource-variable/jetbrains-mono'
 ]
 
-const base = '/bakasub'
+// Served at the root of the custom domain (GitHub Pages custom domain, see docs/site.md).
+const base = '/'
 
 export default defineConfig({
-  site: 'https://lsilvatti.github.io',
+  site: 'https://bakasub.silvatti.com.br',
   base,
   trailingSlash: 'ignore',
   // Starlight turns prefetch-on-hover on for every page when unset; keep the landing's JS unchanged.

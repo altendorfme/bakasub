@@ -15,7 +15,7 @@ interface File {
 }
 
 interface Options {
-  /** Site base without trailing slash, e.g. `/bakasub`. */
+  /** Site base (`/` at the domain root); a trailing slash is stripped. */
   base: string
 }
 
@@ -24,7 +24,7 @@ const external = /^([a-z][a-z\d+.-]*:|\/\/|#|\/)/i
 /**
  * Adapts the repository docs (written for GitHub) to the site, only for files directly in `docs/`:
  * - drops the leading `# Title` (Starlight renders the title from the frontmatter);
- * - `./jobs.md#x` -> `/bakasub/docs/jobs/#x` (the user guide is `/bakasub/docs/`);
+ * - `./jobs.md#x` -> `/docs/jobs/#x` (the user guide is `/docs/`);
  * - any other relative link (`../src/...`, `../README.md`, a folder) -> its GitHub URL on `main`,
  *   since only `docs/*.md` is published.
  * Absolute URLs, root paths and `#anchors` are left alone. Heading ids follow github-slugger on

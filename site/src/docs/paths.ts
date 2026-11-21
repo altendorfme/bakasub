@@ -16,7 +16,7 @@ export const repoRoot = resolve(docsDir, '..')
 export const repoUrl = 'https://github.com/lsilvatti/bakasub'
 export const repoBranch = 'main'
 
-/** URL prefix of the docs, under the site base: `/bakasub/docs/`. */
+/** URL prefix of the docs, under the site base: `/docs/`. */
 export const docsRoute = 'docs'
 
 /** The page served at `/docs/` itself. */
