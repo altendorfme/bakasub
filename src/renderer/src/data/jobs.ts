@@ -14,7 +14,6 @@ import type {
   JobProgressEvent
 } from '@shared/ipc-contract'
 import { IpcCallError, unwrap } from '@renderer/lib/ipc'
-import { notifyJob } from '@renderer/lib/notify'
 import { qk } from './query-keys'
 
 export const useJobs = (): UseQueryResult<Job[]> =>
@@ -102,7 +101,6 @@ export function useJobEvents(qc: QueryClient): void {
       window.api.events.on('jobs:progress', (e) => {
         const before = qc.getQueryData<Job[]>(qk.jobs.list())?.find((j) => j.id === e.id)
         const known = applyJobProgress(qc, e)
-        if (before && before.status !== e.status) notifyJob(before, e.status)
         const terminal = !['queued', 'running', 'awaiting-confirmation'].includes(e.status)
         // Awaiting confirmation: `result.preflight` (the estimate) is new and not in the event.
         const estimated = e.status === 'awaiting-confirmation' && before?.status !== e.status

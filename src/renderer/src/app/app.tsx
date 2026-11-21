@@ -9,11 +9,19 @@ import { ErrorBoundary } from '@renderer/components/common/error-boundary'
 import { TooltipProvider } from '@renderer/components/ui/popover'
 import { Toaster } from '@renderer/components/ui/toaster'
 import { UpdateDialog } from './update-dialog'
+import { useNavigationEvents } from './navigation-events'
 import type { AppRouter } from './router'
 
 /** App-wide IPC event subscriptions (once, at the root). */
-function EventBridge({ queryClient }: { queryClient: QueryClient }): null {
+function EventBridge({
+  queryClient,
+  router
+}: {
+  queryClient: QueryClient
+  router: AppRouter
+}): null {
   useJobEvents(queryClient)
+  useNavigationEvents(router)
   useAppUpdateEvents(queryClient)
   useLanguageSync()
   return null
@@ -30,7 +38,7 @@ export function App({
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={300}>
-          <EventBridge queryClient={queryClient} />
+          <EventBridge queryClient={queryClient} router={router} />
           <ErrorBoundary>
             <RouterProvider router={router} />
           </ErrorBoundary>

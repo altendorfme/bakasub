@@ -24,7 +24,7 @@ React hook ──► window.api.<domain>.<method>()          (preload, typed by 
 
 ## Push events (main → renderer)
 
-`emitToRenderers(channel, payload)` (`src/main/ipc/events.ts`) sends to every live window. The preload exposes `window.api.events.on(channel, listener)`, which validates the channel against `EVENT_CHANNELS` and returns an unsubscribe function. Currently used by `sidecars:progress`.
+`emitToRenderers(channel, payload)` (`src/main/ipc/events.ts`) sends to every live window. The preload exposes `window.api.events.on(channel, listener)`, which validates the channel against `EVENT_CHANNELS` and returns an unsubscribe function. Channels: `sidecars:progress`, `app:update-state`, `jobs:progress`, `logs:entry` and `app:navigate` (a click on a native notification, see [`notifications.md`](./notifications.md)).
 
 ## Adding a channel
 
@@ -79,6 +79,7 @@ React hook ──► window.api.<domain>.<method>()          (preload, typed by 
 | event `logs:entry`                                                                                                                                        | n/a                                                                                                                                                                                                  | `LogEntry[]` (batches every 250 ms, only while `logs:watch` is on)                                                                                                                                                                                   |
 | event `app:update-state`                                                                                                                                  | n/a                                                                                                                                                                                                  | `AppUpdateStatus` (every updater transition; `downloading` throttled to 250 ms)                                                                                                                                                                      |
 | event `sidecars:progress`                                                                                                                                 | n/a                                                                                                                                                                                                  | `SidecarProgress`                                                                                                                                                                                                                                    |
+| event `app:navigate`                                                                                                                                      | n/a                                                                                                                                                                                                  | `NavigationTarget` (job, batch or Settings → About; the window is already shown and focused)                                                                                                                                                         |
 
 ## Error codes
 

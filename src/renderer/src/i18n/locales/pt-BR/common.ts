@@ -821,6 +821,15 @@ export const common: LocaleShape<typeof en> = {
         'Usados para escolher a faixa de legenda de um vídeo automaticamente, nesta ordem.',
       verbose: 'Logs detalhados',
       verboseHint: 'Escreve mais detalhes no log. Útil para relatar um problema.',
+      notifications: 'Notificações do sistema',
+      notificationsHint:
+        'Avisa quando algo precisa de você com o BakaSub em segundo plano. Nunca com a janela em primeiro plano.',
+      notifyJob: 'Jobs',
+      notifyJobHint: 'Um arquivo terminou, falhou ou aguarda a confirmação do custo.',
+      notifyBatch: 'Lotes',
+      notifyBatchHint: 'Uma notificação por lote, quando ele termina ou aguarda confirmação.',
+      notifyUpdate: 'Atualizações',
+      notifyUpdateHint: 'Uma versão nova do BakaSub está disponível.',
       add: 'Adicionar idioma',
       remove: 'Remover {{name}}',
       up: 'Subir {{name}}'
@@ -1239,12 +1248,6 @@ export const common: LocaleShape<typeof en> = {
     start: 'Criar vídeo',
     another: 'Fazer mux de outro vídeo',
     max: 'No máximo 32 legendas.'
-  },
-  notify: {
-    done: 'Tradução concluída',
-    warnings: 'Concluído, com avisos',
-    failed: 'O job falhou',
-    confirm: 'Confirme o custo para traduzir'
   },
   logsPage: {
     body: 'O que o BakaSub fez, com o mais recente embaixo. Keys e outros segredos nunca são escritos aqui.',

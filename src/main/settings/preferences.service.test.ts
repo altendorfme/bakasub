@@ -38,6 +38,10 @@ describe('PreferencesService', () => {
       'tracks.preferredSourceLangs': ['en'],
       'logs.level': 'info',
       'updates.autoCheck': true,
+      'notifications.enabled': true,
+      'notifications.job': true,
+      'notifications.batch': true,
+      'notifications.update': true,
       'ui.language': null,
       'output.mode': 'mux',
       'output.extractNaming': 'player',
@@ -118,6 +122,18 @@ describe('PreferencesService', () => {
     onChanged.mockClear()
     await prefs.update({ 'jobs.concurrency': 3 })
     expect(onChanged).not.toHaveBeenCalled()
+  })
+
+  it('notifications: public, on by default, persisted per category', async () => {
+    await prefs.update({ 'notifications.batch': false, 'notifications.enabled': false })
+    expect(onChanged).toHaveBeenCalledWith(['notifications.enabled', 'notifications.batch'])
+    expect(await settings.get('notifications.enabled')).toBe(false)
+    expect(await settings.get('notifications.batch')).toBe(false)
+    expect(await settings.get('notifications.job')).toBe(true)
+    const s = await prefs.reset(['notifications.enabled', 'notifications.batch'])
+    expect(s['notifications.enabled']).toBe(true)
+    expect(s['notifications.batch']).toBe(true)
+    expect(await code(prefs.update({ 'notifications.job': 'yes' as never }))).toBe('INVALID_INPUT')
   })
 
   it('retry: base delay above the maximum is a conflict', async () => {

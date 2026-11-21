@@ -61,6 +61,7 @@ docs/              detailed system flows
 - **Media context (TMDB)**: [`media-context.md`](./media-context.md).
 - **Sidecars**: remote manifest, verified download, pruning. See [`sidecars.md`](./sidecars.md).
 - **Database**: SQLite in WAL mode (`synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`), Drizzle migrations applied on boot (`drizzle/` ships in `resources/`). See [`database.md`](./database.md).
+- **Native notifications**: emitted by the Main, only in the background, per-category settings. See [`notifications.md`](./notifications.md).
 - **Renderer**: [`renderer.md`](./renderer.md). **Logging**: [`logging.md`](./logging.md). **Build and release**: [`release.md`](./release.md).
 
 ## User data

@@ -114,6 +114,20 @@ describe('Settings', () => {
     expect(update).toHaveBeenCalledWith({ 'jobs.concurrency': 3 })
   })
 
+  it('notifications: general switch plus categories that only apply with it on', async () => {
+    const { update } = setup()
+    const batches = await screen.findByRole('switch', { name: 'Batches' })
+    await userEvent.click(batches)
+    expect(update).toHaveBeenLastCalledWith({ 'notifications.batch': false })
+    await userEvent.click(screen.getByRole('switch', { name: 'System notifications' }))
+    expect(update).toHaveBeenLastCalledWith({ 'notifications.enabled': false })
+    await waitFor(() =>
+      expect((screen.getByRole('switch', { name: 'Jobs' }) as HTMLButtonElement).disabled).toBe(
+        true
+      )
+    )
+  })
+
   it('clearing the auto-confirm amount means "always ask"', async () => {
     const { update } = setup()
     const field = await screen.findByLabelText('Translate without asking below')

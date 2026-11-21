@@ -88,6 +88,66 @@ export function GeneralSection(): React.JSX.Element {
           onCheckedChange={(on) => setLevel(on ? 'debug' : 'info')}
         />
       </SettingRow>
+
+      <Notifications />
+    </div>
+  )
+}
+
+const CATEGORIES = [
+  ['notifications.job', 'notifyJob'],
+  ['notifications.batch', 'notifyBatch'],
+  ['notifications.update', 'notifyUpdate']
+] as const
+
+/** Native OS notifications (Main), only while BakaSub is in the background. */
+function Notifications(): React.JSX.Element {
+  const { t } = useTranslation()
+  const [enabled, setEnabled] = useSetting('notifications.enabled')
+  const on = enabled ?? true
+  return (
+    <>
+      <SettingRow
+        label={t('settings.general.notifications')}
+        description={t('settings.general.notificationsHint')}
+      >
+        <Switch
+          aria-label={t('settings.general.notifications')}
+          checked={on}
+          onCheckedChange={setEnabled}
+        />
+      </SettingRow>
+      {CATEGORIES.map(([key, label]) => (
+        <NotificationCategory key={key} setting={key} label={label} disabled={!on} />
+      ))}
+    </>
+  )
+}
+
+function NotificationCategory({
+  setting,
+  label,
+  disabled
+}: {
+  setting: (typeof CATEGORIES)[number][0]
+  label: (typeof CATEGORIES)[number][1]
+  disabled: boolean
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const [value, setValue] = useSetting(setting)
+  return (
+    <div className={disabled ? 'pl-4 opacity-60' : 'pl-4'}>
+      <SettingRow
+        label={t(`settings.general.${label}`)}
+        description={t(`settings.general.${label}Hint`)}
+      >
+        <Switch
+          aria-label={t(`settings.general.${label}`)}
+          checked={value ?? true}
+          disabled={disabled}
+          onCheckedChange={setValue}
+        />
+      </SettingRow>
     </div>
   )
 }

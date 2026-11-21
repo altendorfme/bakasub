@@ -810,6 +810,15 @@ export const common = {
       sourceLangsHint: 'Used to pick the subtitle track of a video automatically, in this order.',
       verbose: 'Detailed logs',
       verboseHint: 'Writes more detail to the log. Useful when reporting a problem.',
+      notifications: 'System notifications',
+      notificationsHint:
+        'Notify when something needs you while BakaSub is in the background. Never while its window is in front.',
+      notifyJob: 'Jobs',
+      notifyJobHint: 'A file finished, failed or waits for the cost to be confirmed.',
+      notifyBatch: 'Batches',
+      notifyBatchHint: 'One notification per batch, when it finishes or waits for confirmation.',
+      notifyUpdate: 'Updates',
+      notifyUpdateHint: 'A new version of BakaSub is available.',
       add: 'Add language',
       remove: 'Remove {{name}}',
       up: 'Move {{name}} up'
@@ -1225,12 +1234,6 @@ export const common = {
     start: 'Create video',
     another: 'Mux another video',
     max: 'At most 32 subtitles.'
-  },
-  notify: {
-    done: 'Translation finished',
-    warnings: 'Finished, with warnings',
-    failed: 'Job failed',
-    confirm: 'Confirm the cost to translate'
   },
   logsPage: {
     body: 'What BakaSub did, newest at the bottom. Keys and other secrets are never written here.',

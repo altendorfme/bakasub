@@ -23,6 +23,8 @@ import { AppInfoService } from './services/app-info.service'
 import { bootFailureMessage } from './services/boot-failure'
 import { shutdown } from './services/shutdown-coordinator'
 import { createMainWindow } from './window/create-main-window'
+import { ActivityNotifier } from './notifications/activity-notifier'
+import { createNotificationService } from './notifications/create-notifications'
 
 initLogger({ emitEntries: (batch) => emitToRenderers('logs:entry', batch) })
 
@@ -40,6 +42,8 @@ if (!app.requestSingleInstanceLock()) {
     .then(async () => {
       electronApp.setAppUserModelId('com.bakasub.app')
       app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
+      let mainWindow: BrowserWindow | null = null
+      const openMainWindow = (): BrowserWindow => (mainWindow = createMainWindow())
 
       const database = await openDatabase()
       shutdown.register('database', () => database.close())
@@ -90,7 +94,10 @@ if (!app.requestSingleInstanceLock()) {
         runner: sidecarModule.runner,
         tools: sidecarModule.manager,
         workRoot: join(paths.cache(), 'jobs'),
-        emit: (e) => emitToRenderers('jobs:progress', e),
+        emit: (e) => {
+          emitToRenderers('jobs:progress', e)
+          notifier.onJobEvent(e)
+        },
         mediaContext: mediaContext.service,
         onSettingsChanged: (keys) => {
           if (keys.includes('logs.level'))
@@ -99,13 +106,32 @@ if (!app.requestSingleInstanceLock()) {
         log: { jobs: logger.jobs, llm: logger.llm }
       })
       isBusy = () => jobModule.jobs.isBusy()
+      // Os eventos de job só começam no `init()` abaixo: `notifier` já existe quando chegam.
+      const notifier = new ActivityNotifier({
+        notify: (req) => notifications.notify(req),
+        getJob: (id) => jobModule.jobs.get(id),
+        getBatch: (id) => jobModule.batches.get(id),
+        language: async () =>
+          consentLanguage(await jobModule.settings.get('ui.language'), app.getLocale()),
+        log: logger.app
+      })
+      const notifications = createNotificationService({
+        mainWindow: () => mainWindow,
+        createWindow: openMainWindow,
+        setting: (key) => jobModule.settings.get(key),
+        log: logger.app
+      })
+      if (!notifications.isSupported()) logger.app.info('native notifications not supported')
       setLogLevel(await jobModule.settings.get('logs.level'))
       // Registrado por último => descartado primeiro: aborta jobs (e seus processos) antes de
       // sidecars, Job Memory e banco.
       shutdown.register('jobs', () => jobModule.jobs.dispose(5000))
       await jobModule.jobs.init()
 
-      const appUpdate = createAppUpdater({ hasActiveJobs: () => jobModule.jobs.isBusy() })
+      const appUpdate = createAppUpdater({
+        hasActiveJobs: () => jobModule.jobs.isBusy(),
+        onStatus: (status) => notifier.onUpdateStatus(status)
+      })
       registerIpc({
         appInfo: new AppInfoService(),
         appUpdate,
@@ -123,14 +149,14 @@ if (!app.requestSingleInstanceLock()) {
         tmdb: mediaContext.tmdb,
         mediaContext: mediaContext.service
       })
-      createMainWindow()
+      openMainWindow()
       scheduleAutoCheck(appUpdate, {
         enabled: () => jobModule.settings.get('updates.autoCheck'),
         log: logger.app
       })
 
       app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+        if (BrowserWindow.getAllWindows().length === 0) openMainWindow()
       })
     })
     // Startup failures used to become an unhandled rejection and a windowless app.

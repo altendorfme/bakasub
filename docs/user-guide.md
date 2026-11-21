@@ -81,7 +81,7 @@ A preset in use by a queued or running job cannot be deleted.
 
 ## Settings
 
-- **General**: app language (system, English, Português do Brasil), default preset, jobs at the same time, auto-confirm threshold, preferred source languages, detailed logs.
+- **General**: app language (system, English, Português do Brasil), default preset, jobs at the same time, auto-confirm threshold, preferred source languages, detailed logs, system notifications. Notifications appear only while BakaSub is in the background (never while its window is in front): a file finished, failed or waits for cost confirmation; a batch finished or waits for confirmation (one notification per batch); a new version is available. Each category can be turned off, or all of them at once. Clicking a notification brings the window back on that job, batch or the About panel.
 - **Keys**: OpenRouter and TMDB.
 - **Translation cache**: size on disk, number of lines, last used date. You can prune entries not used for a number of days or clear everything. This is disabled while a job is running.
 - **Video tools**: install or re-check ffmpeg and mkvtoolnix.

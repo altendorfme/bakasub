@@ -148,6 +148,14 @@ export interface PublicSettings {
   'logs.level': 'info' | 'debug'
   /** Checagem silenciosa de atualização ~30 s após o boot. Nunca baixa nem instala sozinha. */
   'updates.autoCheck': boolean
+  /** Notificações nativas do SO (só com a janela sem foco). Geral: desligado cala as categorias. */
+  'notifications.enabled': boolean
+  /** Job avulso concluído / com avisos / falhou / aguardando confirmação. */
+  'notifications.job': boolean
+  /** Batch concluído ou aguardando confirmação (uma notificação agregada por batch). */
+  'notifications.batch': boolean
+  /** Nova versão disponível. */
+  'notifications.update': boolean
   /** `null` = idioma do sistema (`navigator.language`). */
   'ui.language': AppLanguage | null
   /** Último modo de saída escolhido ao traduzir um vídeo; a UI começa por ele. */
@@ -1081,6 +1089,10 @@ export interface IpcInvokeContract {
   'batches:confirm': { req: { id: string }; res: Batch }
 }
 
+/** Para onde o clique numa notificação nativa leva a janela (evento `app:navigate`). */
+export type NavigationTarget =
+  { kind: 'job'; id: string } | { kind: 'batch'; id: string } | { kind: 'settings'; tab: 'about' }
+
 /** Canais push (main -> renderer). Payload tipado por canal. */
 export interface IpcEventContract {
   'sidecars:progress': SidecarProgress
@@ -1090,6 +1102,8 @@ export interface IpcEventContract {
   'jobs:progress': JobProgressEvent
   /** Lotes a cada 250 ms, só enquanto `logs:watch` estiver ligado. */
   'logs:entry': LogEntry[]
+  /** Clique numa notificação nativa: a janela já foi mostrada/focada; o renderer navega. */
+  'app:navigate': NavigationTarget
 }
 
 export type InvokeChannel = keyof IpcInvokeContract
@@ -1163,7 +1177,8 @@ export const EVENT_CHANNELS = [
   'sidecars:progress',
   'app:update-state',
   'jobs:progress',
-  'logs:entry'
+  'logs:entry',
+  'app:navigate'
 ] as const satisfies readonly EventChannel[]
 
 /** Superfície tipada de `window.api`. */

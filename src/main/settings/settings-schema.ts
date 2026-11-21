@@ -54,6 +54,11 @@ export const SETTINGS_SCHEMA = {
   'logs.level': { schema: z.enum(['info', 'debug']), default: 'info' as 'info' | 'debug' },
   /** Checagem silenciosa de atualização após o boot (nunca baixa nem instala sozinha). */
   'updates.autoCheck': { schema: z.boolean(), default: true },
+  /** Notificações nativas (ver `src/main/notifications`). Categoria só vale com o geral ligado. */
+  'notifications.enabled': { schema: z.boolean(), default: true },
+  'notifications.job': { schema: z.boolean(), default: true },
+  'notifications.batch': { schema: z.boolean(), default: true },
+  'notifications.update': { schema: z.boolean(), default: true },
   /** Jobs executados ao mesmo tempo. */
   'jobs.concurrency': { schema: z.number().int().min(1).max(4), default: 2 },
   /** Preflight: o job segue sozinho se o custo máximo estimado (USD) ficar abaixo disto. `null` = sempre perguntar. */

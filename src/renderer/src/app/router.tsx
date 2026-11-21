@@ -67,10 +67,14 @@ const pageRoutes = PAGES.map((page) =>
   createRoute({
     getParentRoute: () => shellRoute,
     path: `/${page}`,
-    // `?job=` selects a job (queue, logs); `?tab=` opens a Settings tab. Others ignore them.
-    validateSearch: (search: Record<string, unknown>): { job?: string; tab?: string } => ({
+    // `?job=` selects a job (queue, logs); `?tab=` opens a Settings tab; `?batch=` opens a
+    // batch on Translate. Others ignore them.
+    validateSearch: (
+      search: Record<string, unknown>
+    ): { job?: string; tab?: string; batch?: string } => ({
       ...(typeof search.job === 'string' ? { job: search.job } : {}),
-      ...(typeof search.tab === 'string' ? { tab: search.tab } : {})
+      ...(typeof search.tab === 'string' ? { tab: search.tab } : {}),
+      ...(typeof search.batch === 'string' ? { batch: search.batch } : {})
     }),
     component: (): React.JSX.Element => {
       const Screen = SCREENS[page]

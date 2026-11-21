@@ -116,7 +116,7 @@ Status bar: running/queued/awaiting counts and average progress, the lane cooldo
 
 `pages/settings/`, one tab per section, every field saving on its own (`useSetting(key)` → `[value, set]`, errors from the Main as a toast). `NumberSetting` saves on blur/Enter only when the value is in range (otherwise it keeps the text and shows the range); `nullable` fields save `null` when cleared ("Always ask", "No limit").
 
-- **General**: app language (system / each language in its own name), default preset, jobs at the same time, auto-confirm threshold, preferred source languages (ordered chips: move up, remove, add), detailed logs.
+- **General**: app language (system / each language in its own name), default preset, jobs at the same time, auto-confirm threshold, preferred source languages (ordered chips: move up, remove, add), detailed logs, system notifications (general switch + jobs / batches / updates, disabled while the general one is off).
 - **Keys**: `KeyForm` for OpenRouter (cannot be removed: the app needs it) and TMDB (removable), each with its guide.
 - **Translation cache**: size on disk, line count, least recently used date; prune by age or clear all, disabled with an explanation while a job is active (`MEMORY_BUSY` never reaches the user).
 - **Video tools**: `ToolsPanel` (`components/sidecars/`, shared with the onboarding) and a re-check.
@@ -177,7 +177,7 @@ Shared pieces: `SourcePicker` and `PlanNotices` (`components/files/source-picker
 ## Polish
 
 - **Locales**: `i18n/locales/<lang>/{common,errors}.ts`. Every non-English file is typed `LocaleShape<typeof en>` (`i18n/locale-shape.ts`), so a missing or extra key fails the typecheck, and `i18n/locales.test.ts` checks that every string keeps the same `{{variables}}` as English. Adding a language: add it to `APP_LANGUAGES` (contract), translate both files and every guide, register it in `i18n/index.ts`. The language picker (`LanguageSelect`) is in Settings and on the first onboarding screen.
-- **Notifications**: `lib/notify.ts`, called from `useJobEvents` when a job changes to completed / with warnings / failed / awaiting confirmation while the window is not focused (web `Notification`, supported by Electron; the Main sets the AppUserModelId on Windows). Clicking it focuses the window on that job in the queue.
+- **Notifications**: emitted by the Main (see [`notifications.md`](./notifications.md)); the renderer only follows a click: `app/navigation-events.ts` (`useNavigationEvents` in `EventBridge`) maps `app:navigate` to the queue job, the batch on Translate (`?batch=`) or Settings → About.
 - **Bundle**: screens are `React.lazy` chunks (`app/screens.ts`, rendered in `Suspense` by the router), the guide viewer (react-markdown) loads only when a guide opens, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves it off by default). Entry chunk ≈ 380 kB (was ≈ 2.2 MB unminified, single chunk).
 - **Accessibility**: labelled controls (`Field`, `aria-label` on icon buttons), `aria-current` on steps and selections, `role="alert"`/`status`/`log` where state changes, visible focus everywhere, and `prefers-reduced-motion` turns off spinners, pulses and transitions. Not yet audited with a screen reader on each OS.
 
