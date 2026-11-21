@@ -187,7 +187,7 @@ User guides (OpenRouter key, limits and retries, TMDB key) live in `src/renderer
 
 ## Theme
 
-Dark only (`color-scheme: dark`), pink (`--primary`) and violet (`--violet`) on a deep plum background. Tokens use shadcn/ui names (`background`, `card`, `muted`, `primary`, `ring`…) so its components drop in unchanged; `bg-brand` is the pink→violet gradient. Panels over media artwork use `Card` (`bg-card/92` + blur): semi-opaque, never fully transparent. Icons: `lucide-react`.
+Dark only (`color-scheme: dark`), pink (`--primary`) and violet (`--violet`) on a deep plum background. Tokens use shadcn/ui names (`background`, `card`, `muted`, `primary`, `ring`…) so its components drop in unchanged; `bg-brand` is the pink→violet gradient. The values come from `src/shared/brand/` (shared with the site), imported by `styles/main.css`: see [Brand tokens](./brand-tokens.md). Panels over media artwork use `Card` (`bg-card/92` + blur): semi-opaque, never fully transparent. Icons: `lucide-react`.
 
 ## Tests
 

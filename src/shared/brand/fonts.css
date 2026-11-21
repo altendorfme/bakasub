@@ -1,0 +1,8 @@
+/*
+ * Brand fonts, bundled through Fontsource (the app is offline with CSP font-src 'self', so no CDN).
+ * Variable weight axis, upright + italic. Resolved from the repository's node_modules.
+ */
+@import '@fontsource-variable/schibsted-grotesk/wght.css';
+@import '@fontsource-variable/schibsted-grotesk/wght-italic.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght-italic.css';

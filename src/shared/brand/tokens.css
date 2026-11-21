@@ -1,0 +1,36 @@
+/*
+ * BakaSub brand tokens: the single source of the palette, radius and font stacks.
+ * Plain CSS custom properties, no framework: the app renderer and the site both import this file.
+ * Dark only. Color names follow shadcn/ui so its components drop in unchanged;
+ * `primary-soft`, `violet`, `success` and `warning` are ours.
+ * The font stacks name the families loaded by `fonts.css`.
+ */
+:root {
+  color-scheme: dark;
+  --background: #120c18;
+  --foreground: #f3eaf8;
+  --card: #1b1324;
+  --card-foreground: #f3eaf8;
+  --popover: #1b1324;
+  --popover-foreground: #f3eaf8;
+  --muted: #241a30;
+  --muted-foreground: #a493b6;
+  --border: #33263f;
+  --input: #33263f;
+  --ring: #f472b6;
+  --primary: #f472b6;
+  --primary-foreground: #1a0b14;
+  --primary-soft: #3b1430;
+  --secondary: #2a1f47;
+  --secondary-foreground: #c4b5fd;
+  --accent: #241a30;
+  --accent-foreground: #f3eaf8;
+  --destructive: #f87171;
+  --violet: #a78bfa;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --radius: 0.625rem;
+  --brand-font-sans: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --brand-font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;
+  --brand-gradient: linear-gradient(135deg, var(--primary), var(--violet));
+}
