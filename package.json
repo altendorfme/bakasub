@@ -1,6 +1,6 @@
 {
   "name": "bakasub",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "BakaSub - extract, AI-translate and merge MKV subtitles",
   "main": "./out/main/index.js",
   "author": "BakaSub",
