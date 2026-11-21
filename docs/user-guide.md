@@ -87,6 +87,7 @@ A preset in use by a queued or running job cannot be deleted.
 - **Video tools**: install or re-check ffmpeg and mkvtoolnix.
 - **Advanced**: parallelism and rate-limit tuning, with the recommended range shown; values outside it warn but do not block. "Restore defaults" resets only these.
 - **About**: version, platform, data folder, update panel (check, download, restart; every step is an explicit click).
+  When a new version is found at startup, a dialog shows the version, date, size and release notes; "See details and update" opens this panel, "Later" hides it until the next start.
 
 ## The translation cache
 

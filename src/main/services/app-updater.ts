@@ -294,7 +294,12 @@ function isNetworkFailure(err: unknown): boolean {
   )
 }
 
-export const AUTO_CHECK_DELAY_MS = 30_000
+/**
+ * Só o suficiente para a janela terminar o boot (load do renderer + checagem de sidecars) antes
+ * da requisição ao GitHub; o resultado chega ao renderer por `app:update-state` ou pelo snapshot
+ * lido no mount, então não há corrida com a assinatura do evento.
+ */
+export const AUTO_CHECK_DELAY_MS = 3_000
 
 /**
  * Checagem silenciosa única após o boot, desligável por `updates.autoCheck`. Só consulta:

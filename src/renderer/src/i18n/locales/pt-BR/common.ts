@@ -932,8 +932,15 @@ export const common: LocaleShape<typeof en> = {
       autoCheck: 'Verificar atualizações automaticamente',
       autoCheckHint:
         'Procura uma versão nova alguns segundos depois de abrir o BakaSub. Nunca baixa nem instala nada sozinho.',
-      toast: 'A versão {{latest}} está disponível.',
-      toastAction: 'Ver',
+      dialogTitle: 'Uma nova versão do BakaSub está disponível',
+      dialogVersions: 'Versão {{current}} → {{latest}}',
+      dialogPublished: 'Publicada em {{date}}',
+      dialogSize: 'Tamanho do download: {{size}}',
+      dialogNotes: 'Notas da versão',
+      dialogHint:
+        'Nada é baixado até você decidir. O download e a reinicialização acontecem em Configurações → Sobre.',
+      dialogLater: 'Depois',
+      dialogUpdate: 'Ver detalhes e atualizar',
       jobsTitle: 'Há jobs em andamento',
       jobsBody:
         'Instalar a atualização reinicia o BakaSub e cancela os jobs em andamento. Eles são mantidos e retomados na próxima abertura do app.',

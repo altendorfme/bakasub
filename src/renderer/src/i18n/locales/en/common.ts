@@ -919,8 +919,15 @@ export const common = {
       autoCheck: 'Check for updates automatically',
       autoCheckHint:
         'Looks for a new version a few seconds after BakaSub starts. It never downloads or installs anything by itself.',
-      toast: 'Version {{latest}} is available.',
-      toastAction: 'View',
+      dialogTitle: 'A new version of BakaSub is available',
+      dialogVersions: 'Version {{current}} → {{latest}}',
+      dialogPublished: 'Published on {{date}}',
+      dialogSize: 'Download size: {{size}}',
+      dialogNotes: 'Release notes',
+      dialogHint:
+        'Nothing is downloaded until you choose to. The download and the restart happen in Settings → About.',
+      dialogLater: 'Later',
+      dialogUpdate: 'See details and update',
       jobsTitle: 'Jobs are running',
       jobsBody:
         'Installing the update restarts BakaSub and cancels the jobs in progress. They are kept and resume the next time the app starts.',

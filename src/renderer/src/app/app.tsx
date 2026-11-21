@@ -8,20 +8,13 @@ import { useLanguageSync } from '@renderer/i18n/use-language-sync'
 import { ErrorBoundary } from '@renderer/components/common/error-boundary'
 import { TooltipProvider } from '@renderer/components/ui/popover'
 import { Toaster } from '@renderer/components/ui/toaster'
-import { useUpdateToast } from './use-update-toast'
+import { UpdateDialog } from './update-dialog'
 import type { AppRouter } from './router'
 
 /** App-wide IPC event subscriptions (once, at the root). */
-function EventBridge({
-  queryClient,
-  router
-}: {
-  queryClient: QueryClient
-  router: AppRouter
-}): null {
+function EventBridge({ queryClient }: { queryClient: QueryClient }): null {
   useJobEvents(queryClient)
   useAppUpdateEvents(queryClient)
-  useUpdateToast(router)
   useLanguageSync()
   return null
 }
@@ -37,10 +30,11 @@ export function App({
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={300}>
-          <EventBridge queryClient={queryClient} router={router} />
+          <EventBridge queryClient={queryClient} />
           <ErrorBoundary>
             <RouterProvider router={router} />
           </ErrorBoundary>
+          <UpdateDialog router={router} />
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
