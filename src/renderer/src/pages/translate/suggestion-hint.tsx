@@ -27,7 +27,11 @@ export function suggestionHint({
     return (
       <span className="flex items-center gap-1.5">
         <Sparkles className="size-3.5 shrink-0 text-violet" />
-        {t(`translate.preset.suggested.${suggestion.flavor}`)}
+        {t(
+          suggestion.source === 'name'
+            ? 'translate.preset.suggestedByName'
+            : `translate.preset.suggested.${suggestion.flavor}`
+        )}
       </span>
     )
   if (suggestion)

@@ -253,6 +253,7 @@ export const common = {
         series: 'Suggested: a series on TMDB',
         documentary: 'Suggested: a documentary on TMDB'
       },
+      suggestedByName: 'Suggested: the preset name matches the media',
       useSuggestion: 'Back to the suggestion ({{preset}})',
       noSuggestion: 'No TMDB work: the default preset from Settings applies.',
       preset: 'Preset',

@@ -259,6 +259,7 @@ export const common: LocaleShape<typeof en> = {
         series: 'Sugerido: série no TMDB',
         documentary: 'Sugerido: documentário no TMDB'
       },
+      suggestedByName: 'Sugerido: o nome do preset bate com a mídia',
       useSuggestion: 'Voltar à sugestão ({{preset}})',
       noSuggestion: 'Sem obra do TMDB: vale o preset padrão das configurações.',
       preset: 'Preset',

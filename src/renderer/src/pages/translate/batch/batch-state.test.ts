@@ -190,8 +190,8 @@ describe('batch wizard state', () => {
       g,
       { ...initialBatchWizard.options, notes: 'batch' },
       {
-        'tmdb:7': { presetId: 'builtin:anime', flavor: 'anime' },
-        'tmdb:9': { presetId: 'builtin:movie', flavor: 'movie' }
+        'tmdb:7': { presetId: 'builtin:anime', flavor: 'anime', source: 'flavor' },
+        'tmdb:9': { presetId: 'builtin:movie', flavor: 'movie', source: 'flavor' }
       }
     )
     expect(req).toEqual({
