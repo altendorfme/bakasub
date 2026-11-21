@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+/* Fonts are bundled (offline app, CSP font-src 'self'): variable weight axis, upright + italic. */
+@import '@fontsource-variable/schibsted-grotesk/wght.css';
+@import '@fontsource-variable/schibsted-grotesk/wght-italic.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght-italic.css';
 
 /*
  * BakaSub is dark only. Token names follow shadcn/ui so its components drop in unchanged;
@@ -32,6 +37,8 @@
 }
 
 @theme inline {
+  --font-sans: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -71,7 +78,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+    @apply font-sans;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
