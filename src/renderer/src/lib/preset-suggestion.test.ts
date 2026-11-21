@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MediaDetails } from '@shared/ipc-contract'
-import { mediaFlavor, suggestPreset } from './preset-suggestion'
+import { mediaFlavor, suggestPreset, type PresetSuggestion } from './preset-suggestion'
 
 const d = (patch: Partial<MediaDetails>): MediaDetails => ({
   provider: 'tmdb',
@@ -51,18 +51,30 @@ describe('suggestPreset', () => {
   })
 })
 
+interface TestPreset {
+  id: string
+  name: string
+  builtin: boolean
+  createdAt: string | null
+}
+
 describe('suggestPreset by name', () => {
-  const mine = (id: string, name: string, createdAt = '2026-01-01T00:00:00Z') => ({
+  const mine = (id: string, name: string, createdAt = '2026-01-01T00:00:00Z'): TestPreset => ({
     id,
     name,
     builtin: false,
     createdAt
   })
-  const builtin = (id: string, name: string) => ({ id, name, builtin: true, createdAt: null })
+  const builtin = (id: string, name: string): TestPreset => ({
+    id,
+    name,
+    builtin: true,
+    createdAt: null
+  })
   const lib = [builtin('builtin:anime', 'Anime'), builtin('builtin:series', 'Series')]
   const anime = (patch: Partial<MediaDetails> = {}): MediaDetails =>
     d({ genreIds: [16], originalLanguage: 'ja', ...patch })
-  const byName = (media: MediaDetails, presets: ReturnType<typeof mine>[]) =>
+  const byName = (media: MediaDetails, presets: TestPreset[]): PresetSuggestion | null =>
     suggestPreset(media, [...lib, ...presets])
 
   it('exact match', () => {
