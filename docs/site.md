@@ -19,7 +19,7 @@ The site has no copy of the palette, the fonts or the logos. `site/astro.config.
 | `@brand`     | `src/shared/brand`        | `fonts.css`, `tokens.css`, `theme.css` (see [brand tokens](./brand-tokens.md)) |
 | `@resources` | `resources`               | `icon.svg`: favicon, nav and footer mark                                       |
 | `@assets`    | `src/renderer/src/assets` | `logo.svg`: hero lockup                                                        |
-| `@docs`      | `docs`                    | README logos, screenshots (later phases)                                       |
+| `@docs`      | `docs`                    | README logos                                       |
 
 `site/tsconfig.json` mirrors the aliases for `astro check`. In dev, Vite serves these files from their origin (`/@fs/...`); in the build they are emitted as hashed files in `dist/_astro/`. `build.assetsInlineLimit: 0` keeps SVGs as files instead of data URIs.
 
@@ -41,7 +41,7 @@ The site has no copy of the palette, the fonts or the logos. `site/astro.config.
 - `src/components/HomePage.astro`: the whole page for one locale; `src/pages/index.astro` (EN) and `src/pages/pt/index.astro` (PT) only pass `locale`.
 - `src/i18n/`: see [Languages](#languages). Components take a `locale` prop.
 
-Download buttons point to the GitHub Releases page; resolving the per-OS asset comes with the release integration.
+Download buttons are `components/DownloadButtons.astro` (in the hero), fed by `src/lib/release.ts`; see [Downloads](#downloads).
 
 ## Languages
 
@@ -87,3 +87,39 @@ Scenes find elements by their English labels ("Browse files", "Continue", "Estim
 `Features` (7 cards, the README "What it does" list), `Pipeline` (Extract → Translate → Re-mux, an `<ol>` with inline SVG arrows) and `Privacy` (no account, no telemetry, local key and files, plus what does leave the machine) take every string from `features.*`, `pipeline.*` and `privacy.*` in `en.ts`. Each section is a `<section aria-labelledby>` on its `<h2>`, items are `<h3>`; anchors `#features`, `#how-it-works`, `#privacy`.
 
 Claims must match the README and the docs, never go further: the privacy copy follows [user guide › Privacy](./user-guide.md#privacy-what-leaves-your-computer) (it links there), the pipeline follows [jobs](./jobs.md). Change the docs first, then the site.
+
+## Downloads
+
+`src/lib/release.ts` calls `GET /repos/lsilvatti/bakasub/releases/latest` once per build (memoized, 10 s timeout). That endpoint skips drafts and prereleases; the code checks it again. `GITHUB_TOKEN` is sent when present (CI) to avoid the anonymous rate limit.
+
+Assets are matched by extension against the `artifactName` of `electron-builder.yml`: `*-setup.exe` (nsis) and `*.AppImage`. The version shown is the tag without `v`. **If the artifact names or extensions change, update the two regexes in `release.ts`.**
+
+Any failure (API down, rate limit, no release, a missing asset) logs a `[release]` warning and falls back to `https://github.com/lsilvatti/bakasub/releases` for both buttons, with no version label: the build never fails because of the API.
+
+The version is baked in at build time, which is why a release triggers a deploy (below).
+
+## Deploy
+
+`.github/workflows/site.yml` builds `site/` and publishes `site/dist` to GitHub Pages (`configure-pages`, `upload-pages-artifact`, `deploy-pages`).
+
+| Trigger                    | When                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `push` to `main`           | Paths: `site/**`, `docs/*.svg`, `resources/icon.svg`, the brand sources (`src/shared/brand/**`, `logo.svg`) |
+| `release: [published]`     | Refreshes the version and links of the download buttons                                                      |
+| `workflow_dispatch`        | Manual redeploy                                                                                              |
+
+- Only `site/` is installed (`npm ci --ignore-scripts` with `working-directory: site`, cache keyed on `site/package-lock.json`): the root `postinstall` never runs.
+- Permissions: `contents: read` for the build; `pages: write` + `id-token: write` only on the deploy job. `concurrency: pages` without cancelling a deploy in flight.
+- The release workflow creates a **draft** release; publishing it by hand in the GitHub UI fires `release: published`. A release published by a workflow using `GITHUB_TOKEN` does not trigger other workflows: in that case run **Site** manually (`workflow_dispatch`).
+- **One-time setup (repository owner):** Settings › Pages › Build and deployment › Source: **GitHub Actions**. Until then the deploy job fails.
+- **Rollback**: re-run an earlier successful run of the workflow, or revert the commit on `main`. The site is stateless; unpublishing is Settings › Pages.
+
+## Social image
+
+`public/og.png` (1200×630) is generated from the logo lockup by `scripts/og-image.mjs` (sharp, already a dependency of Astro) and committed: `npm run og` in `site/` after a brand change. `Base.astro` emits `og:image` (absolute URL from `site` + `BASE_URL`), `og:image:width/height/alt`, `og:site_name` and the `twitter:card=summary_large_image` set. The tagline in the image is English only and rendered with a system font (DejaVu Sans on Linux); check the PNG after regenerating.
+
+## Replacing the screenshots
+
+1. Capture again with `scripts/screenshots/capture.mjs` (see [Capturing the screenshots](#capturing-the-screenshots)), or drop your own 1600×1000 PNGs into `site/public/screenshots/` with the same names as the ids in `src/data/screenshots.ts`.
+2. For a new slide, add it to `src/data/screenshots.ts` plus its `screenshots.<id>.caption|alt` keys in `en.ts` and `pt.ts`.
+3. `npm run build` in `site/`, commit the PNGs: they live in the repo, no step in CI produces them.

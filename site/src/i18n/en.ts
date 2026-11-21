@@ -17,7 +17,9 @@ export const en = {
   'hero.titleRest': 'the subtitles of your .mkv videos.',
   'hero.lead':
     'A desktop app that runs on your own machine. Bring your OpenRouter key; your files never leave your computer.',
-  'hero.download': 'Download',
+  'download.windows': 'Download for Windows (.exe)',
+  'download.linux': 'Download for Linux (.AppImage)',
+  'download.version': 'Version {version}',
   'hero.source': 'View source',
   'hero.platforms': 'Windows x64 · Linux x64 · Free and open source',
   'screenshots.title': 'A look inside',

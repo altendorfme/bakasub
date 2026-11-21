@@ -1,0 +1,73 @@
+name: Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/*.svg'
+      - 'resources/icon.svg'
+      # Brand sources the site reads in place (see docs/site.md).
+      - 'src/shared/brand/**'
+      - 'src/renderer/src/assets/logo.svg'
+      - '.github/workflows/site.yml'
+  # A published release updates the version and links of the download buttons.
+  # Does not fire if the release is published with GITHUB_TOKEN; publish it manually (see docs/site.md).
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer run supersedes the queued one but never cancels a deploy in flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      # Only site/ is installed: the root package (and its postinstall) is never touched.
+      - name: Install dependencies
+        working-directory: site
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        working-directory: site
+        env:
+          # Read by src/lib/release.ts to resolve the latest release. Falls back to /releases if the API fails.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

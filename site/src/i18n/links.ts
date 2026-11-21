@@ -1,7 +1,7 @@
 /** External URLs, language independent. */
 export const links = {
   repo: 'https://github.com/lsilvatti/bakasub',
-  // Download buttons point here until F5 resolves the per-OS assets from the GitHub Releases API.
+  // Fallback target of the download buttons when the Releases API is unreachable at build time (lib/release.ts).
   releases: 'https://github.com/lsilvatti/bakasub/releases',
   license: 'https://github.com/lsilvatti/bakasub/blob/main/LICENSE',
   coffee: 'https://buymeacoffee.com/leosilvatto',

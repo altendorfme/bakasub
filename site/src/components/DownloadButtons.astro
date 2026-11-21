@@ -1,0 +1,41 @@
+---
+import { getLatestRelease } from '../lib/release'
+import { useTranslations, format, links, type Locale } from '../i18n'
+import GitHubIcon from './GitHubIcon.astro'
+
+interface Props {
+  locale?: Locale
+}
+const { locale = 'en' } = Astro.props
+const t = useTranslations(locale)
+const release = await getLatestRelease()
+
+const primary =
+  'inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand px-6 font-semibold text-primary-foreground shadow-[0_8px_30px_-8px_var(--primary)] transition hover:brightness-110'
+const secondary =
+  'inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 font-medium transition-colors hover:border-violet/60 hover:bg-muted'
+const targets = [
+  { id: 'windows', href: release.windows, label: t('download.windows') },
+  { id: 'linux', href: release.linux, label: t('download.linux') }
+]
+---
+
+<div id="download" class="mt-9 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
+  {
+    targets.map((target) => (
+      <a href={target.href} class={primary} data-platform={target.id}>
+        <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+        </svg>
+        {target.label}
+      </a>
+    ))
+  }
+  <a href={links.repo} class={secondary}>
+    <GitHubIcon class="size-4" />
+    {t('hero.source')}
+  </a>
+</div>
+<p class="mt-4 font-mono text-xs text-muted-foreground">
+  {release.version ? `${format(t('download.version'), { version: release.version })} · ` : ''}{t('hero.platforms')}
+</p>

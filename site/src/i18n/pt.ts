@@ -18,7 +18,9 @@ export const pt = {
   'hero.titleRest': 'as legendas dos seus vídeos .mkv.',
   'hero.lead':
     'Um app desktop que roda na sua própria máquina. Use sua chave do OpenRouter; seus arquivos nunca saem do seu computador.',
-  'hero.download': 'Baixar',
+  'download.windows': 'Baixar para Windows (.exe)',
+  'download.linux': 'Baixar para Linux (.AppImage)',
+  'download.version': 'Versão {version}',
   'hero.source': 'Ver código-fonte',
   'hero.platforms': 'Windows x64 · Linux x64 · Software livre e de código aberto',
   'screenshots.title': 'Por dentro do app',

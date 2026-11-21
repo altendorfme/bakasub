@@ -1,7 +1,7 @@
 ---
 import logoUrl from '@assets/logo.svg?url'
-import GitHubIcon from './GitHubIcon.astro'
-import { useTranslations, links, type Locale } from '../i18n'
+import DownloadButtons from './DownloadButtons.astro'
+import { useTranslations, type Locale } from '../i18n'
 
 interface Props {
   locale?: Locale
@@ -24,25 +24,7 @@ const t = useTranslations(locale)
     </h1>
     <p class="mt-5 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">{t('hero.lead')}</p>
 
-    <div class="mt-9 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
-      <a
-        href={links.releases}
-        class="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand px-6 font-semibold text-primary-foreground shadow-[0_8px_30px_-8px_var(--primary)] transition hover:brightness-110"
-      >
-        <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
-        </svg>
-        {t('hero.download')}
-      </a>
-      <a
-        href={links.repo}
-        class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 font-medium transition-colors hover:border-violet/60 hover:bg-muted"
-      >
-        <GitHubIcon class="size-4" />
-        {t('hero.source')}
-      </a>
-    </div>
-    <p class="mt-4 font-mono text-xs text-muted-foreground">{t('hero.platforms')}</p>
+    <DownloadButtons locale={locale} />
   </div>
 </section>
 
