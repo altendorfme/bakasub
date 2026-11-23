@@ -42,6 +42,15 @@ export function JobError({ job }: { job: Job }): React.JSX.Element | null {
           {t('jobs.hint.credits')}
         </Button>
       ) : null}
+      {code === 'LLM_NO_ENDPOINT' ? (
+        <Button
+          size="sm"
+          className="justify-self-start"
+          onClick={() => void window.api.app.openExternal('https://openrouter.ai/settings/privacy')}
+        >
+          {t('jobs.hint.privacy')}
+        </Button>
+      ) : null}
       {code === 'SIDECAR_MISSING' && missing.length > 0 ? (
         <Button
           size="sm"

@@ -70,8 +70,22 @@ describe('OpenRouterClient.chat', () => {
       content: '{"1":"olá"}',
       finishReason: 'stop',
       generationId: 'gen-1',
-      usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 4, cost: 0.0012 }
+      usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 4, cost: 0.0012 },
+      reasoningChars: 0
     })
+  })
+
+  it('conta os caracteres de delta.reasoning (raciocínio no stream)', async () => {
+    const thinking = {
+      object: 'chat.completion.chunk',
+      choices: [{ delta: { content: '', reasoning: 'Hmm, ' }, finish_reason: null }]
+    }
+    const f = vi.fn(async () =>
+      streamResponse([sse(thinking, thinking, chunk('{"1":"a"}', 'stop'), '[DONE]')])
+    )
+    const r = await client(f as unknown as typeof fetch).chat(req)
+    expect(r.reasoningChars).toBe(10)
+    expect(r.content).toBe('{"1":"a"}')
   })
 
   it('monta a requisição: stream, headers, response_format e require_parameters', async () => {
@@ -100,6 +114,63 @@ describe('OpenRouterClient.chat', () => {
         json_schema: { name: 'translations', strict: true, schema }
       },
       provider: { require_parameters: true }
+    })
+  })
+
+  it('reasoning vai no corpo quando pedido; reasoning_tokens lido do usage', async () => {
+    const f = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () =>
+      streamResponse([
+        sse(
+          chunk('', 'length'),
+          {
+            choices: [{ delta: { content: '' }, finish_reason: 'length' }],
+            usage: {
+              prompt_tokens: 10,
+              completion_tokens: 256,
+              cost: 0,
+              completion_tokens_details: { reasoning_tokens: 250 }
+            }
+          },
+          '[DONE]'
+        )
+      ])
+    )
+    const r = await client(f as unknown as typeof fetch).chat({
+      ...req,
+      reasoning: { effort: 'none' }
+    })
+    expect(JSON.parse(f.mock.calls[0][1].body as string).reasoning).toEqual({ effort: 'none' })
+    expect(r.usage).toMatchObject({ completionTokens: 256, reasoningTokens: 250 })
+    expect(r.finishReason).toBe('length')
+  })
+
+  it('sem reasoning pedido: corpo sem a chave', async () => {
+    const f = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () =>
+      streamResponse([sse(chunk('x', 'stop'), '[DONE]')])
+    )
+    await client(f as unknown as typeof fetch).chat(req)
+    expect(JSON.parse(f.mock.calls[0][1].body as string)).not.toHaveProperty('reasoning')
+  })
+
+  it('json_schema sem require_parameters: corpo sem `provider` (preferência suave)', async () => {
+    const f = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () =>
+      streamResponse([sse(chunk('x', 'stop'), '[DONE]')])
+    )
+    const schema = { type: 'object' }
+    await client(f as unknown as typeof fetch).chat({
+      ...req,
+      responseFormat: { type: 'json_schema', name: 'translations', schema }
+    })
+    expect(JSON.parse(f.mock.calls[0][1].body as string)).toEqual({
+      model: 'a/b',
+      messages: req.messages,
+      temperature: 0.3,
+      max_tokens: 100,
+      stream: true,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'translations', strict: true, schema }
+      }
     })
   })
 
@@ -134,7 +205,23 @@ describe('OpenRouterClient.chat', () => {
     expect(err.kind).toBe(kind)
     expect(err.status).toBe(status)
     expect(err.message).not.toContain('SECRET')
+    // Corpo do erro guardado para o log, sem a key.
+    expect(err.details.body).toContain(`"code":${status}`)
+    expect(err.details.body).not.toContain('SECRET')
     if (status === 429 || status === 503) expect(err.retryAfterMs).toBe(2000)
+  })
+
+  it.each([
+    ['No endpoints found that can handle the requested parameters.', 'unsupported-params'],
+    ['No endpoints found matching your data policy', 'unsupported-params'],
+    ['Model not found', 'server']
+  ])('HTTP 404 "%s" => %s', async (message, kind) => {
+    const f = async (): Promise<Response> =>
+      new Response(JSON.stringify({ error: { code: 404, message } }), { status: 404 })
+    const err = (await client(f as unknown as typeof fetch)
+      .chat(req)
+      .catch((e) => e)) as LlmError
+    expect(err.kind).toBe(kind)
   })
 
   it('429 lê X-RateLimit-* (limite, restante, reset em epoch ms)', async () => {

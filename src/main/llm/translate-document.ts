@@ -12,7 +12,7 @@ import {
   type SubtitleDocument
 } from '../parsers'
 import { DEFAULT_CHUNK_LIMITS, type ChunkLimits } from './chunker'
-import { ChunkTranslator, type LineFailure } from './chunk-translator'
+import { ChunkTranslator, REASONING_SLACK_TOKENS, type LineFailure } from './chunk-translator'
 import {
   CancelRequested,
   DrainRequested,
@@ -25,8 +25,10 @@ import {
   type Sleep,
   type UsageTotals
 } from './llm-session'
+import { initialOutputMode, OutputModeState } from './output-mode'
 import type { ModelInfo } from './model-catalog'
 import { buildSystemPrompt, parseGlossary } from './prompt-builder'
+import { planReasoning } from './reasoning'
 import { laneOf, RateLimiter, type WaitInfo } from './rate-limiter'
 import { DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 import { planLanes } from './segmenter'
@@ -110,6 +112,11 @@ export interface TranslateResult<F> {
   /** Falas resolvidas reaplicando a tradução de outra com o mesmo context hash. */
   readonly copies: number
   readonly status: 'completed' | 'completed-with-warnings'
+  /**
+   * Avisos informativos (não mudam `status`): ex. o modo de saída rebaixado após um 404
+   * "No endpoints found". Quem chama decide como mostrar.
+   */
+  readonly notices?: readonly string[]
 }
 
 /** Cancelado pelo chamador. O que já foi traduzido está no Job Memory; `usage` traz o custo. */
@@ -253,6 +260,8 @@ export async function translateDocument<F>(
     stylePrompt: input.preset.prompt,
     media: input.media
   })
+  /** Um só para o job: um rebaixamento numa lane vale para todas. */
+  const outputMode = new OutputModeState(initialOutputMode(model))
   const drain = new AbortController()
   let fatal: unknown = null
   const stop = (err: unknown): void => {
@@ -284,7 +293,8 @@ export async function translateDocument<F>(
         temperature: input.preset.temperature,
         signal,
         sessionId,
-        drain: drain.signal
+        drain: drain.signal,
+        outputMode
       }
     )
     sessions.push(session)
@@ -296,6 +306,7 @@ export async function translateDocument<F>(
         known,
         lexInline: input.format.lexInline,
         maxCompletionTokens: model.maxCompletionTokens,
+        reasoningSlack: planReasoning(model).needsSlack ? REASONING_SLACK_TOKENS : 0,
         log
       },
       {
@@ -433,7 +444,12 @@ export async function translateDocument<F>(
     usage: usage(),
     cache: { hits: lookup.hits.size, misses: lookup.misses.length + copyUnits.length },
     copies: copyUnits.length,
-    status: failed.length > 0 ? 'completed-with-warnings' : 'completed'
+    status: failed.length > 0 ? 'completed-with-warnings' : 'completed',
+    notices: outputMode.downgrades.map(
+      (d) =>
+        `output mode downgraded for ${model.id}: ${d.from} -> ${d.to} ` +
+        `(no OpenRouter endpoint accepted the stricter mode)`
+    )
   }
 }
 

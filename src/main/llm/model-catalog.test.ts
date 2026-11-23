@@ -89,6 +89,30 @@ describe('ModelCatalog', () => {
     ).rejects.toBeInstanceOf(LlmError)
   })
 
+  it('cache de versão antiga (sem reasoning) conta como vencido, mas serve offline', async () => {
+    await settings.set('models.cache', { fetchedAt: now, models: [parseModel(raw('a/b'))] })
+    const list = vi.fn(async () => [
+      raw('a/b', {
+        supported_parameters: ['reasoning'],
+        reasoning: { mandatory: false }
+      })
+    ])
+    const r = await catalog(list).get()
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(r.models[0].reasoning).toEqual({ mandatory: false, supportsMaxTokens: false })
+    // Relido do cache novo (v2) com o campo preservado.
+    const again = await catalog(list).get()
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(again.models[0].reasoning).toEqual({ mandatory: false, supportsMaxTokens: false })
+
+    await settings.set('models.cache', { fetchedAt: now, models: [parseModel(raw('a/b'))] })
+    const off = await catalog(async () => {
+      throw new LlmError('network', 'down')
+    }).get()
+    expect(off).toMatchObject({ offline: true })
+    expect(off.models[0].reasoning).toBeUndefined()
+  })
+
   it('find: modelo ausente no cache fresco força um refetch antes de desistir', async () => {
     const list = vi
       .fn<() => Promise<unknown[]>>()

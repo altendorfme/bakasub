@@ -1,8 +1,9 @@
 import type { HashedUnit } from '../memory/context-hash'
 import { validateTranslation, type InlineLexer, type Issue } from '../parsers'
 import { buildContext, DEFAULT_CONTEXT_WINDOW } from './chunker'
-import type { LlmLog, LlmSession } from './llm-session'
+import { FatalLlmError, type LlmLog, type LlmSession, type SessionResponse } from './llm-session'
 import { buildRepairMessage, buildTranslateMessage } from './prompt-builder'
+import { reasoningStarved } from './reasoning'
 import { parseTranslations } from './response-parser'
 import { estimateTokens } from './token-estimate'
 
@@ -11,6 +12,13 @@ export const MAX_CONTENT_ATTEMPTS = 3
 /** Divisões por moderação até isolar a(s) linha(s) bloqueada(s). */
 const MAX_MODERATION_SPLITS = 3
 const RESPONSE_LOG_LIMIT = 2048
+/** Folga de `max_tokens` para modelos cujo raciocínio não pode ser desligado. */
+export const REASONING_SLACK_TOKENS = 1024
+/**
+ * Teto do multiplicador de orçamento quando o raciocínio esgota `max_tokens` (1x -> 2x -> 4x):
+ * no máximo 2 requisições extras antes de `LLM_REASONING_BUDGET`.
+ */
+export const MAX_BUDGET_FACTOR = 4
 
 export type LineFailureReason = 'UNTRANSLATED_VALIDATION_FAILED' | 'UNTRANSLATED_CONTENT_FILTERED'
 
@@ -34,10 +42,18 @@ interface Attempt {
 
 /**
  * Ciclo de um chunk: traduzir -> validar por linha -> aceitar as válidas -> reparar só as
- * inválidas (até 3 tentativas por linha). `length` divide ao meio; moderação divide até isolar.
- * Sequencial: cada rodada usa as traduções já conhecidas como contexto.
+ * inválidas (até 3 tentativas por linha). `length` com a saída gasta em raciocínio repete o
+ * mesmo chunk com orçamento maior; `length` com texto longo divide ao meio; moderação divide
+ * até isolar. Sequencial: cada rodada usa as traduções já conhecidas como contexto.
  */
 export class ChunkTranslator {
+  /**
+   * Multiplicador do `max_tokens`. Sobe (2x, até `MAX_BUDGET_FACTOR`) quando o raciocínio esgota
+   * o orçamento e fica para os próximos chunks da lane: o mesmo modelo vai raciocinar parecido,
+   * e `max_tokens` é teto, não cobrança.
+   */
+  private budgetFactor = 1
+
   constructor(
     private readonly session: LlmSession,
     private readonly env: {
@@ -46,6 +62,8 @@ export class ChunkTranslator {
       known: Map<number, string>
       lexInline: InlineLexer
       maxCompletionTokens: number | null
+      /** Tokens somados ao `max_tokens` quando o raciocínio não pode ser desligado. */
+      reasoningSlack?: number
       log: LlmLog
     },
     private readonly sink: ChunkSink
@@ -63,13 +81,14 @@ export class ChunkTranslator {
 
     while (pending.length > 0) {
       const repair = pending.some((u) => attempts.get(u.cueId)!.count > 0)
+      const maxTokens = this.maxTokens(pending)
       const res = await this.session.request(
         [
           { role: 'system', content: this.env.system },
           { role: 'user', content: this.message(pending, attempts, repair) }
         ],
         pending.map((u) => u.cueId),
-        this.maxTokens(pending)
+        maxTokens
       )
 
       if (res.type === 'moderated') {
@@ -81,18 +100,60 @@ export class ChunkTranslator {
         return
       }
 
-      if (res.finishReason === 'length' && pending.length > 1) {
-        for (const half of halves(pending)) await this.runLines(half, moderationDepth)
-        return
+      if (res.finishReason === 'length' && reasoningStarved(res, estimateTokens)) {
+        // Dividir não resolve: cada metade raciocina de novo e repete System + <context>.
+        // Mesmo chunk, orçamento maior, sem gastar tentativa de conteúdo.
+        if (this.grow(pending, maxTokens)) {
+          this.env.log.warn(
+            `reasoning used the output budget (reasoning=${res.reasoningTokens ?? '?'}/` +
+              `${res.completionTokens ?? '?'} tokens, max_tokens=${maxTokens}); ` +
+              `retrying ${pending.length} lines with budget x${this.budgetFactor}`
+          )
+          continue
+        }
+        throw new FatalLlmError(
+          'LLM_REASONING_BUDGET',
+          `The model spent its output budget on reasoning (reasoning=${res.reasoningTokens ?? '?'}/` +
+            `${res.completionTokens ?? '?'} tokens at max_tokens=${maxTokens})`
+        )
       }
 
       const parsed = parseTranslations(
         res.content,
         pending.map((u) => u.cueId)
       )
+
+      if (res.finishReason === 'length' && pending.length > 1) {
+        // Resposta cortada: aceita as linhas completas e válidas antes do corte (sem gastar
+        // tentativa) e divide só o resto ao meio.
+        const kept: { unit: HashedUnit; translated: string }[] = []
+        if (parsed.ok)
+          for (const u of pending) {
+            const value = parsed.values.get(u.cueId)
+            if (
+              value !== undefined &&
+              validateTranslation(u.unit, value, this.env.lexInline).length === 0
+            )
+              kept.push({ unit: u, translated: value })
+          }
+        this.env.log.warn(
+          `truncated response: kept ${kept.length}/${pending.length} lines, splitting the rest ` +
+            describe(res)
+        )
+        this.logContent(res)
+        await this.acceptAll(kept)
+        const keptIds = new Set(kept.map((e) => e.unit.cueId))
+        const rest = pending.filter((u) => !keptIds.has(u.cueId))
+        if (rest.length > 1)
+          for (const half of halves(rest)) await this.runLines(half, moderationDepth)
+        else if (rest.length === 1) await this.runLines(rest, moderationDepth)
+        return
+      }
+
       const accepted: { unit: HashedUnit; translated: string }[] = []
       if (!parsed.ok) {
-        this.env.log.warn(`unparseable response: ${res.content.slice(0, RESPONSE_LOG_LIMIT)}`)
+        this.env.log.warn(`unparseable response (${parsed.problem}) ${describe(res)}`)
+        this.logContent(res)
         for (const u of pending) {
           const a = attempts.get(u.cueId)!
           a.count++
@@ -102,6 +163,7 @@ export class ChunkTranslator {
         }
       } else {
         if (parsed.extra.length) this.env.log.debug(`ignored extra ids: ${parsed.extra.join(',')}`)
+        const problems: string[] = []
         for (const u of pending) {
           const a = attempts.get(u.cueId)!
           a.count++
@@ -109,6 +171,7 @@ export class ChunkTranslator {
           if (value === undefined) {
             a.returned = ''
             a.issues = []
+            problems.push(`${u.cueId}:MISSING`)
             continue
           }
           const issues = validateTranslation(u.unit, value, this.env.lexInline)
@@ -116,18 +179,25 @@ export class ChunkTranslator {
           else {
             a.returned = value
             a.issues = issues
+            problems.push(`${u.cueId}:${issues.map(formatIssue).join('+')}`)
           }
         }
-        if (accepted.length < pending.length)
+        if (parsed.truncated)
           this.env.log.warn(
-            `invalid lines in response: ${res.content.slice(0, RESPONSE_LOG_LIMIT)}`
+            `truncated response: recovered ${parsed.values.size}/${pending.length} lines ${describe(res)}`
           )
+        if (accepted.length < pending.length) {
+          this.env.log.warn(
+            `invalid lines in response: ${pending.length - accepted.length}/${pending.length} ` +
+              `[${problems.join(' ')}]` +
+              (parsed.extra.length ? ` extra=${parsed.extra.length}` : '') +
+              ` ${describe(res)}`
+          )
+          this.logContent(res)
+        }
       }
 
-      if (accepted.length) {
-        await this.sink.accept(accepted)
-        for (const e of accepted) this.env.known.set(e.unit.cueId, e.translated)
-      }
+      await this.acceptAll(accepted)
 
       const done = new Set(accepted.map((e) => e.unit.cueId))
       const next: HashedUnit[] = []
@@ -144,6 +214,17 @@ export class ChunkTranslator {
       }
       pending = next
     }
+  }
+
+  private async acceptAll(entries: { unit: HashedUnit; translated: string }[]): Promise<void> {
+    if (!entries.length) return
+    await this.sink.accept(entries)
+    for (const e of entries) this.env.known.set(e.unit.cueId, e.translated)
+  }
+
+  /** Texto da legenda só em `debug`. */
+  private logContent(res: OkResponse): void {
+    this.env.log.debug(`response content: ${res.content.slice(0, RESPONSE_LOG_LIMIT)}`)
   }
 
   private message(
@@ -168,12 +249,47 @@ export class ChunkTranslator {
     })
   }
 
-  /** ~2,5× o `<target>` + overhead do JSON, com piso; limitado pelo máximo do modelo. */
+  /**
+   * ~2,5× o `<target>` + overhead do JSON, com piso, + folga de raciocínio, vezes o
+   * `budgetFactor`; limitado pelo máximo do modelo.
+   */
   private maxTokens(pending: readonly HashedUnit[]): number {
     const target = pending.reduce((n, u) => n + estimateTokens(u.unit.payload), 0)
-    const want = Math.max(256, Math.ceil(target * 2.5) + pending.length * 8)
+    const base =
+      Math.max(256, Math.ceil(target * 2.5) + pending.length * 8) + (this.env.reasoningSlack ?? 0)
+    const want = base * this.budgetFactor
     return this.env.maxCompletionTokens ? Math.min(want, this.env.maxCompletionTokens) : want
   }
+
+  /** Dobra o orçamento, se ainda cabe (teto do fator e do modelo). `false` = não há para onde subir. */
+  private grow(pending: readonly HashedUnit[], current: number): boolean {
+    while (this.budgetFactor < MAX_BUDGET_FACTOR) {
+      this.budgetFactor = Math.min(this.budgetFactor * 2, MAX_BUDGET_FACTOR)
+      if (this.maxTokens(pending) > current) return true
+    }
+    return false
+  }
+}
+
+type OkResponse = Extract<SessionResponse, { type: 'ok' }>
+
+/** Campos de diagnóstico de uma resposta (sem conteúdo da legenda). */
+export function describe(res: OkResponse): string {
+  return (
+    `model=${res.model} mode=${res.mode} finish=${res.finishReason ?? '-'} ` +
+    `out=${res.completionTokens ?? '?'} reasoning_tokens=${res.reasoningTokens ?? '?'} ` +
+    `reasoning_streamed=${res.reasoningChars > 0 ? `${res.reasoningChars}ch` : 'no'} ` +
+    `chars=${res.content.length}`
+  )
+}
+
+function formatIssue(i: Issue): string {
+  const extra = [
+    i.id !== undefined ? `id=${i.id}` : null,
+    i.expected !== undefined ? `expected=${i.expected}` : null,
+    i.actual !== undefined ? `actual=${i.actual}` : null
+  ].filter(Boolean)
+  return extra.length ? `${i.code}(${extra.join(',')})` : i.code
 }
 
 function halves<T>(xs: readonly T[]): T[][] {

@@ -1,13 +1,13 @@
 import type { AppErrorCode } from '../errors'
 import type { ModelInfo } from './model-catalog'
+import { planReasoning, type ReasoningRequest } from './reasoning'
 import {
   LlmError,
   type ChatMessage,
   type ChatResult,
-  type GenerationCost,
-  type ResponseFormat
+  type GenerationCost
 } from './openrouter-client'
-import { responseSchema } from './prompt-builder'
+import { initialOutputMode, OutputModeState, requestFormat, type OutputMode } from './output-mode'
 import type { Lease, RateLane, RateLimiter, WaitInfo } from './rate-limiter'
 import { decide, DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 
@@ -67,11 +67,37 @@ export class FatalLlmError extends Error {
 }
 
 export type SessionResponse =
-  { type: 'ok'; content: string; finishReason: string | null } | { type: 'moderated' }
+  | {
+      type: 'ok'
+      content: string
+      finishReason: string | null
+      /** Saída cobrada (inclui raciocínio); `null` sem `usage`. */
+      completionTokens: number | null
+      /** Parte de `completionTokens` gasta em raciocínio; `null` quando não informada. */
+      reasoningTokens: number | null
+      /** Para o diagnóstico de respostas inválidas. */
+      model: string
+      mode: OutputMode
+      /** Caracteres de `delta.reasoning` no stream (0 = nenhum). */
+      reasoningChars: number
+    }
+  | { type: 'moderated' }
 
 /** Atraso antes de consultar `/generation` (o registro pode não estar pronto na hora). */
 const COST_LOOKUP_DELAY_MS = 1500
 const COST_LOOKUP_TIMEOUT_MS = 5000
+
+export const OPENROUTER_PRIVACY_URL = 'https://openrouter.ai/settings/privacy'
+
+/** 404 em todos os degraus: o modelo não é a única causa possível. */
+export function noEndpointMessage(model: string, detail: string): string {
+  return (
+    `No OpenRouter endpoint accepted requests for ${model} in any output mode ` +
+    `(json_schema, json_object, prompt only): ${detail.replace(/\.+$/, '')}. Besides the model itself, your ` +
+    `OpenRouter account's provider restrictions (Settings → Privacy: allowed/ignored providers, ` +
+    `ZDR) may be excluding every endpoint: ${OPENROUTER_PRIVACY_URL}`
+  )
+}
 
 /**
  * Uma conversa de job com um modelo: aplica retry de transporte, escolhe o modo de saída
@@ -90,6 +116,11 @@ export class LlmSession {
   private readonly costLookups: Promise<void>[] = []
 
   private readonly now: () => number
+  private readonly outputMode: OutputModeState
+  /** `reasoning` mandado em toda requisição (ver `planReasoning`); ausente = nada. */
+  private readonly reasoning: ReasoningRequest | undefined
+  /** O corpo do primeiro erro HTTP desta sessão (= lane) já foi para o log. */
+  private errorBodyLogged = false
 
   constructor(
     private readonly deps: {
@@ -114,23 +145,13 @@ export class LlmSession {
       sessionId?: string
       /** Drenagem (ver `DrainRequested`): corta esperas e novas requisições, não o stream. */
       drain?: AbortSignal
+      /** Modo de saída do job, compartilhado entre lanes. Ausente: um só desta sessão. */
+      outputMode?: OutputModeState
     }
   ) {
     this.now = deps.now ?? Date.now
-  }
-
-  private format(ids: readonly number[]): {
-    responseFormat?: ResponseFormat
-    requireParameters?: boolean
-  } {
-    const m = this.params.model
-    if (m.structuredOutputs)
-      return {
-        responseFormat: { type: 'json_schema', name: 'translations', schema: responseSchema(ids) },
-        requireParameters: true
-      }
-    if (m.responseFormat) return { responseFormat: { type: 'json_object' } }
-    return {}
+    this.outputMode = params.outputMode ?? new OutputModeState(initialOutputMode(params.model))
+    this.reasoning = planReasoning(params.model).request
   }
 
   async request(
@@ -162,6 +183,7 @@ export class LlmSession {
         waited = false
         this.deps.onWait?.(null)
       }
+      const mode = this.outputMode.current
       try {
         const res = await this.deps.llm.chat(
           {
@@ -169,8 +191,9 @@ export class LlmSession {
             messages,
             temperature: this.params.temperature,
             maxTokens,
-            ...this.format(ids),
-            ...(this.params.sessionId ? { sessionId: this.params.sessionId } : {})
+            ...requestFormat(mode, ids),
+            ...(this.params.sessionId ? { sessionId: this.params.sessionId } : {}),
+            ...(this.reasoning ? { reasoning: this.reasoning } : {})
           },
           signal
         )
@@ -178,9 +201,19 @@ export class LlmSession {
         this.add(res)
         this.deps.log.info(
           `chat ok model=${this.params.model.id} ids=${ids.length} finish=${res.finishReason} ` +
-            `tokens=${res.usage?.promptTokens ?? '?'}/${res.usage?.completionTokens ?? '?'} cost=${res.usage?.cost ?? '?'}`
+            `max=${maxTokens} tokens=${res.usage?.promptTokens ?? '?'}/${res.usage?.completionTokens ?? '?'} ` +
+            `reasoning=${res.usage?.reasoningTokens ?? '?'} cost=${res.usage?.cost ?? '?'}`
         )
-        return { type: 'ok', content: res.content, finishReason: res.finishReason }
+        return {
+          type: 'ok',
+          content: res.content,
+          finishReason: res.finishReason,
+          completionTokens: res.usage?.completionTokens ?? null,
+          reasoningTokens: res.usage?.reasoningTokens ?? null,
+          model: this.params.model.id,
+          mode,
+          reasoningChars: res.reasoningChars ?? 0
+        }
       } catch (err) {
         // Libera antes de qualquer espera: backoff não segura vaga em voo de outras lanes.
         lease.release(
@@ -189,8 +222,36 @@ export class LlmSession {
             : 'other'
         )
         if (!(err instanceof LlmError)) throw err
+        if (!this.errorBodyLogged && err.details.body !== undefined) {
+          // Uma vez por lane: o corpo costuma ser igual entre tentativas e lanes.
+          this.errorBodyLogged = true
+          this.deps.log.warn(
+            `chat failed body model=${this.params.model.id} mode=${mode} ` +
+              `status=${err.status ?? '-'}: ${err.details.body}`
+          )
+        }
         if (err.generationId && ['aborted', 'timeout', 'stream-error'].includes(err.kind))
           this.lookupCost(err.generationId)
+        if (err.kind === 'unsupported-params') {
+          // Determinístico: sem backoff nem tentativa gasta; desce um degrau (para o job todo).
+          const next = this.outputMode.downgrade(mode)
+          if (!next) {
+            this.deps.log.warn(
+              `chat failed kind=${err.kind} status=${err.status ?? '-'} mode=${mode} -> fatal: ${err.message}`
+            )
+            throw new FatalLlmError(
+              'LLM_NO_ENDPOINT',
+              noEndpointMessage(this.params.model.id, err.message)
+            )
+          }
+          if (next.changed)
+            this.deps.log.warn(
+              `output mode downgraded model=${this.params.model.id} ${mode} -> ${next.mode} ` +
+                `(status=${err.status ?? '-'}: ${err.message})`
+            )
+          attempt--
+          continue
+        }
         const d = decide(err, attempt, { config, random: this.deps.random, now: this.now() })
         this.deps.log.warn(
           `chat failed kind=${err.kind} status=${err.status ?? '-'} attempt=${attempt} -> ${d.action}: ${err.message}`
