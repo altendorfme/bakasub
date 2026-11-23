@@ -548,6 +548,42 @@ describe('JobRunner', () => {
     expect(translator.translate).toHaveBeenCalled()
   })
 
+  it('reestimativa pedida pela revisão: pede confirmação mesmo abaixo do limite', async () => {
+    threshold = 0.05
+    const h = hooks()
+    const spec = pipeline({ confirmBeforeTranslate: true, memory: 'skip' } as Partial<JobSpec>)
+    const first = await runner().run({ spec, artifacts: {}, workDir }, h)
+    const reestimate = { ...h.saved.at(-1)!, reestimate: true as const }
+    delete reestimate.preflight
+    const h2 = hooks()
+    const r = await runner().run({ spec, artifacts: reestimate, workDir }, h2)
+    expect(first.result.preflight?.decision).toBe('auto-confirmed')
+    expect(r.status).toBe('awaiting-confirmation')
+    expect(r.result.preflight?.decision).toBe('needs-confirmation')
+    expect(h2.saved.at(-1)?.reestimate).toBeUndefined()
+  })
+
+  it('memory do spec chega ao preflight e à tradução', async () => {
+    const calls: unknown[] = []
+    const r = new JobRunner({
+      mkv: mkv as unknown as StepDeps['mkv'],
+      translator: translator as unknown as SubtitleTranslator,
+      preflight: {
+        run: async (input) => {
+          calls.push(input.memory)
+          return { estimate: ESTIMATE, coverage: { totals: {} } as never }
+        },
+        autoConfirmBelowUsd: async () => null
+      }
+    })
+    await r.run(
+      { spec: pipeline({ memory: 'skip' } as Partial<JobSpec>), artifacts: {}, workDir },
+      hooks()
+    )
+    expect(calls).toEqual(['skip'])
+    expect(translator.translate.mock.calls.at(-1)![0]).toMatchObject({ memory: 'skip' })
+  })
+
   it('limite abaixo do custo máximo: pede confirmação', async () => {
     threshold = 0.015
     const r = await runner().run(

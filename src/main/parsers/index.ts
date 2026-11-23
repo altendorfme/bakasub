@@ -6,6 +6,7 @@ export { vttFormat, type VttCueData } from './vtt'
 export { SubtitleParseError } from './core/format'
 export type { InlineLexer, RepairOptions, RepairResult, SubtitleFormat } from './core/format'
 export { cuePlainText, normalizeForHash } from './core/plain-text'
+export { isGenericActor, speakerOf } from './core/speaker'
 export { FIX_POLICY } from './core/diagnostics'
 export type { AppliedFix, Diagnostic, DiagnosticCode } from './core/diagnostics'
 export {

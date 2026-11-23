@@ -44,6 +44,8 @@ export interface ContextLine {
   readonly source: string
   /** Texto puro da tradução já conhecida (cache ou chunk anterior). */
   readonly translation?: string
+  /** Falante da linha, quando conhecido (`HashedUnit.speaker`). */
+  readonly speaker?: string
 }
 
 export interface ChunkContext {
@@ -81,13 +83,20 @@ export function buildContext(
     .slice(-window.before)
     .map((u): ContextLine => {
       const t = known.get(u.cueId)
-      return t === undefined
-        ? { cueId: u.cueId, source: u.plain }
-        : { cueId: u.cueId, source: u.plain, translation: payloadPlain(t) }
+      return {
+        ...contextBase(u),
+        ...(t === undefined ? {} : { translation: payloadPlain(t) })
+      }
     })
   const after = byTime
     .filter((u) => u.timeIndex > last && !members.has(u.cueId))
     .slice(0, window.after)
-    .map((u): ContextLine => ({ cueId: u.cueId, source: u.plain }))
+    .map(contextBase)
   return { before, after }
+}
+
+function contextBase(u: HashedUnit): ContextLine {
+  return u.speaker
+    ? { cueId: u.cueId, source: u.plain, speaker: u.speaker }
+    : { cueId: u.cueId, source: u.plain }
 }

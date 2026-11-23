@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type {
   ExtractNaming,
   JobCreateRequest,
+  JobMemoryMode,
   JobMediaRequest,
   MediaContextLookup,
   MediaType,
@@ -126,6 +127,8 @@ export type JobSpec =
         /** O usuário pediu o contexto do TMDB e ele não pôde ser obtido: o motivo (o job avisa). */
         readonly mediaUnavailable?: string
         readonly confirmBeforeTranslate: boolean
+        /** Ausente em jobs antigos = `use`. Use `jobMemoryMode`. */
+        readonly memory?: JobMemoryMode
       })
   | (Base &
       MuxSpecOptions & { readonly kind: 'mux'; readonly subtitles: readonly MuxSubtitleSpec[] })
@@ -145,7 +148,17 @@ export type JobSpec =
         readonly media?: MediaContextLookup
         readonly mediaUnavailable?: string
         readonly confirmBeforeTranslate: boolean
+        readonly memory?: JobMemoryMode
       })
+
+/** `memory` efetivo de um spec persistido (`undefined` = não traduz). */
+export function jobMemoryMode(spec: unknown): JobMemoryMode | undefined {
+  const s = spec as { kind?: string; memory?: JobMemoryMode } | null
+  if (s?.kind !== 'translate' && s?.kind !== 'pipeline') return undefined
+  return s.memory === 'skip' ? 'skip' : 'use'
+}
+
+export const jobMemoryModeSchema = z.enum(['use', 'skip']) satisfies z.ZodType<JobMemoryMode>
 
 const path = z.string().min(1).max(4096)
 const lang = z.string().min(1).max(64)
@@ -185,7 +198,8 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
     sourceLang: lang.optional(),
     outputDir: path.optional(),
     options: z.object({ overwrite: z.boolean().optional() }).optional(),
-    confirmBeforeTranslate: z.boolean().optional()
+    confirmBeforeTranslate: z.boolean().optional(),
+    memory: jobMemoryModeSchema.optional()
   }),
   z.object({
     kind: z.literal('mux'),
@@ -224,7 +238,8 @@ export const JobCreateRequestSchema = z.discriminatedUnion('kind', [
         overwrite: z.boolean().optional()
       })
       .optional(),
-    confirmBeforeTranslate: z.boolean().optional()
+    confirmBeforeTranslate: z.boolean().optional(),
+    memory: jobMemoryModeSchema.optional()
   })
 ]) satisfies z.ZodType<JobCreateRequest>
 
@@ -309,7 +324,8 @@ export async function resolveJobSpec(
         ...(await resolveMedia(req.media, media)),
         ...withLang(optionalLang(req.sourceLang) ?? langFromFilename(src.path)),
         ...overwrite(req.options?.overwrite),
-        confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
+        confirmBeforeTranslate: req.confirmBeforeTranslate ?? true,
+        memory: req.memory ?? 'use'
       }
     }
     case 'mux': {
@@ -350,7 +366,8 @@ export async function resolveJobSpec(
         // `alsoWriteSubtitle` (legado) só vale sem `outputMode`: `true` = `both`.
         outputMode: req.options?.outputMode ?? (req.options?.alsoWriteSubtitle ? 'both' : 'mux'),
         ...overwrite(req.options?.overwrite),
-        confirmBeforeTranslate: req.confirmBeforeTranslate ?? true
+        confirmBeforeTranslate: req.confirmBeforeTranslate ?? true,
+        memory: req.memory ?? 'use'
       }
     }
   }

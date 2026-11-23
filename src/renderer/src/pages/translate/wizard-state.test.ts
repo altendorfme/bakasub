@@ -57,6 +57,14 @@ describe('wizard', () => {
     expect(canContinue(long, { model: 'a/b', targetLang: 'pt-BR' })).toBe(false)
   })
 
+  it('sends memory only when the user chose to ignore saved translations', () => {
+    const s = run({ type: 'file', path: '/a/x.srt' })
+    expect(initialWizard.memory).toBe('use')
+    expect(buildJobRequest(s)).not.toHaveProperty('memory')
+    const skip = wizardReducer(s, { type: 'set', patch: { memory: 'skip' } })
+    expect(buildJobRequest(skip)).toMatchObject({ memory: 'skip' })
+  })
+
   it('builds translate and pipeline requests, leaving defaults to the Main', () => {
     expect(
       buildJobRequest(

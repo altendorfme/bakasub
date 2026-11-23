@@ -8,6 +8,13 @@
       "when": 1795121152658,
       "tag": "0000_lonely_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1795405032150,
+      "tag": "0001_job_memory_media_scope",
+      "breakpoints": true
     }
   ]
 }

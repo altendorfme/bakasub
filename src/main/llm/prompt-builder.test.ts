@@ -7,8 +7,14 @@ import {
   buildTranslateMessage,
   languageName,
   parseGlossary,
-  responseSchema
+  responseSchema,
+  speakerAttrValue
 } from './prompt-builder'
+import { parseTranslations } from './response-parser'
+import { assFormat } from '../parsers/ass'
+import { computeContextHashes } from '../memory/context-hash'
+import { buildContext } from './chunker'
+import { languageNotes } from './language-notes'
 
 describe('parseGlossary', () => {
   it('aceita {source, target?, rule?}; descarta inválidos', () => {
@@ -85,6 +91,29 @@ describe('buildSystemPrompt', () => {
     expect(ja).toContain('current official spelling of Japanese.\n\nOutput:')
     expect(ja).not.toContain(' notes:')
   })
+  it('regra de gênero só para idiomas com concordância', () => {
+    const rule = /7\. .* marks gender where the source often does not/
+    for (const targetLang of ['pt-BR', 'pt-PT', 'es', 'es-419', 'fr', 'de', 'it', 'ru', 'pl']) {
+      const sp = buildSystemPrompt({ targetLang, glossary: [] })
+      expect(sp, targetLang).toMatch(rule)
+      expect(sp, targetLang).toContain('consistent for the same character')
+      expect(sp, targetLang).toContain('gender-neutral phrasing instead of guessing')
+    }
+    for (const targetLang of ['en', 'en-US', 'ja', 'zh', 'zh-Hans', 'ko', 'tr']) {
+      expect(buildSystemPrompt({ targetLang, glossary: [] }), targetLang).not.toMatch(rule)
+    }
+    expect(p).toContain('7. Brazilian Portuguese marks gender')
+    expect(p).toContain('"Que cansaço!"')
+    expect(buildSystemPrompt({ targetLang: 'es', glossary: [] })).toContain('"Estoy lista"')
+  })
+  it('regra de gênero cabe em ~150 tokens (regra + exemplo pt-BR)', () => {
+    const without = buildSystemPrompt({ targetLang: 'en', glossary: [] })
+    const withRule = buildSystemPrompt({ targetLang: 'it', glossary: [] })
+    const ruleChars = withRule.length - without.length - ('Italian'.length - 'English'.length)
+    const noteChars = languageNotes('pt-BR').find((n) => n.startsWith('Gender:'))?.length ?? 0
+    // ~4 caracteres por token em inglês (o preflight conta com o tokenizer real).
+    expect(Math.ceil((ruleChars + noteChars) / 4)).toBeLessThanOrEqual(150)
+  })
   it('sem glossário: sem bloco <glossary>', () => {
     expect(buildSystemPrompt({ targetLang: 'pt-BR', glossary: [] })).not.toContain('<glossary>')
   })
@@ -145,6 +174,87 @@ describe('mensagens', () => {
     expect(m).toContain('<x2/> is missing')
     expect(m).toContain('<returned>A b c d</returned>')
     expect(m).toMatchSnapshot()
+  })
+})
+
+describe('speaker', () => {
+  it('regra fixa explica o atributo (sempre, qualquer idioma)', () => {
+    for (const targetLang of ['pt-BR', 'ja', 'en'])
+      expect(buildSystemPrompt({ targetLang, glossary: [] })).toContain(
+        'Never translate the speaker name or put it in your output.'
+      )
+  })
+  it('ASS com Name: speaker em <target> e <context>; vazio/genérico: sem atributo', () => {
+    const ev = (start: string, name: string, text: string): string =>
+      `Dialogue: 0,${start},0:00:59.00,Default,${name},0,0,0,,${text}`
+    const doc = assFormat.parse(
+      `[Events]\n${[
+        ev('0:00:01.00', 'Kamina', 'Who the hell do you think I am?'),
+        ev('0:00:02.00', 'Default', 'Row, row, fight the power!'),
+        ev('0:00:03.00', '', 'Just believe in yourself.'),
+        ev('0:00:04.00', 'Yoko', "I'm tired."),
+        ev('0:00:05.00', 'Simon', 'Bro!')
+      ].join('\n')}\n`
+    )
+    const hs = computeContextHashes(doc)
+    const chunk = [hs[1], hs[2], hs[3]]
+    const m = buildTranslateMessage({
+      context: buildContext(hs, chunk, new Map([[1, 'Quem diabos você pensa que eu sou?']]), {
+        before: 5,
+        after: 2
+      }),
+      targets: chunk.map((u) => ({ cueId: u.cueId, payload: u.unit.payload, speaker: u.speaker }))
+    })
+    expect(m).toContain('<line id="1" speaker="Kamina"><source>')
+    expect(m).toContain('<line id="5" speaker="Simon"><source>Bro!</source></line>')
+    expect(m).toContain('<line id="2">Row, row, fight the power!</line>')
+    expect(m).toContain('<line id="3">Just believe in yourself.</line>')
+    expect(m).toContain(`<line id="4" speaker="Yoko">I'm tired.</line>`)
+    expect(m).toMatchSnapshot()
+  })
+  it('escapa aspas, <, >, & e quebras; corta em 60 caracteres', () => {
+    expect(speakerAttrValue('Tom & "Jerry" <TL>')).toBe('Tom &amp; &quot;Jerry&quot; &lt;TL&gt;')
+    expect(speakerAttrValue('A\nB\r\nC\u0000D E')).toBe('A B C D E')
+    expect([...speakerAttrValue('é'.repeat(80))]).toHaveLength(60)
+    // corta antes de escapar: a entidade nunca fica pela metade
+    expect(speakerAttrValue(`${'a'.repeat(59)}&b`)).toBe(`${'a'.repeat(59)}&amp;`)
+    const m = buildTranslateMessage({
+      context: {
+        before: [{ cueId: 1, source: 'Hi', speaker: 'O\'Neil "the <Boss>" & co.' }],
+        after: []
+      },
+      targets: [{ cueId: 2, payload: 'Yes.', speaker: 'Lt. "Ace"\nRiker' }]
+    })
+    expect(m).toMatchSnapshot()
+    for (const [, v] of m.matchAll(/speaker="([^"]*)"/g)) {
+      expect(v).not.toMatch(/[<>]/)
+      expect(v.replace(/&(amp|quot|lt|gt);/g, '')).not.toContain('&')
+    }
+    expect(m.match(/speaker="/g)).toHaveLength(2)
+  })
+  it('repair também leva o speaker', () => {
+    const cue = srtFormat.parse('1\n00:00:01,000 --> 00:00:02,000\nHi\n').items[0] as Cue<unknown>
+    const m = buildRepairMessage({
+      context: { before: [], after: [] },
+      failures: [{ unit: toTranslationUnit(cue)!, speaker: 'Nia', returned: '', issues: [] }]
+    })
+    expect(m).toContain('<line id="1" speaker="Nia">\n<source>Hi</source>')
+  })
+  it('a resposta não muda: o speaker não entra no schema nem na validação', () => {
+    expect(responseSchema([1, 2])).toEqual(responseSchema([1, 2]))
+    expect(JSON.stringify(responseSchema([1, 2]))).not.toContain('speaker')
+    // Modelo que ecoa o nome: o parser trata como hoje (texto livre / chave extra), sem regra nova.
+    const echoed = parseTranslations(
+      '{"1": "Kamina: Quem você pensa que eu sou?", "speaker": "Kamina"}',
+      [1]
+    )
+    expect(echoed).toEqual({
+      ok: true,
+      values: new Map([[1, 'Kamina: Quem você pensa que eu sou?']]),
+      missing: [],
+      extra: ['speaker'],
+      truncated: false
+    })
   })
 })
 

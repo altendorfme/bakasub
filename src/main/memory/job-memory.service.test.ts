@@ -6,9 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { initDatabase } from '../database/init'
 import { JobMemoryRepository } from '../database/repositories/job-memory.repository'
 import { AppError } from '../errors'
+import { assFormat } from '../parsers/ass'
 import { srtFormat } from '../parsers/srt'
 import { computeContextHashes } from './context-hash'
+import { PROMPT_RULES_VERSION } from '../llm/prompt-builder'
 import { JobMemoryService, type MemoryContext } from './job-memory.service'
+import { promptHash } from './memory-key'
 
 const DAY = 86_400_000
 let dir: string
@@ -50,7 +53,29 @@ const ctx = (over: Partial<Parameters<typeof JobMemoryService.context>[0]> = {})
 
 describe('JobMemoryService', () => {
   it('context canoniza idioma e glossário', () => {
-    expect(ctx().key).toEqual({ targetLang: 'pt-BR', model: 'm/a', promptHash: '' })
+    expect(ctx().key).toEqual({
+      targetLang: 'pt-BR',
+      model: 'm/a',
+      promptHash: promptHash([]),
+      mediaScope: ''
+    })
+  })
+
+  it('entradas gravadas com regras de prompt antigas viram miss (sem migração)', async () => {
+    const current = ctx()
+    const old: MemoryContext = {
+      ...current,
+      key: { ...current.key, promptHash: promptHash([], '', PROMPT_RULES_VERSION - 1) }
+    }
+    const first = await svc.lookupDocument(doc, old)
+    await svc.commitChunk(old, [
+      { hashed: first.misses[0], translated: 'Hello <g1>world</g1> beautiful today' },
+      { hashed: first.misses[1], translated: 'All good with you?' }
+    ])
+    expect((await svc.lookupDocument(doc, old, { peek: true })).hits.size).toBe(2)
+    const fresh = await svc.lookupDocument(doc, current, { peek: true })
+    expect(fresh.hits.size).toBe(0)
+    expect(fresh.misses.map((m) => m.cueId)).toEqual([1, 2])
   })
 
   it('miss total, commit e hit no reprocessamento', async () => {
@@ -84,6 +109,30 @@ describe('JobMemoryService', () => {
     expect(rep.unit.payload).toBe(sign)
     expect(ids(r.copies.get(rep.cueId)!)).toHaveLength(2)
     expect(r.copies.size).toBe(1)
+  })
+
+  it('mesma frase com atores diferentes: unidades distintas; mesmo ator: cópias', async () => {
+    const line = "I'm so tired of this, seriously."
+    const ev = (name: string, s: number): string =>
+      `Dialogue: 0,0:00:0${s}.00,0:00:0${s}.50,Default,${name},0,0,0,,${line}`
+    const d = assFormat.parse(
+      `[Events]\n${[ev('Simon', 1), ev('Yoko', 2), ev('Simon', 3), ev('Default', 4)].join('\n')}\n`
+    )
+    const c = ctx({ lexInline: assFormat.lexInline })
+    const r = await svc.lookupDocument(d, c)
+    expect(r.misses.map((m) => m.cueId)).toEqual([1, 2, 4])
+    expect(r.copies.get(1)!.map((u) => u.cueId)).toEqual([3])
+    expect(r.copies.size).toBe(1)
+
+    await svc.commitChunk(c, [
+      { hashed: r.misses[0], translated: 'Estou tão cansado disso, sério.' },
+      { hashed: r.misses[1], translated: 'Estou tão cansada disso, sério.' }
+    ])
+    const again = await svc.lookupDocument(d, c, { peek: true })
+    expect(again.hits.get(1)?.translated).toBe('Estou tão cansado disso, sério.')
+    expect(again.hits.get(2)?.translated).toBe('Estou tão cansada disso, sério.')
+    expect(again.hits.get(3)?.translated).toBe('Estou tão cansado disso, sério.')
+    expect(again.misses.map((m) => m.cueId)).toEqual([4])
   })
 
   it('escritas simultâneas (lanes, jobs) vão em fila: sem SQLITE_BUSY', async () => {
@@ -140,9 +189,22 @@ describe('JobMemoryService', () => {
     for (const other of [
       ctx({ model: 'm/b' }),
       ctx({ targetLang: 'pt-PT' }),
-      ctx({ glossary: [{ source: 'senpai', rule: 'manter' }] })
+      ctx({ glossary: [{ source: 'senpai', rule: 'manter' }] }),
+      ctx({ mediaScope: 'tmdb:series:1' })
     ])
       expect((await svc.lookupDocument(doc, other)).hits.size).toBe(0)
+  })
+
+  it('mesma obra compartilha cache; outra obra e o cache sem obra não', async () => {
+    const a = ctx({ mediaScope: 'tmdb:series:1' })
+    const first = await svc.lookupDocument(doc, a)
+    await svc.commitChunk(a, [
+      { hashed: first.misses[0], translated: 'Hello <g1>world</g1> beautiful today' },
+      { hashed: first.misses[1], translated: 'All good with you?' }
+    ])
+    expect((await svc.lookupDocument(doc, ctx({ mediaScope: 'tmdb:series:1' }))).hits.size).toBe(2)
+    expect((await svc.lookupDocument(doc, ctx({ mediaScope: 'tmdb:series:2' }))).hits.size).toBe(0)
+    expect((await svc.lookupDocument(doc, ctx())).hits.size).toBe(0)
   })
 
   it('signal abortado: nada é gravado', async () => {

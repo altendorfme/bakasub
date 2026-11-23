@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import type { Job } from '@shared/ipc-contract'
+import type { Job, JobMemoryMode } from '@shared/ipc-contract'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Tooltip } from '@renderer/components/ui/popover'
@@ -13,12 +14,14 @@ import {
   useJobAction,
   usePreflight,
   useRemoveJob,
+  useSetJobMemory,
   type JobAction
 } from '@renderer/data/jobs'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { episodeCode } from '@renderer/lib/episode'
 import { JobProgress } from './job-progress'
 import { JobResult } from './job-result'
+import { MemoryOption } from './memory-option'
 import { PreflightReview } from './preflight-review'
 import { PromptSummary } from './prompt-summary'
 
@@ -66,8 +69,20 @@ export function JobDetail({
   const preflight = usePreflight(id, waiting || (translates && !active))
   const action = useJobAction()
   const remove = useRemoveJob()
-  const act = (a: JobAction): void =>
-    action.mutate({ id, action: a }, { onError: (err) => toast.error(errorMessage(err)) })
+  const setMemory = useSetJobMemory()
+  const [retryChoice, setRetryMemory] = useState<JobMemoryMode | null>(null)
+  const act = (a: JobAction, memory?: JobMemoryMode): void =>
+    action.mutate(
+      { id, action: a, memory },
+      {
+        onSuccess: () => {
+          if (a === 'retry') setRetryMemory(null)
+        },
+        onError: (err) => toast.error(errorMessage(err))
+      }
+    )
+  const changeMemory = (memory: JobMemoryMode): void =>
+    setMemory.mutate({ id, memory }, { onError: (err) => toast.error(errorMessage(err)) })
 
   if (!job && query.isError) {
     const leave = onRemoved ?? onAnother
@@ -85,7 +100,10 @@ export function JobDetail({
     )
   }
   if (!job) return <p className="text-sm text-muted-foreground">{t('translate.starting')}</p>
-  const busy = action.isPending || remove.isPending
+  const busy = action.isPending || remove.isPending || setMemory.isPending
+  // Retry: starts from the job's original choice; the user may switch it before retrying.
+  const retryable = translates && RETRYABLE_STATUSES.has(job.status)
+  const retryMemory = retryChoice ?? job.memory ?? 'use'
 
   return (
     <div className="grid gap-4">
@@ -103,6 +121,7 @@ export function JobDetail({
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <Badge tone="violet">{t(`jobs.kind.${job.kind}`)}</Badge>
           {job.batchId ? <Badge>{t('jobs.batch')}</Badge> : null}
+          {job.memory === 'skip' ? <Badge tone="primary">{t('jobs.memory.skipped')}</Badge> : null}
           <span>{t(`jobs.status.${job.status}`)}</span>
           {job.attempt > 1 ? <span>{t('jobs.attempt', { n: job.attempt })}</span> : null}
           <span>{t('jobs.created', { when: when(job.createdAt, i18n.language) })}</span>
@@ -114,12 +133,15 @@ export function JobDetail({
 
       {waiting ? (
         preflight.data ? (
-          <PreflightReview
-            estimate={preflight.data.estimate}
-            coverage={preflight.data.coverage}
-            inspectPath={inspectPath}
-            prompt={preflight.data.prompt ?? null}
-          />
+          <>
+            <PreflightReview
+              estimate={preflight.data.estimate}
+              coverage={preflight.data.coverage}
+              inspectPath={inspectPath}
+              prompt={preflight.data.prompt ?? null}
+            />
+            <MemoryOption value={job.memory ?? 'use'} onChange={changeMemory} disabled={busy} />
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">{t('translate.starting')}</p>
         )
@@ -134,11 +156,16 @@ export function JobDetail({
         </>
       )}
 
+      {retryable ? (
+        <MemoryOption value={retryMemory} onChange={setRetryMemory} disabled={busy} />
+      ) : null}
+
       <JobActions
         job={job}
         busy={busy}
         canConfirm={!!preflight.data}
-        onAct={act}
+        // Untouched = omitted: the Main keeps the job's original choice.
+        onAct={(a) => act(a, a === 'retry' ? (retryChoice ?? undefined) : undefined)}
         onRemove={() =>
           remove.mutate(id, {
             onSuccess: onRemoved,

@@ -1,4 +1,4 @@
-import type { FreeQuotaStatus, PreflightEstimate } from '../../shared/ipc-contract'
+import type { FreeQuotaStatus, JobMemoryMode, PreflightEstimate } from '../../shared/ipc-contract'
 import { AppError } from '../errors'
 import type { CatalogSnapshot, ModelInfo } from '../llm/model-catalog'
 import { parseGlossary } from '../llm/prompt-builder'
@@ -24,6 +24,10 @@ export interface PreflightInput {
   readonly targetLang: string
   readonly sourceLang?: string
   readonly media?: string
+  /** Obra na chave do Job Memory (`mediaScope`); ausente = `''`. Igual no preflight e no job. */
+  readonly mediaScope?: string
+  /** `skip`: estimativa sem desconto de hits (o job vai ignorar o cache). Padrão `use`. */
+  readonly memory?: JobMemoryMode
 }
 
 /** Reparos e rodadas extras: requisições além de uma por chunk. */
@@ -65,10 +69,15 @@ export class Preflighter {
       model: model.id,
       glossary,
       stylePrompt: input.preset.prompt,
+      mediaScope: input.mediaScope,
       lexInline: input.format.lexInline,
       sourceLang: input.sourceLang
     })
-    const lookup = await this.deps.memory.lookupDocument(input.doc, ctx, { peek: true })
+    const memory = input.memory ?? 'use'
+    const lookup = await this.deps.memory.lookupDocument(input.doc, ctx, {
+      peek: true,
+      skip: memory === 'skip'
+    })
     const estimate = estimatePreflight({
       doc: input.doc,
       preset: { glossary, prompt: input.preset.prompt },
@@ -85,17 +94,18 @@ export class Preflighter {
         ? await this.deps.freeQuota.status(signal)
         : null
     const requests = Math.ceil(estimate.lines.chunks * REQUEST_MARGIN)
+    const withMemory = { ...estimate, memory }
     return {
       estimate: quota
         ? {
-            ...estimate,
+            ...withMemory,
             freeQuota: {
               ...quota,
               requests,
               enough: quota.remaining === null ? null : quota.remaining >= requests
             }
           }
-        : estimate,
+        : withMemory,
       coverage: analyzeCoverage(input.doc)
     }
   }

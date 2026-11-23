@@ -6,7 +6,7 @@ const code = (season: number, episode: number): string =>
 /**
  * Text of the prompt's `<media>` block: the frozen TMDB details (if the user kept them) and the
  * user's notes. Plain labeled lines: the model reads them as reference, not as instructions.
- * Not part of the Job Memory key, like the notes.
+ * The text is not part of the Job Memory key; only the work's identity is (`mediaScope`).
  */
 export function buildMediaContext(
   media: MediaContextLookup | null | undefined,

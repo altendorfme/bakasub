@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { TimelineRange, TranslationTimeline } from '../../shared/ipc-contract'
+import type { JobMemoryMode, TimelineRange, TranslationTimeline } from '../../shared/ipc-contract'
 import { AppError } from '../errors'
 import type { HashedUnit } from '../memory/context-hash'
 import { JobMemoryService } from '../memory/job-memory.service'
@@ -63,6 +63,10 @@ export interface TranslateInput<F> {
   readonly sourceLang?: string
   /** Contexto de mídia (sinopse etc.), opcional. */
   readonly media?: string
+  /** Obra na chave do Job Memory (`mediaScope`); ausente = `''`. Igual no preflight e no job. */
+  readonly mediaScope?: string
+  /** `skip`: nenhum hit do Job Memory; tudo vai ao LLM e as traduções novas sobrescrevem. */
+  readonly memory?: JobMemoryMode
   readonly limits?: Partial<ChunkLimits>
 }
 
@@ -108,7 +112,7 @@ export interface TranslateResult<F> {
   readonly doc: SubtitleDocument<F>
   readonly failed: readonly LineFailure[]
   readonly usage: UsageTotals
-  readonly cache: { readonly hits: number; readonly misses: number }
+  readonly cache: { readonly hits: number; readonly misses: number; readonly skipped?: boolean }
   /** Falas resolvidas reaplicando a tradução de outra com o mesmo context hash. */
   readonly copies: number
   readonly status: 'completed' | 'completed-with-warnings'
@@ -154,11 +158,14 @@ export async function translateDocument<F>(
     model: model.id,
     glossary: glossary.entries,
     stylePrompt: input.preset.prompt,
+    mediaScope: input.mediaScope,
     lexInline: input.format.lexInline,
     sourceLang: input.sourceLang
   })
 
-  const lookup = await deps.memory.lookupDocument(input.doc, ctx)
+  const skipMemory = input.memory === 'skip'
+  if (skipMemory) log.info('job memory: saved translations ignored for this job')
+  const lookup = await deps.memory.lookupDocument(input.doc, ctx, { skip: skipMemory })
   const known = new Map<number, string>()
   for (const [cueId, hit] of lookup.hits) known.set(cueId, hit.translated)
   // Contexto do LLM: cache + representantes. As cópias repetiriam a mesma fala no `<context>`.
@@ -442,7 +449,11 @@ export async function translateDocument<F>(
     doc: { ...input.doc, items },
     failed,
     usage: usage(),
-    cache: { hits: lookup.hits.size, misses: lookup.misses.length + copyUnits.length },
+    cache: {
+      hits: lookup.hits.size,
+      misses: lookup.misses.length + copyUnits.length,
+      ...(skipMemory ? { skipped: true } : {})
+    },
     copies: copyUnits.length,
     status: failed.length > 0 ? 'completed-with-warnings' : 'completed',
     notices: outputMode.downgrades.map(

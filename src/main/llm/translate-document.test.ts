@@ -128,6 +128,44 @@ describe('translateDocument', () => {
     expect(srtFormat.serialize(r2.doc as never)).toBe(srtFormat.serialize(r.doc as never))
   })
 
+  it("memory 'skip': tudo vai ao LLM, as novas sobrescrevem e um job 'use' depois as recebe", async () => {
+    const doc = srt('Hello <i>world</i>, how are you?', 'Fine.')
+    await translateDocument(input(doc), deps(echo))
+
+    const fixed = (req: ChatRequest): ChatResult =>
+      ok(
+        JSON.stringify(Object.fromEntries([...targetLines(req)].map(([id, p]) => [id, `NEW ${p}`])))
+      )
+    const skip = deps(fixed)
+    const r = await translateDocument(input(doc, { memory: 'skip' }), skip)
+    expect(skip.calls).toHaveLength(1)
+    expect(targetLines(skip.calls[0]).size).toBe(2)
+    expect(r.cache).toEqual({ hits: 0, misses: 2, skipped: true })
+    expect(srtFormat.serialize(r.doc as never)).toContain('NEW Hello <i>world</i>, how are you?')
+
+    const use = deps(echo)
+    const r2 = await translateDocument(input(doc, { memory: 'use' }), use)
+    expect(use.calls).toHaveLength(0)
+    expect(r2.cache).toEqual({ hits: 2, misses: 0 })
+    const out = srtFormat.serialize(r2.doc as never)
+    expect(out).toContain('NEW Hello <i>world</i>, how are you?')
+    expect(out).toContain('NEW Fine.')
+    expect(out).not.toContain('PT ')
+  })
+
+  it("memory 'skip' mantém as cópias agrupadas: uma requisição por context hash", async () => {
+    const doc = srt(
+      'The first episode title card',
+      'The first episode title card',
+      'The first episode title card'
+    )
+    const d = deps(echo)
+    const r = await translateDocument(input(doc, { memory: 'skip' }), d)
+    expect(d.calls).toHaveLength(1)
+    expect(targetLines(d.calls[0]).size).toBe(1)
+    expect(r.copies).toBe(2)
+  })
+
   it('pede json_schema estrito com require_parameters; json_object como fallback; nada sem suporte', async () => {
     const doc = srt('Hello there my friend.')
     const d = deps(echo)

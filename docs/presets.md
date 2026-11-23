@@ -89,4 +89,4 @@ User:    <media> (user notes now; external API synopsis later)  →  <context>  
 
 ## Cache key
 
-The Job Memory key uses `prompt_hash` = sha256 of the canonical JSON of `{ glossary, style }` (`''` when both are empty): the same line translated with the Documentary style is not reused by the Anime style. Temperature and media context are **not** part of the key (a per-episode synopsis would defeat reuse). See [`job-memory.md`](./job-memory.md).
+The Job Memory key uses `prompt_hash` = sha256 of the canonical JSON of `{ glossary, rules, style }`, where `rules` is `PROMPT_RULES_VERSION` (never `''`): the same line translated with the Documentary style is not reused by the Anime style. Temperature and media context are **not** part of the key (a per-episode synopsis would defeat reuse). See [`job-memory.md`](./job-memory.md).

@@ -14,8 +14,13 @@ export const jobMemory = sqliteTable(
     /** BCP-47 canônico (`pt-BR` ≠ `pt-PT`). */
     targetLang: text('target_lang').notNull(),
     model: text('model').notNull(),
-    /** sha256 de glossário + estilo do preset (ver `promptHash`); '' sem nenhum dos dois. */
+    /** sha256 de versão das regras do prompt + glossário + estilo (ver `promptHash`); nunca '' em linhas novas. */
     promptHash: text('prompt_hash').notNull().default(''),
+    /**
+     * Obra (não episódio) do contexto de mídia congelado no job: `tmdb:<kind>:<id>` (ver
+     * `mediaScope`). `''` sem obra identificada (e em linhas anteriores à coluna): só casa com `''`.
+     */
+    mediaScope: text('media_scope').notNull().default(''),
     sourceText: text('source_text').notNull(),
     translatedText: text('translated_text').notNull(),
     /** Última reescrita da tradução. */
@@ -28,7 +33,13 @@ export const jobMemory = sqliteTable(
       .default(sql`(unixepoch() * 1000)`)
   },
   (t) => [
-    uniqueIndex('job_memory_key_uq').on(t.contextHash, t.targetLang, t.model, t.promptHash),
+    uniqueIndex('job_memory_key_uq').on(
+      t.contextHash,
+      t.targetLang,
+      t.model,
+      t.promptHash,
+      t.mediaScope
+    ),
     index('job_memory_last_used_idx').on(t.lastUsedAt)
   ]
 )

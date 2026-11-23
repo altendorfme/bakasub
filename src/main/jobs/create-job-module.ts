@@ -107,6 +107,8 @@ export function createJobModule(o: JobModuleOptions): {
             prompt: input.preset.prompt
           },
           media: input.media,
+          mediaScope: input.mediaScope,
+          memory: input.memory,
           targetLang: input.targetLang,
           sourceLang: input.sourceLang
         },

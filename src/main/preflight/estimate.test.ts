@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ModelInfo } from '../llm/model-catalog'
 import { computeContextHashes } from '../memory/context-hash'
 import type { DocumentLookup } from '../memory/job-memory.service'
+import { assFormat } from '../parsers/ass'
 import { srtFormat } from '../parsers/srt'
 import { estimatePreflight } from './estimate'
 
@@ -129,5 +130,31 @@ describe('estimatePreflight', () => {
     expect(e.lines.chunks).toBe(0)
     expect(e.tokens).toEqual({ input: { low: 0, high: 0 }, output: { low: 0, high: 0 } })
     expect(e.cost).toEqual({ low: 0, high: 0 })
+  })
+
+  it('speaker (Name do ASS) entra na conta de entrada; a saída não muda', () => {
+    const ass = (name: string): ReturnType<typeof assFormat.parse> =>
+      assFormat.parse(
+        `[Events]\n${Array.from(
+          { length: 20 },
+          (_, i) =>
+            `Dialogue: 0,0:00:${String(i).padStart(2, '0')}.00,0:00:59.00,Default,${name},0,0,0,,Sentence number ${i} here.`
+        ).join('\n')}\n`
+      )
+    const run = (name: string): ReturnType<typeof estimatePreflight> => {
+      const d = ass(name)
+      return estimatePreflight({
+        ...base,
+        doc: d,
+        model: GPT,
+        lookup: { hits: new Map(), misses: computeContextHashes(d), copies: new Map() }
+      })
+    }
+    const without = run('')
+    const generic = run('Default')
+    const named = run('Kamina')
+    expect(generic.tokens).toEqual(without.tokens)
+    expect(named.tokens.input.low).toBeGreaterThan(without.tokens.input.low)
+    expect(named.tokens.output).toEqual(without.tokens.output)
   })
 })

@@ -7,6 +7,8 @@ export interface MemoryKey {
   readonly targetLang: string
   readonly model: string
   readonly promptHash: string
+  /** Obra do job (`tmdb:series:123`) ou `''` sem obra identificada. Ver `mediaScope`. */
+  readonly mediaScope: string
 }
 
 export interface MemoryEntry {
@@ -32,7 +34,7 @@ export interface MemoryStats {
 
 export type PruneScope = { readonly olderThan: Date } | 'all'
 
-/** Linhas por statement: 7 parâmetros por linha fica bem abaixo do limite do SQLite. */
+/** Linhas por statement: 8 parâmetros por linha fica bem abaixo do limite do SQLite. */
 const BATCH = 500
 
 function chunks<T>(xs: readonly T[], size = BATCH): T[][] {
@@ -59,6 +61,7 @@ export class JobMemoryRepository {
             eq(jobMemory.targetLang, key.targetLang),
             eq(jobMemory.model, key.model),
             eq(jobMemory.promptHash, key.promptHash),
+            eq(jobMemory.mediaScope, key.mediaScope),
             inArray(jobMemory.contextHash, part)
           )
         )
@@ -81,7 +84,8 @@ export class JobMemoryRepository {
               jobMemory.contextHash,
               jobMemory.targetLang,
               jobMemory.model,
-              jobMemory.promptHash
+              jobMemory.promptHash,
+              jobMemory.mediaScope
             ],
             set: {
               sourceText: sql`excluded.source_text`,

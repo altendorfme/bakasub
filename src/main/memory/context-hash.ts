@@ -3,13 +3,14 @@ import {
   classify,
   cuePlainText,
   normalizeForHash,
+  speakerOf,
   type Cue,
   type SubtitleDocument,
   type TranslationUnit
 } from '../parsers'
 
 /** Sobe quando a normalização ou a composição mudar: entradas antigas deixam de casar. */
-export const CONTEXT_HASH_VERSION = 'v1'
+export const CONTEXT_HASH_VERSION = 'v2'
 /** Frases com até este número de palavras levam a linha anterior no hash. */
 export const SHORT_SENTENCE_WORDS = 3
 
@@ -32,6 +33,8 @@ export interface HashedUnit {
   readonly endMs: number
   /** Texto puro normalizado do cue (contexto do LLM e linha anterior do hash). */
   readonly plain: string
+  /** Falante (`Cue.actor` sem valores genéricos, ver `speakerOf`). Vai ao prompt e ao hash. */
+  readonly speaker?: string
 }
 
 const segmenters = new Map<string, Intl.Segmenter>()
@@ -66,9 +69,14 @@ function sha256(s: string): string {
 /**
  * Context hash do Job Memory para cada cue traduzível, em ordem de documento.
  *
- * `hash = sha256("v1\0" + prev + "\0" + payload)`, com `payload` normalizado (texto + forma dos
- * marcadores; o `raw` das tags não entra) e `prev` = texto puro normalizado do cue traduzível
- * anterior por `start.ms` (empate: ordem do arquivo), apenas quando o cue atual tem até 3 palavras.
+ * Sem falante: `hash = sha256("v2\0" + prev + "\0" + payload)`.
+ * Com falante: `hash = sha256("v2\x01" + speaker + "\0" + prev + "\0" + payload)`.
+ *
+ * `payload` normalizado (texto + forma dos marcadores; o `raw` das tags não entra), `prev` = texto
+ * puro normalizado do cue traduzível anterior por `start.ms` (empate: ordem do arquivo), apenas
+ * quando o cue atual tem até 3 palavras, e `speaker` = `speakerOf(cue.actor)` (sem genéricos e sem
+ * caracteres de controle, então o `\x01` após a versão e o primeiro `\0` delimitam o campo sem
+ * ambiguidade). A mesma frase dita por personagens diferentes vira entradas (e unidades) distintas.
  * Cues não traduzíveis (desenho, karaokê, sem letras…) não recebem hash nem servem de contexto.
  */
 export function computeContextHashes(
@@ -90,10 +98,10 @@ export function computeContextHashes(
   let prev = ''
   for (const [timeIndex, { cue, unit }] of byTime.entries()) {
     const plain = normalizeForHash(cuePlainText(cue))
+    const speaker = speakerOf(cue.actor)
     const contextUsed = countWords(plain, options.sourceLang) <= SHORT_SENTENCE_WORDS
-    const hash = sha256(
-      `${CONTEXT_HASH_VERSION}\0${contextUsed ? prev : ''}\0${normalizeForHash(unit.payload)}`
-    )
+    const head = speaker ? `${CONTEXT_HASH_VERSION}\x01${speaker}` : CONTEXT_HASH_VERSION
+    const hash = sha256(`${head}\0${contextUsed ? prev : ''}\0${normalizeForHash(unit.payload)}`)
     out.set(cue.id, {
       cueId: cue.id,
       hash,
@@ -102,7 +110,8 @@ export function computeContextHashes(
       timeIndex,
       startMs: cue.start.ms,
       endMs: cue.end.ms,
-      plain
+      plain,
+      ...(speaker ? { speaker } : {})
     })
     prev = plain
   }

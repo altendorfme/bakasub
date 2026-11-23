@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { JobManager } from '../../jobs/job-manager'
-import { JobCreateRequestSchema } from '../../jobs/job-spec'
+import { JobCreateRequestSchema, jobMemoryModeSchema } from '../../jobs/job-spec'
 import { createHandler } from '../create-handler'
 
 const byId = z.object({ id: z.string().min(1).max(64) })
@@ -13,7 +13,14 @@ export function registerJobHandlers(deps: { jobs: JobManager }): void {
   createHandler('jobs:list', { handle: () => deps.jobs.list() })
   createHandler('jobs:get', { input: byId, handle: ({ id }) => deps.jobs.get(id) })
   createHandler('jobs:cancel', { input: byId, handle: ({ id }) => deps.jobs.cancel(id) })
-  createHandler('jobs:retry', { input: byId, handle: ({ id }) => deps.jobs.retry(id) })
+  createHandler('jobs:retry', {
+    input: byId.extend({ memory: jobMemoryModeSchema.optional() }),
+    handle: ({ id, memory }) => deps.jobs.retry(id, memory)
+  })
+  createHandler('jobs:set-memory', {
+    input: byId.extend({ memory: jobMemoryModeSchema }),
+    handle: ({ id, memory }) => deps.jobs.setMemory(id, memory)
+  })
   createHandler('jobs:confirm', { input: byId, handle: ({ id }) => deps.jobs.confirm(id) })
   createHandler('jobs:dismiss-consistency', {
     input: byId,

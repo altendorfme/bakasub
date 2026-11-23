@@ -31,7 +31,12 @@ npm run db:check      # consistency check, also run in CI
 
 Schema files live in `src/main/database/schema/` and are re-exported from `index.ts`. Migrations are committed.
 
-**Until the first public release, `0000` is mutable:** schema changes delete `drizzle/` and regenerate it, and every dev machine deletes `userData/bakasub.db*` once (Drizzle's migrator only compares the journal timestamp with the last applied one and never checks the SQL hash, so an edited `0000` is either skipped silently or re-applied and fails with `table already exists`). After the first release, only incremental migrations.
+**Incremental only.** `0000` was mutable until the first public release; released databases now exist, so every schema change is a new migration (`npm run db:generate -- --name <what>`) and an applied migration is never edited: `assertMigrationHistory` refuses to boot (`DB_SCHEMA_MISMATCH`) when an applied migration is missing or changed locally (Drizzle's migrator alone only compares the last timestamp). History:
+
+| Migration                     | Change                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `0000_lonely_gambit`          | initial schema                                                                             |
+| `0001_job_memory_media_scope` | `job_memory.media_scope` (default `''`, existing rows get `''`) + rebuilt unique key index |
 
 ## Tables
 
@@ -66,19 +71,20 @@ Envelope encryption (`src/main/settings/secret-vault.ts`):
 
 ### `job_memory`
 
-| Column            | Type                                     | Notes                                                                  |
-| ----------------- | ---------------------------------------- | ---------------------------------------------------------------------- |
-| `id`              | integer PK autoincrement                 |                                                                        |
-| `context_hash`    | text, not null                           | sha256 of `v1\0prev\0payload` (see [`job-memory.md`](./job-memory.md)) |
-| `target_lang`     | text, not null                           | canonical BCP-47 (`pt-BR` ≠ `pt-PT`)                                   |
-| `model`           | text, not null                           | OpenRouter model id                                                    |
-| `prompt_hash`     | text, not null, default `''`             | sha256 of the canonical glossary JSON; `''` without glossary           |
-| `source_text`     | text, not null                           | source payload with markers (`<gN>`, `<xN/>`, `<br/>`)                 |
-| `translated_text` | text, not null                           | translated payload with markers                                        |
-| `updated_at`      | integer (ms), default `unixepoch()*1000` | last rewrite of the translation                                        |
-| `last_used_at`    | integer (ms), default `unixepoch()*1000` | last hit or write; the prune works on this column                      |
+| Column            | Type                                     | Notes                                                                                                                            |
+| ----------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | integer PK autoincrement                 |                                                                                                                                  |
+| `context_hash`    | text, not null                           | sha256 of `v2[\x01speaker]\0prev\0payload` (see [`job-memory.md`](./job-memory.md))                                              |
+| `target_lang`     | text, not null                           | canonical BCP-47 (`pt-BR` ≠ `pt-PT`)                                                                                             |
+| `model`           | text, not null                           | OpenRouter model id                                                                                                              |
+| `prompt_hash`     | text, not null, default `''`             | sha256 of `{ glossary, rules, style }` (see `promptHash`); `''` only in rows predating the rules version                         |
+| `media_scope`     | text, not null, default `''`             | work of the job's TMDB context (`tmdb:<kind>:<id>`, see `mediaScope`); `''` without a work or in rows predating migration `0001` |
+| `source_text`     | text, not null                           | source payload with markers (`<gN>`, `<xN/>`, `<br/>`)                                                                           |
+| `translated_text` | text, not null                           | translated payload with markers                                                                                                  |
+| `updated_at`      | integer (ms), default `unixepoch()*1000` | last rewrite of the translation                                                                                                  |
+| `last_used_at`    | integer (ms), default `unixepoch()*1000` | last hit or write; the prune works on this column                                                                                |
 
-Indexes: unique `(context_hash, target_lang, model, prompt_hash)`; `last_used_at`.
+Indexes: unique `(context_hash, target_lang, model, prompt_hash, media_scope)`; `last_used_at`.
 
 Repository: `src/main/database/repositories/job-memory.repository.ts` (`lookupMany`, `upsertMany` in one transaction, `touch`, `prune` + `incremental_vacuum`, `stats` with real on-disk bytes from `dbstat`). Policy lives in the service; see [`job-memory.md`](./job-memory.md).
 

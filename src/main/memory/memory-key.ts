@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import type { MediaRef } from '../../shared/ipc-contract'
+import { PROMPT_RULES_VERSION } from '../llm/prompt-builder'
 
 /** BCP-47 canônico (`pt-br` -> `pt-BR`). Variantes regionais são chaves distintas. Lança `RangeError`. */
 export function canonicalLang(tag: string): string {
@@ -20,12 +22,31 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
- * O que, no prompt, muda a tradução e entra na chave do cache: glossário + orientação de estilo
- * do preset. sha256 do JSON canônico, ou '' quando ambos são vazios. Presets com o mesmo
- * glossário e estilo compartilham cache; temperatura e contexto de mídia (por episódio) não entram.
+ * O que, no prompt, muda a tradução e entra na chave do cache: versão das regras fixas do
+ * System Prompt (`PROMPT_RULES_VERSION`) + glossário + orientação de estilo do preset. sha256 do
+ * JSON canônico; nunca vazio (a versão sempre entra). Presets com o mesmo glossário e estilo
+ * compartilham cache; temperatura e o texto do contexto de mídia não entram (a obra entra à
+ * parte, em `mediaScope`).
  */
-export function promptHash(glossary: readonly unknown[], stylePrompt = ''): string {
+export function promptHash(
+  glossary: readonly unknown[],
+  stylePrompt = '',
+  rulesVersion: number = PROMPT_RULES_VERSION
+): string {
   const style = stylePrompt.trim()
-  if (glossary.length === 0 && style === '') return ''
-  return createHash('sha256').update(canonicalJson({ glossary, style }), 'utf8').digest('hex')
+  return createHash('sha256')
+    .update(canonicalJson({ glossary, rules: rulesVersion, style }), 'utf8')
+    .digest('hex')
+}
+
+/**
+ * Escopo da obra na chave do cache: `tmdb:<kind>:<id>` da obra (série ou filme) congelada no
+ * job; temporada e episódio ficam de fora (outra release ou outro episódio da mesma série dá
+ * hit). Sem obra identificada, `''`, que só casa com `''`: uma entrada global nunca serve a um
+ * job com obra, e vice-versa.
+ */
+export function mediaScope(
+  ref: Pick<MediaRef, 'provider' | 'kind' | 'id'> | null | undefined
+): string {
+  return ref ? `${ref.provider}:${ref.kind}:${ref.id}` : ''
 }

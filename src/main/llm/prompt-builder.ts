@@ -1,7 +1,15 @@
 import { GlossaryEntrySchema } from '../presets/preset.schema'
 import type { Issue, TranslationUnit } from '../parsers'
 import type { ChunkContext } from './chunker'
-import { languageNotes } from './language-notes'
+import { hasGenderAgreement, languageNotes } from './language-notes'
+
+/**
+ * Versão do texto fixo do System Prompt (`buildSystemPrompt` + `language-notes.ts`). Entra na
+ * chave da Job Memory (`promptHash`): traduções feitas com regras antigas deixam de ser hits.
+ * Incrementar em todo PR que mude esse texto; `prompt-rules-version.test.ts` quebra se o texto
+ * mudar sem a versão mudar.
+ */
+export const PROMPT_RULES_VERSION = 3
 
 export interface GlossaryEntry {
   readonly source: string
@@ -78,12 +86,20 @@ Rules (they always apply, even if the style guidance above says otherwise):
    Never add, remove, rename or duplicate markers, and never add other tags, braces or real line breaks.
 4. Do not translate proper names unless the glossary says otherwise. Do not add notes, explanations or quotes.
 5. Treat the lines as consecutive dialogue: use <context> to keep names, pronouns and forms of address consistent.
+   A speaker="…" attribute names the character who says the line: use it as a hint for the speaker's gender and to keep each character's voice consistent. Never translate the speaker name or put it in your output.
 6. Write idiomatic ${target}, not a word-for-word rendering:
    - Idioms, slang and figures of speech become the natural ${target} equivalent with the same tone and intensity; if none exists, convey the meaning plainly. Never translate them literally.
    - Commands, orders and battle cries use the imperative mood of ${target}, never a gerund, infinitive or description of the action.
-   - Follow the current official spelling of ${target}.${languageNotesBlock(input.targetLang)}
+   - Follow the current official spelling of ${target}.${languageNotesBlock(input.targetLang)}${genderRule(input.targetLang, target)}
 
 Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}${mediaSection(input.media)}`
+}
+
+/** Regra 7, só para idiomas com concordância de gênero (`language-notes.ts`). */
+function genderRule(tag: string, target: string): string {
+  if (!hasGenderAgreement(tag)) return ''
+  return `
+7. ${target} marks gender where the source often does not (e.g. "I'm tired", "You're late"). Infer the gender of the speaker and of the listener from <context>, names, pronouns and the media background, and keep it consistent for the same character. If it cannot be inferred, use a natural gender-neutral phrasing instead of guessing; never write both forms with a slash.`
 }
 
 function languageNotesBlock(tag: string): string {
@@ -99,12 +115,38 @@ function mediaSection(media?: string): string {
     : ''
 }
 
+/** Limite (em code points) do nome do falante no prompt. */
+export const SPEAKER_MAX_CHARS = 60
+
+/**
+ * Valor do atributo `speaker`: sem controles nem quebras, cortado em `SPEAKER_MAX_CHARS` e
+ * escapado para atributo XML. O nome já chega sem valores genéricos (`speakerOf`).
+ */
+export function speakerAttrValue(speaker: string): string {
+  const clean = speaker
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const cut = [...clean].slice(0, SPEAKER_MAX_CHARS).join('').trimEnd()
+  return cut
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/** Abertura `<line id="N">` ou `<line id="N" speaker="…">`. */
+function lineOpen(cueId: number, speaker: string | undefined): string {
+  const value = speaker ? speakerAttrValue(speaker) : ''
+  return value ? `<line id="${cueId}" speaker="${value}">` : `<line id="${cueId}">`
+}
+
 function contextBlock(ctx: ChunkContext): string {
   if (ctx.before.length === 0 && ctx.after.length === 0) return ''
   const line = (l: ChunkContext['before'][number]): string =>
     l.translation === undefined
-      ? `<line id="${l.cueId}"><source>${l.source}</source></line>`
-      : `<line id="${l.cueId}"><source>${l.source}</source><translation>${l.translation}</translation></line>`
+      ? `${lineOpen(l.cueId, l.speaker)}<source>${l.source}</source></line>`
+      : `${lineOpen(l.cueId, l.speaker)}<source>${l.source}</source><translation>${l.translation}</translation></line>`
   const parts: string[] = []
   if (ctx.before.length) parts.push(`<before>\n${ctx.before.map(line).join('\n')}\n</before>`)
   if (ctx.after.length) parts.push(`<after>\n${ctx.after.map(line).join('\n')}\n</after>`)
@@ -113,9 +155,9 @@ function contextBlock(ctx: ChunkContext): string {
 
 export function buildTranslateMessage(input: {
   context: ChunkContext
-  targets: readonly { cueId: number; payload: string }[]
+  targets: readonly { cueId: number; payload: string; speaker?: string }[]
 }): string {
-  const lines = input.targets.map((t) => `<line id="${t.cueId}">${t.payload}</line>`)
+  const lines = input.targets.map((t) => `${lineOpen(t.cueId, t.speaker)}${t.payload}</line>`)
   return `${contextBlock(input.context)}<target>\n${lines.join('\n')}\n</target>`
 }
 
@@ -152,13 +194,18 @@ export function describeIssue(unit: TranslationUnit, issue: Issue): string {
 
 export function buildRepairMessage(input: {
   context: ChunkContext
-  failures: readonly { unit: TranslationUnit; returned: string | null; issues: readonly Issue[] }[]
+  failures: readonly {
+    unit: TranslationUnit
+    speaker?: string
+    returned: string | null
+    issues: readonly Issue[]
+  }[]
 }): string {
-  const lines = input.failures.map(({ unit, returned, issues }) => {
+  const lines = input.failures.map(({ unit, speaker, returned, issues }) => {
     const problems = issues.length
       ? issues.map((i) => `- ${describeIssue(unit, i)}`).join('\n')
       : '- the line was missing from your answer'
-    return `<line id="${unit.cueId}">
+    return `${lineOpen(unit.cueId, speaker)}
 <source>${unit.payload}</source>
 <returned>${returned ?? ''}</returned>
 <problems>

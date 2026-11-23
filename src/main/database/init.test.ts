@@ -1,7 +1,10 @@
 import { createClient } from '@libsql/client'
-import { resolve } from 'node:path'
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { initDatabase } from './init'
+import { JobMemoryRepository } from './repositories/job-memory.repository'
 
 const MIGRATIONS = resolve('drizzle')
 
@@ -25,7 +28,7 @@ describe('initDatabase', () => {
     const keyCols = (await client.execute(`PRAGMA index_info(${String(name)})`)).rows.map(
       (r) => r.name
     )
-    expect(keyCols).toEqual(['context_hash', 'target_lang', 'model', 'prompt_hash'])
+    expect(keyCols).toEqual(['context_hash', 'target_lang', 'model', 'prompt_hash', 'media_scope'])
     client.close()
   })
 
@@ -82,5 +85,42 @@ describe('initDatabase', () => {
     await initDatabase(client, MIGRATIONS)
     await expect(initDatabase(client, MIGRATIONS)).resolves.toBeDefined()
     client.close()
+  })
+
+  it('0001 sobre um banco já populado: linhas antigas ficam com media_scope vazio e seguem casando', async () => {
+    // Pasta de migrações só com a 0000: o banco de quem ainda não tem a coluna.
+    const dir = mkdtempSync(join(tmpdir(), 'bakasub-mig-'))
+    const old = join(dir, 'drizzle')
+    cpSync(MIGRATIONS, old, { recursive: true })
+    rmSync(join(old, '0001_job_memory_media_scope.sql'))
+    const journalPath = join(old, 'meta', '_journal.json')
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8'))
+    journal.entries = journal.entries.slice(0, 1)
+    writeFileSync(journalPath, JSON.stringify(journal))
+
+    const client = createClient({ url: `file:${join(dir, 't.db')}` })
+    await initDatabase(client, old)
+    await client.execute(
+      "INSERT INTO job_memory (context_hash, target_lang, model, prompt_hash, source_text, translated_text) VALUES ('h', 'pt-BR', 'm/a', 'p', 'src', 'tr')"
+    )
+
+    const db = await initDatabase(client, MIGRATIONS)
+    const repo = new JobMemoryRepository(db)
+    const key = { targetLang: 'pt-BR', model: 'm/a', promptHash: 'p' }
+    expect((await repo.lookupMany({ ...key, mediaScope: '' }, ['h'])).get('h')).toMatchObject({
+      translatedText: 'tr'
+    })
+    expect((await repo.lookupMany({ ...key, mediaScope: 'tmdb:series:1' }, ['h'])).size).toBe(0)
+    // A linha antiga é a mesma chave do upsert sem obra: sobrescreve, não duplica.
+    await repo.upsertMany({ ...key, mediaScope: '' }, [
+      { contextHash: 'h', sourceText: 'src', translatedText: 'tr2' }
+    ])
+    expect((await repo.stats()).rows).toBe(1)
+    client.close()
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+    } catch {
+      /* Windows: libsql pode manter o arquivo aberto; limpeza best-effort */
+    }
   })
 })

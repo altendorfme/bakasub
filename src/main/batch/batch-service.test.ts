@@ -329,6 +329,23 @@ describe('BatchService: estado agregado, cancel e remove', () => {
     await until(() => runs.length === 1)
     expect(runs[0].spec).toMatchObject({ confirmBeforeTranslate: false })
   })
+
+  it("memory 'skip' vale para todos os jobs do batch", async () => {
+    const batch = await svc.create({
+      kind: 'pipeline',
+      root: null,
+      items: [
+        { path: join(root, 'show', 'ep1.mkv'), trackIds: [3] },
+        { path: join(root, 'show', 'ep2.mkv'), trackIds: [3] }
+      ],
+      presetId: 'p-test',
+      confirmBeforeTranslate: false,
+      memory: 'skip'
+    })
+    await until(() => runs.length >= 1)
+    expect(runs[0].spec).toMatchObject({ memory: 'skip' })
+    expect((await svc.jobs(batch.id)).map((j) => j.memory)).toEqual(['skip', 'skip'])
+  })
 })
 
 describe('BatchService: obras (groups)', () => {

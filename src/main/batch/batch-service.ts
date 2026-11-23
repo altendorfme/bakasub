@@ -19,6 +19,7 @@ import type { BatchRepository, BatchRow } from '../database/repositories/batch.r
 import { AppError } from '../errors'
 import type { JobManager } from '../jobs/job-manager'
 import {
+  jobMemoryModeSchema,
   resolveJobSpec,
   type JobSpec,
   type MediaLookupSource,
@@ -129,7 +130,8 @@ export const BatchCreateRequestSchema = z
         extractNaming: z.enum(['player', 'track']).optional()
       })
       .optional(),
-    confirmBeforeTranslate: z.boolean().optional()
+    confirmBeforeTranslate: z.boolean().optional(),
+    memory: jobMemoryModeSchema.optional()
   })
   .superRefine((req, ctx) => {
     if (req.groups && (req.kind === 'extract' || req.kind === 'mux'))
@@ -239,7 +241,8 @@ export class BatchService {
           groups: req.groups,
           outputDir: outRoot,
           options: req.options,
-          confirmBeforeTranslate: req.confirmBeforeTranslate
+          confirmBeforeTranslate: req.confirmBeforeTranslate,
+          ...(req.memory ? { memory: req.memory } : {})
         }
       },
       specs.map((spec) => ({ id: randomUUID(), kind: spec.kind, spec, status: 'queued' as const }))
@@ -352,7 +355,8 @@ export class BatchService {
             }
           }
         : {}),
-      confirmBeforeTranslate: req.confirmBeforeTranslate
+      confirmBeforeTranslate: req.confirmBeforeTranslate,
+      ...(req.memory ? { memory: req.memory } : {})
     }
   }
 

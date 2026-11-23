@@ -7,7 +7,7 @@ import { initDatabase } from '../init'
 import { JobMemoryRepository, type MemoryKey } from './job-memory.repository'
 
 const DAY = 86_400_000
-const KEY: MemoryKey = { targetLang: 'pt-BR', model: 'm/a', promptHash: '' }
+const KEY: MemoryKey = { targetLang: 'pt-BR', model: 'm/a', promptHash: '', mediaScope: '' }
 
 let dir: string
 let client: Client
@@ -63,9 +63,21 @@ describe('JobMemoryRepository', () => {
     for (const k of [
       { ...KEY, targetLang: 'pt-PT' },
       { ...KEY, model: 'm/b' },
-      { ...KEY, promptHash: 'g' }
+      { ...KEY, promptHash: 'g' },
+      { ...KEY, mediaScope: 'tmdb:series:1' }
     ])
       expect((await repo.lookupMany(k, ['a'])).size).toBe(0)
+  })
+
+  it('mesma frase em duas obras: duas entradas; escopo vazio só casa com vazio', async () => {
+    const a = { ...KEY, mediaScope: 'tmdb:series:1' }
+    const b = { ...KEY, mediaScope: 'tmdb:series:2' }
+    await repo.upsertMany(a, [entry('x', 'ele')])
+    await repo.upsertMany(b, [entry('x', 'ela')])
+    expect((await repo.lookupMany(a, ['x'])).get('x')?.translatedText).toBe('ele')
+    expect((await repo.lookupMany(b, ['x'])).get('x')?.translatedText).toBe('ela')
+    expect((await repo.lookupMany(KEY, ['x'])).size).toBe(0)
+    expect((await repo.stats()).rows).toBe(2)
   })
 
   it('lookup com muitas chaves (acima do limite de variáveis por statement)', async () => {

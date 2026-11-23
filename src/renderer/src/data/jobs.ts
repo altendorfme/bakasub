@@ -11,6 +11,7 @@ import type {
   IpcInvokeContract,
   Job,
   JobCreateRequest,
+  JobMemoryMode,
   JobProgressEvent
 } from '@shared/ipc-contract'
 import { IpcCallError, unwrap } from '@renderer/lib/ipc'
@@ -54,16 +55,47 @@ export function useCreateJob(): UseMutationResult<Job, Error, JobCreateRequest> 
 
 export type JobAction = 'confirm' | 'cancel' | 'retry' | 'dismissConsistency'
 
-/** Confirm / cancel / retry / dismiss the term suggestions: the Main answers with the updated job. */
-export function useJobAction(): UseMutationResult<Job, Error, { id: string; action: JobAction }> {
+const putJob = (qc: QueryClient, job: Job): void => {
+  qc.setQueryData(qk.jobs.detail(job.id), job)
+  qc.setQueryData<Job[]>(qk.jobs.list(), (list) => list?.map((j) => (j.id === job.id ? job : j)))
+}
+
+/**
+ * Confirm / cancel / retry / dismiss the term suggestions: the Main answers with the updated job.
+ * `memory` (retry only): omitted = the job's original choice.
+ */
+export function useJobAction(): UseMutationResult<
+  Job,
+  Error,
+  { id: string; action: JobAction; memory?: JobMemoryMode }
+> {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, action }) => unwrap(window.api.jobs[action](id)),
+    mutationFn: ({ id, action, memory }) =>
+      unwrap(
+        action === 'retry' && memory
+          ? window.api.jobs.retry(id, memory)
+          : window.api.jobs[action](id)
+      ),
+    onSuccess: (job) => putJob(qc, job)
+  })
+}
+
+/**
+ * Preflight review: switch "Ignore saved translations". The job goes back to the queue to be
+ * re-estimated and stops again for confirmation; the old estimate is dropped.
+ */
+export function useSetJobMemory(): UseMutationResult<
+  Job,
+  Error,
+  { id: string; memory: JobMemoryMode }
+> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, memory }) => unwrap(window.api.jobs.setMemory(id, memory)),
     onSuccess: (job) => {
-      qc.setQueryData(qk.jobs.detail(job.id), job)
-      qc.setQueryData<Job[]>(qk.jobs.list(), (list) =>
-        list?.map((j) => (j.id === job.id ? job : j))
-      )
+      putJob(qc, job)
+      qc.removeQueries({ queryKey: qk.jobs.preflight(job.id) })
     }
   })
 }

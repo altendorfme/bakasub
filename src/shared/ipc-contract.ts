@@ -388,6 +388,13 @@ export interface WriteOptions {
   overwrite?: boolean
 }
 
+/**
+ * Job Memory num job de tradução: `use` (padrão) consulta e grava o cache; `skip` ("ignorar
+ * traduções salvas") trata todas as linhas como misses, mas continua gravando: as traduções novas
+ * sobrescrevem as antigas, então o cache é corrigido, não só contornado.
+ */
+export type JobMemoryMode = 'use' | 'skip'
+
 /** Pedido do renderer. Caminhos vêm do diálogo/drag & drop e são revalidados no Main. */
 export type JobCreateRequest =
   | {
@@ -421,6 +428,8 @@ export type JobCreateRequest =
       /** Para em `awaiting-confirmation` com a estimativa de custo. Padrão `true`. */
       options?: WriteOptions
       confirmBeforeTranslate?: boolean
+      /** Padrão `use`. Congelado no spec; o retry herda (ou troca, ver `jobs:retry`). */
+      memory?: JobMemoryMode
     }
   | {
       kind: 'mux'
@@ -457,6 +466,8 @@ export type JobCreateRequest =
         }
       /** Para em `awaiting-confirmation` com a estimativa de custo. Padrão `true`. */
       confirmBeforeTranslate?: boolean
+      /** Padrão `use`. Congelado no spec; o retry herda (ou troca, ver `jobs:retry`). */
+      memory?: JobMemoryMode
     }
 
 /** `[from, to)` em posições da linha do tempo dos traduzíveis (`timeIndex`). */
@@ -571,7 +582,8 @@ export interface JobResult {
     cost: number
     costIncomplete: boolean
   }
-  cache?: { hits: number; misses: number }
+  /** `skipped`: o job ignorou as traduções salvas (`memory: 'skip'`); `hits` é 0. */
+  cache?: { hits: number; misses: number; skipped?: boolean }
   failedLines?: FailedLine[]
   /** Termos traduzidos de formas diferentes (ausente em jobs anteriores a esta passada). */
   consistency?: TermConsistencyReport
@@ -603,6 +615,8 @@ export interface Job {
   progress: JobProgress
   /** Só com contexto de mídia incluído. */
   media?: JobMediaSummary
+  /** Só `translate`/`pipeline`: a escolha congelada no spec (jobs antigos = `use`). */
+  memory?: JobMemoryMode
   result: JobResult | null
   error: { code: string; message: string } | null
   attempt: number
@@ -788,6 +802,8 @@ export interface BatchCreateRequest {
       extractNaming?: ExtractNaming
     }
   confirmBeforeTranslate?: boolean
+  /** `translate`/`pipeline`: vale para todos os jobs do batch. Padrão `use`. */
+  memory?: JobMemoryMode
 }
 
 export interface Batch {
@@ -921,6 +937,8 @@ export interface PreflightEstimate {
    * uma delas (letreiro quadro a quadro), resolvidas sem requisição. `total` inclui as duas.
    */
   lines: { total: number; cached: number; toTranslate: number; copies: number; chunks: number }
+  /** O job ignora as traduções salvas: `cached` é 0 e o custo é cheio. Ausente em jobs antigos. */
+  memory?: JobMemoryMode
   tokens: { input: Range; output: Range }
   /** USD; `null` quando o preço é dinâmico. */
   cost: Range | null
@@ -1055,12 +1073,21 @@ export interface IpcInvokeContract {
   'jobs:list': { req: void; res: Job[] }
   'jobs:get': { req: { id: string }; res: Job }
   'jobs:cancel': { req: { id: string }; res: Job }
-  'jobs:retry': { req: { id: string }; res: Job }
+  /**
+   * `memory` ausente = a escolha original do job. Trocar refaz o preflight e a tradução (os
+   * artefatos dessas etapas são descartados); só `translate`/`pipeline`.
+   */
+  'jobs:retry': { req: { id: string; memory?: JobMemoryMode }; res: Job }
   'jobs:remove': { req: { id: string }; res: { removed: true } }
   /** Remove todos os concluídos/cancelados (falhas e interrompidos ficam). */
   'jobs:clear-completed': { req: void; res: { removed: string[] } }
   /** `awaiting-confirmation` -> fila; retoma na tradução, sem reextrair nem reestimar. */
   'jobs:confirm': { req: { id: string }; res: Job }
+  /**
+   * Troca o `memory` de um job em `awaiting-confirmation`: refaz só o preflight (volta à fila e
+   * para de novo para confirmação, mesmo abaixo do limite de confirmação automática).
+   */
+  'jobs:set-memory': { req: { id: string; memory: JobMemoryMode }; res: Job }
   /** Esconde as sugestões de consistência de termos deste job (job terminal; não toca no preset). */
   'jobs:dismiss-consistency': { req: { id: string }; res: Job }
   /**
@@ -1157,6 +1184,7 @@ export const INVOKE_CHANNELS = [
   'jobs:get',
   'jobs:cancel',
   'jobs:retry',
+  'jobs:set-memory',
   'jobs:remove',
   'jobs:clear-completed',
   'dialog:open-folder',
@@ -1262,10 +1290,11 @@ export interface BakaSubApi {
     list(): Promise<IpcResult<Job[]>>
     get(id: string): Promise<IpcResult<Job>>
     cancel(id: string): Promise<IpcResult<Job>>
-    retry(id: string): Promise<IpcResult<Job>>
+    retry(id: string, memory?: JobMemoryMode): Promise<IpcResult<Job>>
     remove(id: string): Promise<IpcResult<{ removed: true }>>
     clearCompleted(): Promise<IpcResult<{ removed: string[] }>>
     confirm(id: string): Promise<IpcResult<Job>>
+    setMemory(id: string, memory: JobMemoryMode): Promise<IpcResult<Job>>
     dismissConsistency(id: string): Promise<IpcResult<Job>>
     preflight(
       id: string

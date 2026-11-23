@@ -74,4 +74,14 @@ describe('buildContext', () => {
     expect(ctx.before.map((c) => c.cueId)).toEqual([3])
     expect(ctx.after.map((c) => c.cueId)).toEqual([7])
   })
+  it('leva o speaker do vizinho quando existe', () => {
+    const t = [
+      { ...unit(1, 'a'), speaker: 'Kamina' },
+      unit(2, 'b'),
+      { ...unit(3, 'c'), speaker: 'Yoko' }
+    ]
+    const ctx = buildContext(t, [t[1]], new Map([[1, 'A']]), { before: 5, after: 2 })
+    expect(ctx.before).toEqual([{ cueId: 1, source: 'a', speaker: 'Kamina', translation: 'A' }])
+    expect(ctx.after).toEqual([{ cueId: 3, source: 'c', speaker: 'Yoko' }])
+  })
 })

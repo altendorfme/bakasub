@@ -5,6 +5,7 @@ import { basename, join } from 'node:path'
 import type {
   Job,
   JobCreateRequest,
+  JobMemoryMode,
   JobProgress,
   JobProgressEvent,
   JobStatus
@@ -16,7 +17,13 @@ import { TranslationCancelled } from '../llm/translate-document'
 import type { Artifacts } from './artifacts'
 import type { RunHooks, RunOutcome } from './job-runner'
 import { StepFailure } from './job-runner'
-import { resolveJobSpec, type JobSpec, type PresetSource, type MediaLookupSource } from './job-spec'
+import {
+  jobMemoryMode,
+  resolveJobSpec,
+  type JobSpec,
+  type PresetSource,
+  type MediaLookupSource
+} from './job-spec'
 import { createThrottle, type Throttle } from './throttle'
 
 const TERMINAL: ReadonlySet<JobStatus> = new Set([
@@ -67,6 +74,7 @@ interface Running {
 function toDto(r: JobRow): Job {
   const spec = r.spec as { source?: string }
   const media = mediaSummary(r.spec)
+  const memory = jobMemoryMode(r.spec)
   return {
     id: r.id,
     kind: r.kind,
@@ -76,6 +84,7 @@ function toDto(r: JobRow): Job {
     source: spec.source ? basename(spec.source) : '',
     progress: r.progress,
     ...(media ? { media } : {}),
+    ...(memory ? { memory } : {}),
     result: r.result ?? null,
     error: r.error ?? null,
     attempt: r.attempt,
@@ -84,6 +93,13 @@ function toDto(r: JobRow): Job {
     startedAt: r.startedAt?.toISOString() ?? null,
     finishedAt: r.finishedAt?.toISOString() ?? null
   }
+}
+
+/** Cópia dos artefatos sem as etapas dadas (refeitas na próxima execução). */
+function withoutSteps(raw: unknown, steps: readonly (keyof Artifacts)[]): Artifacts {
+  const a = structuredClone((raw ?? {}) as Artifacts)
+  for (const s of steps) delete a[s]
+  return a
 }
 
 function isCancellation(err: unknown): boolean {
@@ -189,11 +205,25 @@ export class JobManager {
     return (row.artifacts as Artifacts).preflight ?? null
   }
 
-  async retry(id: string): Promise<Job> {
+  /**
+   * Volta à fila retomando da primeira etapa incompleta. `memory` ausente = a escolha original;
+   * trocar descarta preflight e tradução (estimativa e cache mudam), mantendo probe/extração.
+   */
+  async retry(id: string, memory?: JobMemoryMode): Promise<Job> {
     const row = await this.row(id)
     if (!RETRYABLE.has(row.status) || this.running.has(id))
       throw new AppError('JOB_INVALID_STATE', `Job ${id} is ${row.status}`)
+    const change = this.memoryChange(row, memory)
     await this.deps.repo.update(id, {
+      ...(change
+        ? {
+            spec: change.spec,
+            artifacts: withoutSteps(row.artifacts, ['preflight', 'translate']) as Record<
+              string,
+              unknown
+            >
+          }
+        : {}),
       status: 'queued',
       attempt: row.attempt + 1,
       error: null,
@@ -203,6 +233,39 @@ export class JobManager {
     })
     this.pump()
     return this.get(id)
+  }
+
+  /**
+   * Revisão do preflight: troca o `memory` de um job em `awaiting-confirmation` e refaz só a
+   * estimativa. O job volta à fila e para de novo para confirmação (`reestimate`).
+   */
+  async setMemory(id: string, memory: JobMemoryMode): Promise<Job> {
+    const row = await this.row(id)
+    if (row.status !== 'awaiting-confirmation' || this.running.has(id))
+      throw new AppError('JOB_INVALID_STATE', `Job ${id} is ${row.status}`)
+    const change = this.memoryChange(row, memory)
+    if (!change) return this.get(id)
+    const artifacts = withoutSteps(row.artifacts, ['preflight', 'translate'])
+    artifacts.reestimate = true
+    await this.deps.repo.update(id, {
+      spec: change.spec,
+      artifacts: artifacts as Record<string, unknown>,
+      status: 'queued',
+      result: null,
+      progress: { step: null }
+    })
+    this.pump()
+    return this.get(id)
+  }
+
+  /** Novo spec quando `memory` muda; `null` sem mudança. Só jobs que traduzem. */
+  private memoryChange(row: JobRow, memory: JobMemoryMode | undefined): { spec: JobSpec } | null {
+    if (memory === undefined) return null
+    const current = jobMemoryMode(row.spec)
+    if (!current)
+      throw new AppError('INVALID_INPUT', `Job ${row.id} (${row.kind}) does not translate`)
+    if (current === memory) return null
+    return { spec: { ...(row.spec as JobSpec & { memory?: JobMemoryMode }), memory } as JobSpec }
   }
 
   async remove(id: string): Promise<void> {
