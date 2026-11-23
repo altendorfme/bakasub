@@ -6,7 +6,10 @@
  * personagem e são descartados.
  */
 
-/** Comparados sem caixa, após `trim` e colapso de espaços. */
+/**
+ * Comparados sem caixa, após `trim` e colapso de espaços. Tratados como "sem ator": não vão ao
+ * prompt nem ao context hash. Alterar a lista muda hashes: suba `CONTEXT_HASH_VERSION`.
+ */
 const GENERIC_ACTORS: ReadonlySet<string> = new Set([
   'default',
   'ntp',
@@ -42,8 +45,12 @@ const GENERIC_ACTORS: ReadonlySet<string> = new Set([
   'flashback'
 ])
 
+/** NFC, controles (incl. `\0`, separador do hash) viram espaço, espaços colapsados, trim. Caixa preservada. */
 function normalize(raw: string): string {
-  return raw.replace(/\s+/g, ' ').trim()
+  return raw
+    .normalize('NFC')
+    .replace(/[\p{Cc}\s]+/gu, ' ')
+    .trim()
 }
 
 /** `true` quando o valor não identifica um personagem (vazio, genérico ou só pontuação/dígitos). */
@@ -54,7 +61,7 @@ export function isGenericActor(actor: string | undefined): boolean {
   return GENERIC_ACTORS.has(n.toLowerCase())
 }
 
-/** Nome do falante normalizado (espaços colapsados), ou `undefined` se ausente/genérico. */
+/** Nome do falante normalizado (NFC, espaços colapsados, caixa preservada), ou `undefined` se ausente/genérico. */
 export function speakerOf(actor: string | undefined): string | undefined {
   return isGenericActor(actor) ? undefined : normalize(actor!)
 }

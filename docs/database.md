@@ -74,7 +74,7 @@ Envelope encryption (`src/main/settings/secret-vault.ts`):
 | Column            | Type                                     | Notes                                                                                                                            |
 | ----------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `id`              | integer PK autoincrement                 |                                                                                                                                  |
-| `context_hash`    | text, not null                           | sha256 of `v1\0prev\0payload` (see [`job-memory.md`](./job-memory.md))                                                           |
+| `context_hash`    | text, not null                           | sha256 of `v2[\x01speaker]\0prev\0payload` (see [`job-memory.md`](./job-memory.md))                                              |
 | `target_lang`     | text, not null                           | canonical BCP-47 (`pt-BR` ≠ `pt-PT`)                                                                                             |
 | `model`           | text, not null                           | OpenRouter model id                                                                                                              |
 | `prompt_hash`     | text, not null, default `''`             | sha256 of `{ glossary, rules, style }` (see `promptHash`); `''` only in rows predating the rules version                         |

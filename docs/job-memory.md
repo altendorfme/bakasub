@@ -13,7 +13,7 @@ settings ──► memory:stats / memory:prune
 
 Payloads, not plain text: `source_text` is the source payload and `translated_text` the translated payload, both with the segmentation markers (`<gN>…</gN>`, `<xN/>`, `<br/>`, see [`parsing.md`](./parsing.md)). Reinjection needs the markers. Only marker ids/order are in the payload, never the tags' `raw`, so `{\an8}` vs `{\an2}` (or a different edge tag) share the same entry.
 
-**Copies.** Misses that share a `context_hash` would hit the same cache row, so `lookupDocument` keeps only the first one (document order) in `misses` and groups the rest under `copies` (keyed by the representative's `cueId`). Only representatives go to the LLM; the accepted translation is validated against each copy's own skeleton and reapplied there, and only the representative is written (same row). Typical case: motion-tracked signs typeset frame by frame (a single "Episode 1" title card can be 100+ events with different `\pos`/`\fscx` and identical payload). Short lines (≤ 3 words) only group when the previous line also matches, so contextual short lines ("What?" in different scenes) stay separate.
+**Copies.** Misses that share a `context_hash` would hit the same cache row, so `lookupDocument` keeps only the first one (document order) in `misses` and groups the rest under `copies` (keyed by the representative's `cueId`). Only representatives go to the LLM; the accepted translation is validated against each copy's own skeleton and reapplied there, and only the representative is written (same row). Typical case: motion-tracked signs typeset frame by frame (a single "Episode 1" title card can be 100+ events with different `\pos`/`\fscx` and identical payload; they share one `Name` too, so the speaker in the hash keeps them grouped, regression test in `context-hash.test.ts`). Copies also require the same speaker: one sentence said by two characters is two representatives. Short lines (≤ 3 words) only group when the previous line also matches, so contextual short lines ("What?" in different scenes) stay separate.
 
 **Every hit is validated** with `validateTranslation` against the current cue's skeleton (and `source_text` must equal the current payload). A corrupt or incompatible entry is a miss: the cue goes to the LLM and the upsert overwrites the entry.
 
@@ -38,14 +38,19 @@ Payloads, not plain text: `source_text` is the source payload and `translated_te
 ## Context hash (`context-hash.ts`)
 
 ```
-hash = sha256_hex("v1" + "\0" + prev + "\0" + normalizeForHash(payload))
+no speaker:   hash = sha256_hex("v2" + "\0" + prev + "\0" + normalizeForHash(payload))
+with speaker: hash = sha256_hex("v2" + "\x01" + speaker + "\0" + prev + "\0" + normalizeForHash(payload))
 ```
 
 - `prev` is used only when the current cue has **≤ 3 words**; otherwise `''`.
 - Words: `Intl.Segmenter(sourceLang, { granularity: 'word' })`, counting `isWordLike` segments over the normalized plain text (punctuation does not count; CJK is segmented by dictionary). Unknown/invalid `sourceLang` → ICU default locale.
 - `prev` = normalized plain text (`cuePlainText`, no markers) of the previous **translatable** cue ordered by `start.ms` (ties: file order). Drawings, karaoke, letterless cues and unparsed blocks never get a hash and never serve as context. The first cue uses `''`.
 - `normalizeForHash` (`parsers/core/plain-text.ts`): NFC, ASS `\h` → space, collapse whitespace, trim. Case is preserved ("OK." and "ok." may need different translations).
-- `v1` is bumped whenever normalization or composition changes; old entries simply stop matching and age out through the prune.
+- `speaker` = `speakerOf(cue.actor)` (`parsers/core/speaker.ts`, the same value sent to the prompt as `speaker="…"`): the ASS/SSA `Name` column or the VTT `<v Name>`, normalized (NFC, control characters → space, whitespace collapsed, trim, **case preserved**). It applies to short and long lines alike. Values that do not identify a character are treated as "no speaker" and keep the speakerless formula: empty, letterless (`-`, `1`, `??`) and the generic list `GENERIC_ACTORS` (`Default`, `NTP`, `Main`, `Comment`, `Sign`, `Song`, `TL Note`…, compared case-insensitively; covered by `speaker.test.ts`). SRT has no speaker, so its hashes only changed by the version. Since the speaker has no control characters, the `\x01` after the version and the first `\0` delimit it unambiguously, and a speakerless key can never equal a speaker key.
+- Why: a long line is otherwise keyed by its text alone, so "I'm so tired of this" said by two characters in the same file became a copy and reused the first speaker's gendered translation. Now the same sentence with different speakers is two cache rows and two units sent to the LLM; with the same speaker it still groups as copies.
+- **Trade-off:** two releases of the same episode whose `Name` columns differ (different fansub groups, or one that leaves it empty) no longer share cache on the lines that carry a speaker. The speakerless lines still share.
+- Changing `GENERIC_ACTORS` changes hashes of the affected lines: bump the version with it.
+- The version (`v2` since the speaker entered the hash; `v1` before) is bumped whenever normalization or composition changes; old entries simply stop matching and age out through the prune.
 
 ## Writes and cancellation
 

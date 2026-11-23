@@ -5,6 +5,9 @@ describe('speakerOf', () => {
   it('nome real: normalizado (trim, espaços colapsados)', () => {
     expect(speakerOf('  Kamina ')).toBe('Kamina')
     expect(speakerOf('Yoko\t  Littner')).toBe('Yoko Littner')
+    expect(speakerOf('Jose\u0301')).toBe('José')
+    expect(speakerOf('Ki\0ra')).toBe('Ki ra')
+    expect(speakerOf('KAMINA')).toBe('KAMINA')
   })
   it('ausente, vazio, genérico ou sem letras: undefined', () => {
     for (const v of [
