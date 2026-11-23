@@ -36,6 +36,17 @@ Exports are redacted again and the home folder becomes `~` (raw, `/` and JSON-es
 
 The live feed is fed by the same hook, only for messages that passed the **file** transport's level, so it shows exactly what the file gets. A failing emit (window closed) never breaks logging.
 
+## Logs screen
+
+`useLiveLogs(live, jobId)` (`src/renderer/src/data/logs.ts`) loads the history once, then appends `logs:entry` batches while **Live** is on. History is always requested with `minLevel: 'debug'`: level and area are filtered on screen, so changing them never drops a line. At most 2000 lines are kept on screen.
+
+- **General view**: `logs:tail({ limit: 1000, minLevel: 'debug' })`, the newest lines of every job.
+- **One job** (`/logs?job=<id>`, the job's "View logs" link): `logs:tail({ jobId, limit: 2000, minLevel: 'debug' })`. The Main filters by `jobId` **before counting**, across every rotated file, so an old job (or a small one followed by large ones) comes back whole instead of being whatever survived in the global 1000-line tail. Live batches are filtered by the same `jobId` on arrival. A chip shows the job's source file (short id when the job no longer exists) and clears the filter (`navigate({ search: {} })`), which reloads the general tail; the live feed stays on.
+- Live lines that arrive while the history is loading are buffered and appended after it (lines not newer than the last history line are skipped as already loaded).
+- Empty states: "Reading the log…" while loading; for a job with no lines at all, a specific message (rotated out after 5 × 5 MB, or the files were deleted); "No log lines match the filters" when level/area hide everything.
+
+**Limitation:** only lines carrying `jobId` belong to a job. Anything logged outside `runWithJob` (an `ipc` error from the handler that started or cancelled the job, a renderer report) is not shown in the job view even when it is about that job; it is in the general view. The screen does not try to guess.
+
 ## Renderer errors
 
 `installGlobalErrorReporting()` (`src/renderer/src/lib/report-error.ts`) sends `window.onerror` and `unhandledrejection` to `logs:report`; the React error boundary (shell) uses `reportError(err, 'boundary')`. Reporting never throws back into the app.

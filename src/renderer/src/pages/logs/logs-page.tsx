@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { useJob } from '@renderer/data/jobs'
 import { LOG_LEVELS, matchesLog, useLiveLogs } from '@renderer/data/logs'
 import { errorMessage } from '@renderer/i18n/error-message'
 import { unwrap } from '@renderer/lib/ipc'
@@ -31,7 +32,10 @@ const clock = (iso: string): string => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString(undefined, { hour12: false })
 }
 
-/** Log viewer: tail + live feed, filtered by level, area and job (`?job=` from the queue). */
+/**
+ * Log viewer: history + live feed, filtered by level and area on screen. `?job=` (from the queue)
+ * loads that job's lines from every rotated file instead of the global tail.
+ */
 export function LogsPage(): React.JSX.Element {
   const { t } = useTranslation()
   const { job } = useSearch({ from: '/shell/logs' })
@@ -39,8 +43,9 @@ export function LogsPage(): React.JSX.Element {
   const [live, setLive] = useState(true)
   const [minLevel, setMinLevel] = useState<LogLevel>('info')
   const [scope, setScope] = useState<string | null>(null)
-  const { entries, loading, error } = useLiveLogs(live)
-  const shown = entries.filter((e) => matchesLog(e, { minLevel, scope, jobId: job ?? null }))
+  const jobId = job ?? null
+  const { entries, loading, error } = useLiveLogs(live, jobId)
+  const shown = entries.filter((e) => matchesLog(e, { minLevel, scope, jobId }))
   const scopes = [...new Set(entries.map((e) => e.scope))].sort()
   const bottom = useRef<HTMLDivElement>(null)
 
@@ -105,12 +110,7 @@ export function LogsPage(): React.JSX.Element {
             ))}
           </SelectContent>
         </Select>
-        {job ? (
-          <Button size="sm" variant="ghost" onClick={() => void navigate({ search: {} })}>
-            {t('logsPage.job', { id: job.slice(0, 8) })}
-            <X aria-label={t('logsPage.clearJob')} />
-          </Button>
-        ) : null}
+        {jobId ? <JobFilter jobId={jobId} onClear={() => void navigate({ search: {} })} /> : null}
         <span className="ml-auto text-xs text-muted-foreground">
           {t('logsPage.count', { shown: shown.length, total: entries.length })}
         </span>
@@ -127,6 +127,8 @@ export function LogsPage(): React.JSX.Element {
           <p role="alert" className="p-4 font-sans text-sm text-destructive">
             {t('logsPage.loadFailed')} {errorMessage(error)}
           </p>
+        ) : jobId && entries.length === 0 ? (
+          <p className="p-4 font-sans text-sm text-muted-foreground">{t('logsPage.jobEmpty')}</p>
         ) : shown.length === 0 ? (
           <p className="p-4 font-sans text-sm text-muted-foreground">{t('logsPage.empty')}</p>
         ) : (
@@ -139,6 +141,29 @@ export function LogsPage(): React.JSX.Element {
         <div ref={bottom} />
       </div>
     </div>
+  )
+}
+
+/** "Showing job X" chip; the name comes from the job when it still exists, else the short id. */
+function JobFilter({ jobId, onClear }: { jobId: string; onClear: () => void }): React.JSX.Element {
+  const { t } = useTranslation()
+  const { data } = useJob(jobId)
+  const name = data?.source ?? jobId.slice(0, 8)
+  return (
+    <span className="flex min-w-0 items-center gap-1 rounded-md border px-2 py-0.5">
+      <span className="max-w-80 truncate" title={jobId}>
+        {t('logsPage.filteredJob', { name })}
+      </span>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-6"
+        onClick={onClear}
+        aria-label={t('logsPage.clearJob')}
+      >
+        <X />
+      </Button>
+    </span>
   )
 }
 
