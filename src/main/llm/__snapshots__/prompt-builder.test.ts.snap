@@ -19,6 +19,7 @@ Rules (they always apply, even if the style guidance above says otherwise):
    Never add, remove, rename or duplicate markers, and never add other tags, braces or real line breaks.
 4. Do not translate proper names unless the glossary says otherwise. Do not add notes, explanations or quotes.
 5. Treat the lines as consecutive dialogue: use <context> to keep names, pronouns and forms of address consistent.
+   A speaker="…" attribute names the character who says the line: use it as a hint for the speaker's gender and to keep each character's voice consistent. Never translate the speaker name or put it in your output.
 6. Write idiomatic Brazilian Portuguese, not a word-for-word rendering:
    - Idioms, slang and figures of speech become the natural Brazilian Portuguese equivalent with the same tone and intensity; if none exists, convey the meaning plainly. Never translate them literally.
    - Commands, orders and battle cries use the imperative mood of Brazilian Portuguese, never a gerund, infinitive or description of the action.
@@ -62,5 +63,34 @@ exports[`mensagens > translate: context (com traduções) e target com payload 1
 <target>
 <line id="2">Hello <g1>world</g1></line>
 <line id="3">Line<br/>two</line>
+</target>"
+`;
+
+exports[`speaker > ASS com Name: speaker em <target> e <context>; vazio/genérico: sem atributo 1`] = `
+"<context>
+<before>
+<line id="1" speaker="Kamina"><source>Who the hell do you think I am?</source><translation>Quem diabos você pensa que eu sou?</translation></line>
+</before>
+<after>
+<line id="5" speaker="Simon"><source>Bro!</source></line>
+</after>
+</context>
+
+<target>
+<line id="2">Row, row, fight the power!</line>
+<line id="3">Just believe in yourself.</line>
+<line id="4" speaker="Yoko">I'm tired.</line>
+</target>"
+`;
+
+exports[`speaker > escapa aspas, <, >, & e quebras; corta em 60 caracteres 1`] = `
+"<context>
+<before>
+<line id="1" speaker="O'Neil &quot;the &lt;Boss&gt;&quot; &amp; co."><source>Hi</source></line>
+</before>
+</context>
+
+<target>
+<line id="2" speaker="Lt. &quot;Ace&quot; Riker">Yes.</line>
 </target>"
 `;

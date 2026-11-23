@@ -75,7 +75,7 @@ export function estimatePreflight(input: EstimateInput): Omit<PreflightEstimate,
       const context = buildContext(timeline, chunk, known, DEFAULT_CONTEXT_WINDOW)
       const user = buildTranslateMessage({
         context,
-        targets: chunk.map((u) => ({ cueId: u.cueId, payload: u.unit.payload }))
+        targets: chunk.map((u) => ({ cueId: u.cueId, payload: u.unit.payload, speaker: u.speaker }))
       })
       inputTokens += countMessageTokens([
         { role: 'system', content: system },

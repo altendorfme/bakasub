@@ -29,7 +29,8 @@ function rulesFingerprint(): string {
  */
 const FINGERPRINTS: Readonly<Record<number, string>> = {
   1: '1c690d5fd6fe6cc6ef57f770636ea74076754c46b9c68576d20786e66c53ea4a',
-  2: 'e5a6df741dce558e16c61b5e27ceb1ca1fe6a6bb835b07e83a49e84b09fa8062'
+  2: 'e5a6df741dce558e16c61b5e27ceb1ca1fe6a6bb835b07e83a49e84b09fa8062',
+  3: '6cd39fcfeaa793e490885631e0a50379307ee4ea742b0cf2dfca9bbc600e91f8'
 }
 
 describe('PROMPT_RULES_VERSION', () => {

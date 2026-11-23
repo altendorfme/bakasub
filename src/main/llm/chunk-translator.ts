@@ -239,13 +239,14 @@ export class ChunkTranslator {
         context,
         failures: pending.map((u) => ({
           unit: u.unit,
+          speaker: u.speaker,
           returned: attempts.get(u.cueId)!.returned,
           issues: attempts.get(u.cueId)!.issues
         }))
       })
     return buildTranslateMessage({
       context,
-      targets: pending.map((u) => ({ cueId: u.cueId, payload: u.unit.payload }))
+      targets: pending.map((u) => ({ cueId: u.cueId, payload: u.unit.payload, speaker: u.speaker }))
     })
   }
 

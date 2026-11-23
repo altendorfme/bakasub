@@ -34,7 +34,7 @@ Order: BOM (UTF-8, UTF-16 LE/BE) → strict UTF-8 → `chardet` restricted to an
 - `Node` = `TextNode | TagNode | LineBreakNode`. `TagNode.raw` keeps the exact source; `kind` is `open | close | override`.
 - `TextNode.value` is the logical text (what the LLM and the hash see). Formats that escape text (WebVTT) also set `TextNode.raw` on **every** original node; nodes created by a translation have no `raw`, and the format's serializer escapes their `value` (`nodesRaw(nodes, escapeText)`). SRT and ASS never set `raw`.
 - `Cue<F>`: `id` (document ordinal, **not** the file index), `start`/`end` (`{ ms, raw }`), `nodes`, `leading`, `line`/`endLine`, and `format: F` (lossless, format-specific data; for SRT: index line, timing line, EOLs, extras).
-- `Cue.style?` / `Cue.actor?`: ASS/SSA `Style` and `Name` columns (`undefined` in SRT or when empty).
+- `Cue.style?` / `Cue.actor?`: ASS/SSA `Style` and `Name` columns (`undefined` in SRT or when empty). `speakerOf(actor)` (`core/speaker.ts`) is the single place that decides whether an actor is a real speaker (generic values such as `Default`, `NTP`, `Main`, `Signs` and values without letters are dropped); the prompt sends it as `speaker="…"` (see [`llm.md`](./llm.md#prompt)).
 - `UnparsedBlock`: raw text the scanner could not classify (`orphan-text | bad-timing | empty-block | bad-event`).
 - `SubtitleDocument`: `items`, `trailing`, `meta`, `diagnostics`. Everything is immutable.
 
@@ -133,7 +133,7 @@ One module for both dialects: `doc.format` is `'ssa'` when `ScriptType: v4.00` (
 | `LineBreak`        | each EOL                                                                                                                                                               |
 | `Text`             | everything else; entities `&amp; &lt; &gt; &nbsp; &lrm; &rlm; &quot; &apos;` and `&#N;`/`&#xH;` are **decoded** into `value` (raw kept); unknown entities stay literal |
 
-- **Speaker**: the annotation of the first `<v Name>` (with or without classes) goes to `Cue.actor`; the tag itself is a marker, so the name never reaches the LLM as text.
+- **Speaker**: the annotation of the first `<v Name>` (with or without classes) goes to `Cue.actor`; the tag itself is a marker, so the name never reaches the LLM as text (it reaches it only as the `speaker` attribute of the line).
 - **Escaping**: text produced by a translation is escaped on output (`&` `<` `>` and the decoded NBSP/LRM/RLM become entities), so a model that writes `-->` or `<3` can never break the file. A source and an SRT file with the same sentence share Job Memory entries, because the payload carries decoded text.
 - **Repair** (`vtt-repair.ts`): inserts the missing `WEBVTT` header; regenerates non-canonical timestamps (keeping hours if they were written, and the settings); separates glued cues with a blank line and empties whitespace-only lines, except for a cue glued to orphan lines of the same block (separating it would turn its identifier into trivia, e.g. `NOTE x`); rewrites a raw `-->` in cue text as `--&gt;` (same rendering, valid cue); unifies EOLs. `unparsed: 'drop'` removes unparsed blocks and keeps the trivia before them. Idempotent, and the result reparses without `auto` diagnostics (property test).
 - **Pipeline**: `S_TEXT/WEBVTT` tracks are extractable and translatable (`mkvextract` writes `.vtt`), `.vtt` files are accepted by `translate` and `mux`, and the output keeps the source format (`mkvmerge` muxes WebVTT natively).

@@ -84,4 +84,19 @@ describe('computeContextHashes', () => {
     const d = srt('Ok.', 'Vamos lá agora mesmo.', 'Tá.')
     expect(computeContextHashes(d)).toEqual(computeContextHashes(d))
   })
+
+  it('speaker: Name do ASS sem valores genéricos; não muda o hash', () => {
+    const named = (name: string, text: string): string =>
+      `Dialogue: 0,0:00:01.00,0:00:59.00,Default,${name},0,0,0,,${text}`
+    const hs = computeContextHashes(
+      ass(
+        named('Kamina', 'Who the hell do you think I am?'),
+        named('Default', 'Line two here.'),
+        named('', 'Line three here.')
+      )
+    )
+    expect(hs.map((h) => h.speaker)).toEqual(['Kamina', undefined, undefined])
+    const plain = computeContextHashes(ass(named('', 'Who the hell do you think I am?')))
+    expect(hs[0].hash).toBe(plain[0].hash)
+  })
 })

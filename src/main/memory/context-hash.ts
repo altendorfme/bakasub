@@ -3,6 +3,7 @@ import {
   classify,
   cuePlainText,
   normalizeForHash,
+  speakerOf,
   type Cue,
   type SubtitleDocument,
   type TranslationUnit
@@ -32,6 +33,8 @@ export interface HashedUnit {
   readonly endMs: number
   /** Texto puro normalizado do cue (contexto do LLM e linha anterior do hash). */
   readonly plain: string
+  /** Falante (`Cue.actor` sem valores genéricos, ver `speakerOf`). Só vai ao prompt. */
+  readonly speaker?: string
 }
 
 const segmenters = new Map<string, Intl.Segmenter>()
@@ -90,6 +93,7 @@ export function computeContextHashes(
   let prev = ''
   for (const [timeIndex, { cue, unit }] of byTime.entries()) {
     const plain = normalizeForHash(cuePlainText(cue))
+    const speaker = speakerOf(cue.actor)
     const contextUsed = countWords(plain, options.sourceLang) <= SHORT_SENTENCE_WORDS
     const hash = sha256(
       `${CONTEXT_HASH_VERSION}\0${contextUsed ? prev : ''}\0${normalizeForHash(unit.payload)}`
@@ -102,7 +106,8 @@ export function computeContextHashes(
       timeIndex,
       startMs: cue.start.ms,
       endMs: cue.end.ms,
-      plain
+      plain,
+      ...(speaker ? { speaker } : {})
     })
     prev = plain
   }
