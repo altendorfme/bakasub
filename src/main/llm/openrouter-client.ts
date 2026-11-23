@@ -52,6 +52,8 @@ export class LlmError extends Error {
       rateLimit?: RateLimitHeaders
       /** Para contabilizar custo de gerações interrompidas (`/generation`). */
       generationId?: string | null
+      /** Corpo da resposta HTTP de erro, sem a key e cortado (`ERROR_BODY_LIMIT`), para o log. */
+      body?: string
     } = {}
   ) {
     super(message)
@@ -125,6 +127,11 @@ export interface ChatResult {
   readonly finishReason: string | null
   readonly usage: Usage | null
   readonly generationId: string | null
+  /**
+   * Caracteres de raciocínio recebidos em `delta.reasoning` (0 = o stream não trouxe raciocínio
+   * visível, igual a ausente; o provedor pode raciocinar sem expor, ver `Usage.reasoningTokens`).
+   */
+  readonly reasoningChars?: number
 }
 
 export interface GenerationCost {
@@ -141,6 +148,9 @@ export interface OpenRouterClientOptions {
   /** Sem nenhum byte (keep-alives contam) por este tempo => `timeout`. Padrão: 60 s. */
   readonly idleTimeoutMs?: number
 }
+
+/** Teto do corpo de erro guardado em `LlmError.details.body`. */
+export const ERROR_BODY_LIMIT = 2048
 
 const SECRET_PATTERN = /sk-or-[A-Za-z0-9_-]+/g
 
@@ -239,7 +249,7 @@ function kindForStatus(status: number, body: ErrorBody | null): LlmErrorKind {
 
 interface StreamChunk {
   error?: { code?: unknown; message?: unknown }
-  choices?: { delta?: { content?: unknown }; finish_reason?: unknown }[]
+  choices?: { delta?: { content?: unknown; reasoning?: unknown }; finish_reason?: unknown }[]
   usage?: {
     prompt_tokens?: unknown
     completion_tokens?: unknown
@@ -339,13 +349,15 @@ export class OpenRouterClient {
             status: res.status,
             retryAfterMs: parseRetryAfter(res.headers.get('retry-after')),
             ...(rateLimit ? { rateLimit } : {}),
-            generationId
+            generationId,
+            ...(text ? { body: redact(text, key).slice(0, ERROR_BODY_LIMIT) } : {})
           }
         )
       }
       if (!res.body) throw new LlmError('stream-error', 'Empty response body', { generationId })
 
       let content = ''
+      let reasoningChars = 0
       let finishReason: string | null = null
       let usage: Usage | null = null
       let done = false
@@ -369,6 +381,8 @@ export class OpenRouterClient {
         }
         const choice = c.choices?.[0]
         if (typeof choice?.delta?.content === 'string') content += choice.delta.content
+        if (typeof choice?.delta?.reasoning === 'string')
+          reasoningChars += choice.delta.reasoning.length
         if (typeof choice?.finish_reason === 'string') finishReason = choice.finish_reason
         if (c.usage) {
           const reasoningTokens = optNum(c.usage.completion_tokens_details?.reasoning_tokens)
@@ -388,7 +402,7 @@ export class OpenRouterClient {
         throw new LlmError('moderation', 'Blocked by content filter', { generationId })
       if (!done && finishReason === null)
         throw new LlmError('stream-error', 'Stream ended unexpectedly', { generationId })
-      return { content, finishReason, usage, generationId }
+      return { content, finishReason, usage, generationId, reasoningChars }
     } catch (err) {
       return fail(err)
     } finally {

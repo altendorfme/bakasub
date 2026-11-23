@@ -1,7 +1,7 @@
 import type { HashedUnit } from '../memory/context-hash'
 import { validateTranslation, type InlineLexer, type Issue } from '../parsers'
 import { buildContext, DEFAULT_CONTEXT_WINDOW } from './chunker'
-import { FatalLlmError, type LlmLog, type LlmSession } from './llm-session'
+import { FatalLlmError, type LlmLog, type LlmSession, type SessionResponse } from './llm-session'
 import { buildRepairMessage, buildTranslateMessage } from './prompt-builder'
 import { reasoningStarved } from './reasoning'
 import { parseTranslations } from './response-parser'
@@ -118,18 +118,42 @@ export class ChunkTranslator {
         )
       }
 
-      if (res.finishReason === 'length' && pending.length > 1) {
-        for (const half of halves(pending)) await this.runLines(half, moderationDepth)
-        return
-      }
-
       const parsed = parseTranslations(
         res.content,
         pending.map((u) => u.cueId)
       )
+
+      if (res.finishReason === 'length' && pending.length > 1) {
+        // Resposta cortada: aceita as linhas completas e válidas antes do corte (sem gastar
+        // tentativa) e divide só o resto ao meio.
+        const kept: { unit: HashedUnit; translated: string }[] = []
+        if (parsed.ok)
+          for (const u of pending) {
+            const value = parsed.values.get(u.cueId)
+            if (
+              value !== undefined &&
+              validateTranslation(u.unit, value, this.env.lexInline).length === 0
+            )
+              kept.push({ unit: u, translated: value })
+          }
+        this.env.log.warn(
+          `truncated response: kept ${kept.length}/${pending.length} lines, splitting the rest ` +
+            describe(res)
+        )
+        this.logContent(res)
+        await this.acceptAll(kept)
+        const keptIds = new Set(kept.map((e) => e.unit.cueId))
+        const rest = pending.filter((u) => !keptIds.has(u.cueId))
+        if (rest.length > 1)
+          for (const half of halves(rest)) await this.runLines(half, moderationDepth)
+        else if (rest.length === 1) await this.runLines(rest, moderationDepth)
+        return
+      }
+
       const accepted: { unit: HashedUnit; translated: string }[] = []
       if (!parsed.ok) {
-        this.env.log.warn(`unparseable response: ${res.content.slice(0, RESPONSE_LOG_LIMIT)}`)
+        this.env.log.warn(`unparseable response (${parsed.problem}) ${describe(res)}`)
+        this.logContent(res)
         for (const u of pending) {
           const a = attempts.get(u.cueId)!
           a.count++
@@ -139,6 +163,7 @@ export class ChunkTranslator {
         }
       } else {
         if (parsed.extra.length) this.env.log.debug(`ignored extra ids: ${parsed.extra.join(',')}`)
+        const problems: string[] = []
         for (const u of pending) {
           const a = attempts.get(u.cueId)!
           a.count++
@@ -146,6 +171,7 @@ export class ChunkTranslator {
           if (value === undefined) {
             a.returned = ''
             a.issues = []
+            problems.push(`${u.cueId}:MISSING`)
             continue
           }
           const issues = validateTranslation(u.unit, value, this.env.lexInline)
@@ -153,18 +179,25 @@ export class ChunkTranslator {
           else {
             a.returned = value
             a.issues = issues
+            problems.push(`${u.cueId}:${issues.map(formatIssue).join('+')}`)
           }
         }
-        if (accepted.length < pending.length)
+        if (parsed.truncated)
           this.env.log.warn(
-            `invalid lines in response: ${res.content.slice(0, RESPONSE_LOG_LIMIT)}`
+            `truncated response: recovered ${parsed.values.size}/${pending.length} lines ${describe(res)}`
           )
+        if (accepted.length < pending.length) {
+          this.env.log.warn(
+            `invalid lines in response: ${pending.length - accepted.length}/${pending.length} ` +
+              `[${problems.join(' ')}]` +
+              (parsed.extra.length ? ` extra=${parsed.extra.length}` : '') +
+              ` ${describe(res)}`
+          )
+          this.logContent(res)
+        }
       }
 
-      if (accepted.length) {
-        await this.sink.accept(accepted)
-        for (const e of accepted) this.env.known.set(e.unit.cueId, e.translated)
-      }
+      await this.acceptAll(accepted)
 
       const done = new Set(accepted.map((e) => e.unit.cueId))
       const next: HashedUnit[] = []
@@ -181,6 +214,17 @@ export class ChunkTranslator {
       }
       pending = next
     }
+  }
+
+  private async acceptAll(entries: { unit: HashedUnit; translated: string }[]): Promise<void> {
+    if (!entries.length) return
+    await this.sink.accept(entries)
+    for (const e of entries) this.env.known.set(e.unit.cueId, e.translated)
+  }
+
+  /** Texto da legenda só em `debug`. */
+  private logContent(res: OkResponse): void {
+    this.env.log.debug(`response content: ${res.content.slice(0, RESPONSE_LOG_LIMIT)}`)
   }
 
   private message(
@@ -225,6 +269,27 @@ export class ChunkTranslator {
     }
     return false
   }
+}
+
+type OkResponse = Extract<SessionResponse, { type: 'ok' }>
+
+/** Campos de diagnóstico de uma resposta (sem conteúdo da legenda). */
+export function describe(res: OkResponse): string {
+  return (
+    `model=${res.model} mode=${res.mode} finish=${res.finishReason ?? '-'} ` +
+    `out=${res.completionTokens ?? '?'} reasoning_tokens=${res.reasoningTokens ?? '?'} ` +
+    `reasoning_streamed=${res.reasoningChars > 0 ? `${res.reasoningChars}ch` : 'no'} ` +
+    `chars=${res.content.length}`
+  )
+}
+
+function formatIssue(i: Issue): string {
+  const extra = [
+    i.id !== undefined ? `id=${i.id}` : null,
+    i.expected !== undefined ? `expected=${i.expected}` : null,
+    i.actual !== undefined ? `actual=${i.actual}` : null
+  ].filter(Boolean)
+  return extra.length ? `${i.code}(${extra.join(',')})` : i.code
 }
 
 function halves<T>(xs: readonly T[]): T[][] {

@@ -7,7 +7,7 @@ import {
   type ChatResult,
   type GenerationCost
 } from './openrouter-client'
-import { initialOutputMode, OutputModeState, requestFormat } from './output-mode'
+import { initialOutputMode, OutputModeState, requestFormat, type OutputMode } from './output-mode'
 import type { Lease, RateLane, RateLimiter, WaitInfo } from './rate-limiter'
 import { decide, DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-policy'
 
@@ -75,6 +75,11 @@ export type SessionResponse =
       completionTokens: number | null
       /** Parte de `completionTokens` gasta em raciocínio; `null` quando não informada. */
       reasoningTokens: number | null
+      /** Para o diagnóstico de respostas inválidas. */
+      model: string
+      mode: OutputMode
+      /** Caracteres de `delta.reasoning` no stream (0 = nenhum). */
+      reasoningChars: number
     }
   | { type: 'moderated' }
 
@@ -114,6 +119,8 @@ export class LlmSession {
   private readonly outputMode: OutputModeState
   /** `reasoning` mandado em toda requisição (ver `planReasoning`); ausente = nada. */
   private readonly reasoning: ReasoningRequest | undefined
+  /** O corpo do primeiro erro HTTP desta sessão (= lane) já foi para o log. */
+  private errorBodyLogged = false
 
   constructor(
     private readonly deps: {
@@ -202,7 +209,10 @@ export class LlmSession {
           content: res.content,
           finishReason: res.finishReason,
           completionTokens: res.usage?.completionTokens ?? null,
-          reasoningTokens: res.usage?.reasoningTokens ?? null
+          reasoningTokens: res.usage?.reasoningTokens ?? null,
+          model: this.params.model.id,
+          mode,
+          reasoningChars: res.reasoningChars ?? 0
         }
       } catch (err) {
         // Libera antes de qualquer espera: backoff não segura vaga em voo de outras lanes.
@@ -212,6 +222,14 @@ export class LlmSession {
             : 'other'
         )
         if (!(err instanceof LlmError)) throw err
+        if (!this.errorBodyLogged && err.details.body !== undefined) {
+          // Uma vez por lane: o corpo costuma ser igual entre tentativas e lanes.
+          this.errorBodyLogged = true
+          this.deps.log.warn(
+            `chat failed body model=${this.params.model.id} mode=${mode} ` +
+              `status=${err.status ?? '-'}: ${err.details.body}`
+          )
+        }
         if (err.generationId && ['aborted', 'timeout', 'stream-error'].includes(err.kind))
           this.lookupCost(err.generationId)
         if (err.kind === 'unsupported-params') {

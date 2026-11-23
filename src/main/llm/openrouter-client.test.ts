@@ -70,8 +70,22 @@ describe('OpenRouterClient.chat', () => {
       content: '{"1":"olá"}',
       finishReason: 'stop',
       generationId: 'gen-1',
-      usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 4, cost: 0.0012 }
+      usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 4, cost: 0.0012 },
+      reasoningChars: 0
     })
+  })
+
+  it('conta os caracteres de delta.reasoning (raciocínio no stream)', async () => {
+    const thinking = {
+      object: 'chat.completion.chunk',
+      choices: [{ delta: { content: '', reasoning: 'Hmm, ' }, finish_reason: null }]
+    }
+    const f = vi.fn(async () =>
+      streamResponse([sse(thinking, thinking, chunk('{"1":"a"}', 'stop'), '[DONE]')])
+    )
+    const r = await client(f as unknown as typeof fetch).chat(req)
+    expect(r.reasoningChars).toBe(10)
+    expect(r.content).toBe('{"1":"a"}')
   })
 
   it('monta a requisição: stream, headers, response_format e require_parameters', async () => {
@@ -191,6 +205,9 @@ describe('OpenRouterClient.chat', () => {
     expect(err.kind).toBe(kind)
     expect(err.status).toBe(status)
     expect(err.message).not.toContain('SECRET')
+    // Corpo do erro guardado para o log, sem a key.
+    expect(err.details.body).toContain(`"code":${status}`)
+    expect(err.details.body).not.toContain('SECRET')
     if (status === 429 || status === 503) expect(err.retryAfterMs).toBe(2000)
   })
 

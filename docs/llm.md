@@ -78,7 +78,16 @@ A 404 on the last step fails the job with `LLM_NO_ENDPOINT`. The message says th
 
 Every request also carries the `reasoning` field chosen from the catalog (next section), or nothing for models without reasoning control.
 
-Always parsed with the same two layers: tolerant extraction (code fences, prose around, first balanced object) + Zod shape (extra ids ignored and logged; missing or non-string ids are failures), then `validateTranslation` per line.
+Always parsed with the same two layers (`response-parser.ts`): tolerant extraction + Zod shape (extra ids ignored and logged; missing or non-string ids are failures), then `validateTranslation` per line (tags stay strict: a changed `<gN>`, `<xN/>` or `<br/>` is never accepted).
+
+Accepted response shapes:
+
+| Shape                                                       | Result                                                                                             |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `{ "<id>": "<text>" }`, optionally in a code fence or prose | parsed (first balanced object)                                                                     |
+| truncated object, e.g. `{"95": "A.", "96": "B.", "97": "C`  | the complete `"id": "text"` pairs before the cut are kept (`truncated: true`); the rest is missing |
+
+Not accepted (fails with the problem in the log): empty content (`empty content`), a top-level array such as `[{"id":1,"text":"…"}]` (`top-level JSON array (expected an object)`), no `{` at all (`no JSON object`), a truncated object with no complete pair such as `{"96": "E` (`malformed or truncated JSON with no complete entry`). An object wrapped in another key (`{"translations":{…}}`) passes the shape but every id is missing (the wrapper key is logged as extra). These shapes were measured against the 2026-11-21…23 logs: only empty and truncated answers (Nemotron) occurred, so no other variant is tolerated until one shows up.
 
 ## Reasoning models
 
@@ -104,8 +113,9 @@ The client reads `usage.completion_tokens_details.reasoning_tokens` (`Usage.reas
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | line fails validation / missing from the answer           | accept the valid lines (written to the cache), repair only the failing ones; ≤ 3 attempts per line                          |
 | unparseable JSON                                          | counts as an attempt for every pending line; retried with the translate prompt                                              |
+| truncated JSON (single line, or `stop`)                   | complete pairs are validated like a normal answer; the cut ones count as missing and are repaired                           |
 | `finish_reason: length`, budget spent on reasoning        | same chunk again with `max_tokens` ×2, then ×4 (no split, no content attempt spent); still starved → `LLM_REASONING_BUDGET` |
-| `finish_reason: length`, long visible answer              | split the chunk in half (no content attempt spent)                                                                          |
+| `finish_reason: length`, long visible answer              | keep the complete, valid lines before the cut; split only the rest in half (no content attempt spent)                       |
 | moderation (403 / `content_filter`)                       | split until isolated (≤ 3 levels); blocked lines → `UNTRANSLATED_CONTENT_FILTERED`                                          |
 | 429                                                       | the whole lane cools down (`Retry-After`, else `X-RateLimit-Reset`, else backoff; ≤ 60 s); ≤ 5 attempts                     |
 | 429 free-model daily quota                                | fail the job: `LLM_DAILY_LIMIT` (reset time in the message)                                                                 |
@@ -142,7 +152,9 @@ Limits: needs a cased script in the source (Latin, Cyrillic, Greek); a rendering
 ## API key and logging
 
 - The key lives encrypted in SQLite (`SecretVault`, see [`database.md`](./database.md)) and is read on every request (`apiKey: () => Promise<string | null>`), so changing it in the UI needs no restart. Missing key → `LLM_AUTH` without any network call.
-- The client redacts the key (and any `sk-or-…` token) from every error message. Logs at `info` carry only metadata (model, ids count, finish reason, tokens, cost, status); responses that fail parsing/validation are logged truncated (2 KB) at `warn`; subtitle content otherwise only at `debug`.
+- The client redacts the key (and any `sk-or-…` token) from every error message. Logs at `info` carry only metadata (model, ids count, finish reason, tokens, cost, status); subtitle content only at `debug` (`response content: …`, truncated to 2 KB).
+- Every parse/validation failure logs one `warn` line with the diagnostics, no subtitle text: `model=… mode=json_schema_strict|json_schema|json_object|prompt finish=… out=<completion tokens> reasoning_tokens=… reasoning_streamed=<chars of delta.reasoning>|no chars=<content length>`. Prefixes: `unparseable response (<problem>)`, `invalid lines in response: n/m [<id>:<ISSUE_CODE>(id=…,expected=…,actual=…) <id>:MISSING …]`, `truncated response: recovered|kept n/m lines`.
+- The first HTTP error of each lane (one `LlmSession`) also logs its body, redacted and cut at 2 KB: `chat failed body model=… mode=… status=…: …`.
 - Request headers: `Authorization`, `Content-Type`, `X-OpenRouter-Title: BakaSub`. No `HTTP-Referer` (attribution only).
 
 ## Open points

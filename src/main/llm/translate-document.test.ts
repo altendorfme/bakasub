@@ -6,6 +6,7 @@ import { analyzeCoverage, type SubtitleDocument } from '../parsers'
 import { srtFormat } from '../parsers/srt'
 import type { ModelInfo } from './model-catalog'
 import { LlmError, type ChatRequest, type ChatResult } from './openrouter-client'
+import type { LlmLog } from './llm-session'
 import { RateLimiter } from './rate-limiter'
 import {
   DEFAULT_RETRY_SETTINGS,
@@ -219,7 +220,7 @@ describe('translateDocument', () => {
     expect(r.status).toBe('completed')
   })
 
-  it('length com resposta longa e válida até o corte continua dividindo (com reasoning_tokens)', async () => {
+  it('length com resposta longa e válida até o corte: aceita as linhas completas e refaz só a cortada', async () => {
     const long = (req: ChatRequest): ChatResult => ({
       ...echo(req),
       content: echo(req).content.slice(0, -10),
@@ -234,7 +235,8 @@ describe('translateDocument', () => {
     })
     const d = deps((req, call) => (call === 1 ? long(req) : echo(req)))
     const r = await translateDocument(input(longSrt(8)), d)
-    expect(d.calls.map((c) => targetLines(c).size)).toEqual([8, 4, 4])
+    // As 7 primeiras fecharam antes do corte; só a 8ª volta (sozinha, sem dividir de novo).
+    expect(d.calls.map((c) => [...targetLines(c).keys()])).toEqual([[1, 2, 3, 4, 5, 6, 7, 8], [8]])
     expect(r.status).toBe('completed')
   })
 
@@ -864,5 +866,99 @@ describe('translateDocument em lanes', () => {
     expect(last.timeline!.cached).toEqual([[80, 160]])
     expect(last.timeline!.translated).toEqual([[0, 80]])
     expect(last.timeline!.lanes).toHaveLength(1)
+  })
+})
+
+describe('translateDocument: diagnóstico de respostas inválidas', () => {
+  const recorder = (): { log: LlmLog; lines: { level: string; msg: string }[] } => {
+    const lines: { level: string; msg: string }[] = []
+    const at =
+      (level: string) =>
+      (msg: string): void => {
+        lines.push({ level, msg })
+      }
+    return { lines, log: { info: at('info'), warn: at('warn'), debug: at('debug') } }
+  }
+  const warns = (lines: { level: string; msg: string }[], prefix: string): string[] =>
+    lines.filter((l) => l.level === 'warn' && l.msg.startsWith(prefix)).map((l) => l.msg)
+
+  it('resposta vazia: warn com modelo, modo, finish, tokens, tamanho e raciocínio; conteúdo só em debug', async () => {
+    const { log, lines } = recorder()
+    const d = deps(
+      (req, call) =>
+        call === 1
+          ? {
+              content: '',
+              finishReason: 'stop',
+              generationId: 'g',
+              usage: { promptTokens: 10, completionTokens: 37, cachedTokens: 0, cost: 0 },
+              reasoningChars: 120
+            }
+          : echo(req),
+      { log }
+    )
+    await translateDocument(input(srt('Hello there friend.')), d)
+    expect(warns(lines, 'unparseable response')).toEqual([
+      'unparseable response (empty content) model=a/b mode=json_schema_strict finish=stop ' +
+        'out=37 reasoning_tokens=? reasoning_streamed=120ch chars=0'
+    ])
+  })
+
+  it('linhas inválidas: warn com o problema de cada linha, sem texto da legenda', async () => {
+    const { log, lines } = recorder()
+    const d = deps(
+      (req, call) =>
+        call === 1 ? ok('{"1":"PT secreto sem tags","2":"PT Bye now friend."}') : echo(req),
+      { log }
+    )
+    await translateDocument(input(srt('Hello <i>world</i>, my friend.', 'Bye now friend.')), d)
+    const [w] = warns(lines, 'invalid lines in response')
+    expect(w).toMatch(/^invalid lines in response: 1\/2 \[1:MISSING_MARKER[^\]]*\] model=a\/b /)
+    expect(w).toContain('finish=stop out=5')
+    expect(
+      lines
+        .filter((l) => l.level !== 'debug')
+        .map((l) => l.msg)
+        .join('\n')
+    ).not.toContain('secreto')
+    expect(lines.some((l) => l.level === 'debug' && l.msg.includes('secreto'))).toBe(true)
+  })
+
+  it('JSON truncado de uma linha com o valor completo (caso do Nemotron) é aceito sem reparo', async () => {
+    const { log, lines } = recorder()
+    const d = deps(() => ok('{"1":"PT Hello there friend."', 'length'), { log })
+    const r = await translateDocument(input(srt('Hello there friend.')), d)
+    expect(d.calls).toHaveLength(1)
+    expect(r.status).toBe('completed')
+    expect(warns(lines, 'truncated response')).toEqual([
+      expect.stringMatching(/^truncated response: recovered 1\/1 lines model=a\/b .*finish=length/)
+    ])
+  })
+
+  it('JSON truncado sem par completo ({"96": "E): falha descrita e a linha volta', async () => {
+    const { log, lines } = recorder()
+    const d = deps((req, call) => (call === 1 ? ok('{"1": "E', 'length') : echo(req)), { log })
+    const r = await translateDocument(input(srt('Hello there friend.')), d)
+    expect(d.calls).toHaveLength(2)
+    expect(r.status).toBe('completed')
+    expect(warns(lines, 'unparseable response')).toEqual([
+      expect.stringContaining('(malformed or truncated JSON with no complete entry) model=a/b')
+    ])
+  })
+
+  it('corpo do erro HTTP só na primeira falha da lane', async () => {
+    const { log, lines } = recorder()
+    const d = deps(
+      (req, call) => {
+        if (call <= 2)
+          throw new LlmError('server', 'boom', { status: 500, body: '{"error":{"code":500}}' })
+        return echo(req)
+      },
+      { log }
+    )
+    await translateDocument(input(srt('Hello there friend.')), d)
+    expect(warns(lines, 'chat failed body')).toEqual([
+      'chat failed body model=a/b mode=json_schema_strict status=500: {"error":{"code":500}}'
+    ])
   })
 })
