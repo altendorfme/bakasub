@@ -108,14 +108,24 @@ export class JobMemoryService {
   async lookupDocument(
     doc: SubtitleDocument<unknown>,
     ctx: MemoryContext,
-    /** `peek`: consulta sem marcar uso (preflight); um preflight cancelado não segura entradas. */
-    options: { peek?: boolean } = {}
+    options: {
+      /** Consulta sem marcar uso (preflight); um preflight cancelado não segura entradas. */
+      peek?: boolean
+      /**
+       * Job com "ignorar traduções salvas": nenhum hit (nem consulta ao banco), tudo é miss. As
+       * cópias continuam agrupadas: o mesmo context hash é a mesma linha do cache, e a gravação
+       * do representante sobrescreve a entrada antiga.
+       */
+      skip?: boolean
+    } = {}
   ): Promise<DocumentLookup> {
     const units = computeContextHashes(doc, { sourceLang: ctx.sourceLang })
-    const rows = await this.repo.lookupMany(
-      ctx.key,
-      units.map((u) => u.hash)
-    )
+    const rows = options.skip
+      ? new Map<string, never>()
+      : await this.repo.lookupMany(
+          ctx.key,
+          units.map((u) => u.hash)
+        )
 
     const hits = new Map<number, MemoryHitResult>()
     const misses: HashedUnit[] = []

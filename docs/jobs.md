@@ -75,7 +75,7 @@ queued → running(step) → [awaiting-confirmation] → completed | completed-w
 
 ## Retry, cancel, remove
 
-- `jobs:retry` (failed / cancelled / interrupted): back to `queued`, `attempt + 1`. The runner resumes at the **first step whose artifact does not verify** (`artifacts.ts`: probe info, extracted and translated files with size + sha256); everything from there on is redone. Outputs (`write`, `mux`) are always redone. Translation is cheap anyway thanks to the Job Memory.
+- `jobs:retry` (failed / cancelled / interrupted): back to `queued`, `attempt + 1`. The runner resumes at the **first step whose artifact does not verify** (`artifacts.ts`: probe info, extracted and translated files with size + sha256); everything from there on is redone. Outputs (`write`, `mux`) are always redone. Translation is cheap anyway thanks to the Job Memory. The retry keeps the job's `memory` choice; `jobs:retry { id, memory }` can switch it, which also drops the `preflight` and `translate` artifacts (see [`job-memory.md`](./job-memory.md)).
 - `jobs:cancel`: queued → `cancelled` directly; running → abort (LLM request and backoff, child processes); a translation already paid for is still written to the cache.
 - `jobs:remove`: terminal jobs only; deletes the row and the work dir.
 - `jobs:clear-completed`: the queue's "Clear finished". Deletes every `completed`, `completed-with-warnings` and `cancelled` job in one `DELETE … WHERE id IN (…)`, then their work dirs (a dir that fails to go is collected later as an orphan). Failed and interrupted jobs stay, since they still need a decision.

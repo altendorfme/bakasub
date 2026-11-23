@@ -1,4 +1,4 @@
-import type { JobProgress, JobResult } from '../../shared/ipc-contract'
+import type { JobMemoryMode, JobProgress, JobResult } from '../../shared/ipc-contract'
 import type { TranslateProgress, TranslateResult } from '../llm/translate-document'
 import type { MkvToolnix } from '../media/mkvtoolnix-service'
 import type { InlineLexer, SubtitleDocument } from '../parsers'
@@ -17,6 +17,8 @@ export interface SubtitleTranslator {
       media?: string
       /** Obra na chave do Job Memory (`mediaScope`). */
       mediaScope?: string
+      /** `skip`: ignorar as traduções salvas. */
+      memory?: JobMemoryMode
       targetLang: string
       sourceLang?: string
     },

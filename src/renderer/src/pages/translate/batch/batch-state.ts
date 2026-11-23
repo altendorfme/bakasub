@@ -4,6 +4,7 @@ import type {
   BatchKind,
   BatchPlan,
   BatchSource,
+  JobMemoryMode,
   OutputMode
 } from '@shared/ipc-contract'
 import { NOTES_MAX } from '../wizard-state'
@@ -44,6 +45,8 @@ export interface BatchOptions extends WorkSettings {
   overwrite: boolean
   mux: { setDefault: boolean; keepOriginalSubtitles: boolean }
   confirmBeforeTranslate: boolean
+  /** `skip` = "Ignore saved translations" for every job of the batch. */
+  memory: JobMemoryMode
 }
 
 export interface BatchWizardState {
@@ -75,7 +78,8 @@ export const initialBatchWizard: BatchWizardState = {
     outputMode: null,
     overwrite: false,
     mux: { setDefault: true, keepOriginalSubtitles: true },
-    confirmBeforeTranslate: true
+    confirmBeforeTranslate: true,
+    memory: 'use'
   },
   draw: 0
 }
@@ -257,7 +261,8 @@ export function buildBatchRequest(
     ...(notes ? { notes } : {}),
     ...(o.outputDir ? { outputDir: o.outputDir } : {}),
     ...writeOptions(plan.kind, o, defaultMode),
-    confirmBeforeTranslate: o.confirmBeforeTranslate
+    confirmBeforeTranslate: o.confirmBeforeTranslate,
+    ...(o.memory === 'skip' ? { memory: 'skip' as const } : {})
   }
 }
 

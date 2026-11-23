@@ -22,6 +22,7 @@ import { outputFolder, translateOutputNames } from '@renderer/lib/output-names'
 import { usePageReducer, usePageState } from '@renderer/lib/page-state'
 import { presetLabel } from '@renderer/lib/preset-labels'
 import { suggestPreset } from '@renderer/lib/preset-suggestion'
+import { MemoryOption } from '@renderer/components/jobs/memory-option'
 import { OutputStep } from './output-step'
 import { PresetStep } from './preset-step'
 import { suggestionHint } from './suggestion-hint'
@@ -241,6 +242,12 @@ export function TranslatePage({
                       onMode={(m) => dispatch({ type: 'set', patch: { outputMode: m } })}
                       onMux={(patch) => dispatch({ type: 'mux', patch })}
                       onOverwrite={(overwrite) => dispatch({ type: 'set', patch: { overwrite } })}
+                    />
+                  ) : null}
+                  {state.step === 'output' ? (
+                    <MemoryOption
+                      value={state.memory}
+                      onChange={(memory) => dispatch({ type: 'set', patch: { memory } })}
                     />
                   ) : null}
 

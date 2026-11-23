@@ -267,6 +267,16 @@ describe('batch output mode', () => {
     expect(req(false)).not.toHaveProperty('options')
     expect(req(true).options).toEqual({ overwrite: true })
   })
+
+  it('ignore saved translations applies to the whole batch', () => {
+    expect(initialBatchWizard.options.memory).toBe('use')
+    expect(buildBatchRequest(plan, rows, g, initialBatchWizard.options)).not.toHaveProperty(
+      'memory'
+    )
+    expect(
+      buildBatchRequest(plan, rows, g, { ...initialBatchWizard.options, memory: 'skip' })
+    ).toMatchObject({ memory: 'skip' })
+  })
 })
 
 describe('outputs of an earlier translation', () => {

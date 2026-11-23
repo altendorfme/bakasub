@@ -60,6 +60,18 @@ with speaker: hash = sha256_hex("v2" + "\x01" + speaker + "\0" + prev + "\0" + n
 - Shutdown: the `job-memory` disposer (registered after `database`, LIFO) refuses new writes and awaits in-flight ones before the database closes.
 - Hits update `last_used_at` in one batched `UPDATE` per lookup, except with `{ peek: true }` (the preflight): a cancelled preflight must not keep stale entries alive.
 
+## Ignoring saved translations (`memory: 'skip'`)
+
+A cached translation can be wrong (gender, a term, the style) and the key cannot tell: same file, same model, same prompt. Pruning everything would be destructive for every other file and is refused while a job runs, so each `translate` / `pipeline` job has `memory: 'use' | 'skip'` (`JobCreateRequest`, `BatchCreateRequest` for the whole batch), frozen in the spec (`spec.memory`; absent on older jobs = `use`, read with `jobMemoryMode`).
+
+- `lookupDocument(doc, ctx, { skip: true })` does not query the table: every translatable cue is a miss. Copies are still grouped (same context hash = same cache row), so motion-tracked signs still cost one line.
+- Writes are unchanged: `commitChunk` upserts every validated chunk, so the new translation **replaces** the old entry under the same key. A later job with `use` hits the corrected text. The cache is fixed, not only bypassed.
+- No `touch` (there are no hits). The key is the same as with `use`: `skip` is not part of it.
+- The preflight passes the same flag (estimate with 0 hits, full cost) and the result carries `cache.skipped: true`; the job DTO exposes `memory` (see [`preflight.md`](./preflight.md), [`ipc.md`](./ipc.md)).
+- Retry keeps the original choice; `jobs:retry { id, memory }` can switch it, and switching drops the `preflight` and `translate` artifacts (both depend on it). During the review, `jobs:set-memory` switches it and re-runs only the preflight.
+
+Out of scope: pruning by file or by model, ignoring only selected lines.
+
 ## Size and prune
 
 - `stats()`: rows, real on-disk bytes of the table + indexes (`dbstat`), oldest `last_used_at`.

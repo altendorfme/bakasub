@@ -108,6 +108,7 @@ export function createJobModule(o: JobModuleOptions): {
           },
           media: input.media,
           mediaScope: input.mediaScope,
+          memory: input.memory,
           targetLang: input.targetLang,
           sourceLang: input.sourceLang
         },

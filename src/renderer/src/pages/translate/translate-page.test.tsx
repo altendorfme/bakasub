@@ -121,10 +121,25 @@ function setup(
   fake: FakeApi
   create: ReturnType<typeof vi.fn>
   confirm: ReturnType<typeof vi.fn>
+  setMemory: ReturnType<typeof vi.fn>
+  retry: ReturnType<typeof vi.fn>
+  update: (over: Partial<Job>) => void
 } {
   let current = job({})
+  let preflightEstimate = estimate
   const create = vi.fn(async (req: JobCreateRequest) => {
-    current = job({ kind: req.kind })
+    const memory = 'memory' in req && req.memory ? req.memory : 'use'
+    current = job({ kind: req.kind, memory })
+    preflightEstimate = { ...estimate, memory }
+    return { ok: true as const, data: current }
+  })
+  const setMemory = vi.fn(async (_id: string, memory: 'use' | 'skip') => {
+    current = { ...current, memory, status: 'queued', result: null }
+    preflightEstimate = { ...estimate, memory }
+    return { ok: true as const, data: current }
+  })
+  const retry = vi.fn(async (_id: string, memory?: 'use' | 'skip') => {
+    current = { ...current, memory: memory ?? current.memory, status: 'queued' }
     return { ok: true as const, data: current }
   })
   const confirm = vi.fn(async () => {
@@ -136,8 +151,10 @@ function setup(
       list: () => ok([]),
       create,
       confirm,
+      setMemory,
+      retry,
       get: () => ok(current),
-      preflight: () => ok({ estimate, coverage })
+      preflight: () => ok({ estimate: preflightEstimate, coverage })
     },
     sidecars: {
       check: () =>
@@ -212,7 +229,16 @@ function setup(
     history: createMemoryHistory({ initialEntries: ['/translate'] })
   })
   render(<App queryClient={queryClient} router={router} />)
-  return { fake, create, confirm }
+  return {
+    fake,
+    create,
+    confirm,
+    setMemory,
+    retry,
+    update: (over) => {
+      current = { ...current, ...over }
+    }
+  }
 }
 
 afterEach(cleanup)
@@ -278,6 +304,39 @@ describe('Translate a file', () => {
     })
     expect(await screen.findByText(/120 of 280 lines · 2 of 7 parts/)).toBeTruthy()
     expect(screen.getByText(/Paused after a rate limit · \d s/)).toBeTruthy()
+  })
+
+  it('ignore saved translations: wizard, preflight review (re-estimate) and retry', async () => {
+    const { fake, create, setMemory, retry, update } = setup('/subs/ep01.en.srt')
+    await openSingle()
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await next()
+    await next()
+    const option = await screen.findByRole('checkbox', { name: 'Ignore saved translations' })
+    expect((option as HTMLButtonElement).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByText(/reused at no cost/)).toBeTruthy()
+    await userEvent.click(option)
+    expect(screen.getByText(/new translations replace the saved ones/)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Estimate cost' }))
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ memory: 'skip' }))
+
+    // Review: the estimate says the cache is ignored; switching back re-estimates.
+    expect(await screen.findByText(/cache ignored/)).toBeTruthy()
+    expect(screen.getByText('Saved translations ignored')).toBeTruthy()
+    const review = screen.getByRole('checkbox', { name: 'Ignore saved translations' })
+    expect(review.getAttribute('aria-checked')).toBe('true')
+    await userEvent.click(review)
+    expect(setMemory).toHaveBeenCalledWith('j1', 'use')
+
+    // Failed: the retry starts from the job's choice and can switch it.
+    update({ status: 'failed', memory: 'skip', error: { code: 'LLM_UNAVAILABLE', message: 'x' } })
+    fake.emit('jobs:progress', { id: 'j1', status: 'failed', progress: { step: 'translate' } })
+    await screen.findByRole('button', { name: 'Retry' })
+    const again = screen.getByRole('checkbox', { name: 'Ignore saved translations' })
+    expect(again.getAttribute('aria-checked')).toBe('true')
+    await userEvent.click(again)
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledWith('j1', 'use')
   })
 
   it('video: subtitle-only output hides the mux options and previews the file name', async () => {

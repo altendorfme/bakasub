@@ -8,6 +8,7 @@ import { translationInput } from './translation-input'
  */
 export const preflightStep: Step = async (ctx) => {
   const input = await translationInput(ctx)
+  const reviewing = ctx.artifacts.reestimate === true
   const { estimate, coverage } = await ctx.deps.preflight.run(
     {
       doc: input.doc,
@@ -15,6 +16,7 @@ export const preflightStep: Step = async (ctx) => {
       preset: input.preset,
       media: input.media,
       mediaScope: input.mediaScope,
+      memory: input.memory,
       targetLang: input.targetLang,
       sourceLang: input.sourceLang
     },
@@ -38,9 +40,10 @@ export const preflightStep: Step = async (ctx) => {
       ...estimate,
       decision:
         // Tudo em cache também para: a revisão mostra a cobertura e que nada vai ao LLM.
-        !confirm || (cheap && !shortQuota) ? 'auto-confirmed' : 'needs-confirmation'
+        !confirm || (cheap && !shortQuota && !reviewing) ? 'auto-confirmed' : 'needs-confirmation'
     },
     coverage,
     prompt: summarizePrompt(input)
   }
+  delete ctx.artifacts.reestimate
 }

@@ -521,6 +521,12 @@ export const common = {
     cancel: 'Cancel job',
     cancelHint: 'Some providers keep generating (and billing) the request already in progress.',
     retry: 'Retry',
+    memory: {
+      option: 'Ignore saved translations',
+      off: 'Lines already in the translation cache are reused at no cost.',
+      on: 'Every line goes to the AI again. The new translations replace the saved ones, so the cache is fixed for next time.',
+      skipped: 'Saved translations ignored'
+    },
     openQueue: 'Open in Queue',
     logs: 'Show logs',
     subtitleFile: 'Subtitle saved to',
@@ -598,6 +604,7 @@ export const common = {
     approximate: 'Approximate: this model counts tokens differently from BakaSub.',
     model: 'Model {{model}}, prices from {{date}}',
     nothing: 'Everything is already in the translation cache: nothing will be sent to the AI.',
+    cacheSkipped: 'cache ignored',
     quotaShort:
       'This needs about {{requests}} free-model requests and you have {{remaining}} left today. The job may stop when the daily limit is reached; what is translated by then is kept.',
     quotaUnknown: 'Free models have a daily limit and BakaSub could not check how much is left.',

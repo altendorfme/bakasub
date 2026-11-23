@@ -528,6 +528,12 @@ export const common: LocaleShape<typeof en> = {
     cancel: 'Cancelar job',
     cancelHint: 'Alguns provedores continuam gerando (e cobrando) a requisição já em andamento.',
     retry: 'Tentar de novo',
+    memory: {
+      option: 'Ignorar traduções salvas',
+      off: 'As falas que já estão no cache de tradução são reaproveitadas sem custo.',
+      on: 'Todas as falas vão para a IA de novo. As traduções novas substituem as salvas, então o cache fica corrigido para a próxima vez.',
+      skipped: 'Traduções salvas ignoradas'
+    },
     openQueue: 'Abrir na fila',
     logs: 'Ver logs',
     subtitleFile: 'Legenda salva em',
@@ -606,6 +612,7 @@ export const common: LocaleShape<typeof en> = {
     approximate: 'Aproximado: este modelo conta tokens de um jeito diferente do BakaSub.',
     model: 'Modelo {{model}}, preços de {{date}}',
     nothing: 'Tudo já está no cache de tradução: nada será enviado para a IA.',
+    cacheSkipped: 'cache ignorado',
     quotaShort:
       'Isto precisa de cerca de {{requests}} requisições de modelos gratuitos e restam {{remaining}} hoje. O job pode parar quando o limite diário for atingido; o que já tiver sido traduzido fica salvo.',
     quotaUnknown:

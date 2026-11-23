@@ -8,6 +8,7 @@ export type NewJob = Pick<typeof jobs.$inferInsert, 'id' | 'kind' | 'spec' | 'st
 export type JobPatch = Partial<
   Pick<
     typeof jobs.$inferInsert,
+    | 'spec'
     | 'status'
     | 'step'
     | 'progress'

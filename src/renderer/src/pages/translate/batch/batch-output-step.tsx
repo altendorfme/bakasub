@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { MemoryOption } from '@renderer/components/jobs/memory-option'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { useOutputPrefs } from '@renderer/data/output-prefs'
 import { useSettings } from '@renderer/data/settings'
@@ -70,6 +71,7 @@ export function BatchOutputStep({ ctx }: { ctx: BatchCtx }): React.JSX.Element {
           <p className="pl-6.5 text-xs text-muted-foreground">{t('batch.output.confirmOff')}</p>
         ) : null}
       </div>
+      <MemoryOption value={o.memory} onChange={(memory) => ctx.setOptions({ memory })} />
 
       <section
         aria-labelledby="batch-review"

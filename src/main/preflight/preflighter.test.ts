@@ -170,4 +170,28 @@ describe('Preflighter e translateDocument: mesma chave do Job Memory', () => {
     expect(calls).toHaveLength(2)
     expect((await memory.stats()).rows).toBe(2)
   })
+
+  it("memory 'skip': 0 hits e o mesmo custo cheio de um cache vazio", async () => {
+    const run = (memoryMode?: 'use' | 'skip'): ReturnType<Preflighter['run']> =>
+      pf().run({
+        doc,
+        format: srtFormat,
+        preset,
+        targetLang: 'pt-BR',
+        ...(memoryMode ? { memory: memoryMode } : {})
+      })
+    const cold = (await run()).estimate
+    expect(cold.memory).toBe('use')
+    await translate()
+    const warm = (await run('use')).estimate
+    expect(warm.lines.cached).toBe(1)
+    expect(warm.cost).toEqual({ low: 0, high: 0 })
+
+    const skipped = (await run('skip')).estimate
+    expect(skipped.memory).toBe('skip')
+    expect(skipped.lines).toEqual({ ...cold.lines, cached: 0 })
+    expect(skipped.tokens).toEqual(cold.tokens)
+    expect(skipped.cost).toEqual(cold.cost)
+    expect(skipped.cost!.high).toBeGreaterThan(0)
+  })
 })

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { TEST_PRESET, testPresetSource } from '../presets/test-presets'
 import { AppError } from '../errors'
-import { resolveJobSpec } from './job-spec'
+import { jobMemoryMode, resolveJobSpec } from './job-spec'
 
 let dir: string
 const presets = testPresetSource()
@@ -38,8 +38,30 @@ describe('resolveJobSpec', () => {
       targetLang: 'pt-BR',
       sourceLang: 'en',
       outputDir: dir,
-      confirmBeforeTranslate: true
+      confirmBeforeTranslate: true,
+      memory: 'use'
     })
+  })
+
+  it("memory: 'skip' congelado no spec; valor desconhecido é INVALID_INPUT", async () => {
+    const base = {
+      kind: 'translate' as const,
+      source: join(dir, 'ep01.en.srt'),
+      presetId: 'p-test'
+    }
+    expect(await resolveJobSpec({ ...base, memory: 'skip' }, presets)).toMatchObject({
+      memory: 'skip'
+    })
+    await expect(
+      resolveJobSpec({ ...base, memory: 'clear' } as never, presets)
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+
+  it('jobMemoryMode: jobs antigos sem o campo = use; jobs que não traduzem = undefined', () => {
+    expect(jobMemoryMode({ kind: 'translate' })).toBe('use')
+    expect(jobMemoryMode({ kind: 'pipeline', memory: 'skip' })).toBe('skip')
+    expect(jobMemoryMode({ kind: 'extract' })).toBeUndefined()
+    expect(jobMemoryMode(null)).toBeUndefined()
   })
 
   it('pipeline: opções padrão; sourceLang explícito canonizado', async () => {
@@ -64,7 +86,8 @@ describe('resolveJobSpec', () => {
       setDefault: true,
       keepOriginalSubtitles: true,
       outputMode: 'mux',
-      confirmBeforeTranslate: true
+      confirmBeforeTranslate: true,
+      memory: 'use'
     })
   })
 

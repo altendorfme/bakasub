@@ -301,6 +301,107 @@ describe('JobManager', () => {
     expect(pending[2].input.artifacts.preflight?.estimate.decision).toBe('confirmed')
   })
 
+  describe('memory (ignorar traduções salvas)', () => {
+    const estimate = {
+      model: { id: 'a/b', pricing: null, catalogFetchedAt: null },
+      approximate: true,
+      lines: { total: 1, cached: 1, toTranslate: 0, copies: 0, chunks: 0 },
+      tokens: { input: { low: 0, high: 0 }, output: { low: 0, high: 0 } },
+      cost: null,
+      decision: 'needs-confirmation' as const
+    }
+    const specMemory = async (id: string): Promise<unknown> =>
+      ((await repo.get(id))!.spec as { memory?: string }).memory
+
+    it("congela no spec (padrão 'use') e expõe no job", async () => {
+      expect((await manager.create(req())).memory).toBe('use')
+      expect((await manager.create({ ...req(), memory: 'skip' } as JobCreateRequest)).memory).toBe(
+        'skip'
+      )
+      expect(await specMemory('job-2')).toBe('skip')
+    })
+
+    it('retry herda a escolha original; trocar descarta preflight e tradução', async () => {
+      await manager.create({ ...req(), memory: 'skip' } as JobCreateRequest)
+      await tick()
+      const translated = {
+        file: { path: '/w/t.srt', size: 1, sha256: 'x', format: 'srt' as const },
+        failedLines: [],
+        usage: { requests: 1, promptTokens: 1, completionTokens: 1, cachedTokens: 0, cost: 0 },
+        cache: { hits: 0, misses: 1, skipped: true }
+      }
+      const artifacts = {
+        probe: { tracks: [] },
+        preflight: { estimate, coverage: { byReason: {} } as never },
+        translate: translated as never
+      }
+      await pending[0].hooks.onArtifacts(artifacts)
+      pending[0].reject(
+        new StepFailure('write', new AppError('LLM_UNAVAILABLE', 'x'), {
+          outputs: [],
+          warnings: []
+        })
+      )
+      await tick()
+
+      expect((await manager.retry('job-1')).memory).toBe('skip')
+      await tick()
+      expect(pending[1].input.spec).toMatchObject({ memory: 'skip' })
+      expect(pending[1].input.artifacts).toEqual(artifacts)
+      pending[1].reject(
+        new StepFailure('write', new AppError('LLM_UNAVAILABLE', 'x'), {
+          outputs: [],
+          warnings: []
+        })
+      )
+      await tick()
+
+      expect((await manager.retry('job-1', 'use')).memory).toBe('use')
+      await tick()
+      expect(pending[2].input.spec).toMatchObject({ memory: 'use' })
+      expect(pending[2].input.artifacts).toEqual({ probe: { tracks: [] } })
+    })
+
+    it('retry com memory num job que não traduz: INVALID_INPUT', async () => {
+      writeFileSync(join(root, 'a.mkv'), 'x')
+      await manager.create({ kind: 'extract', source: join(root, 'a.mkv'), trackIds: [1] })
+      await tick()
+      pending[0].reject(
+        new StepFailure('extract', new AppError('EXTRACT_FAILED', 'x'), {
+          outputs: [],
+          warnings: []
+        })
+      )
+      await tick()
+      expect((await manager.get('job-1')).memory).toBeUndefined()
+      await expect(manager.retry('job-1', 'skip')).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    })
+
+    it('revisão: setMemory refaz só o preflight e força nova confirmação', async () => {
+      await manager.create(req())
+      await tick()
+      await pending[0].hooks.onArtifacts({
+        preflight: { estimate, coverage: { byReason: {} } as never }
+      })
+      pending[0].resolve({
+        status: 'awaiting-confirmation',
+        result: { outputs: [], warnings: [], preflight: estimate }
+      })
+      await until(async () => (await manager.get('job-1')).status === 'awaiting-confirmation')
+
+      // Mesma escolha: nada muda.
+      expect((await manager.setMemory('job-1', 'use')).status).toBe('awaiting-confirmation')
+      const j = await manager.setMemory('job-1', 'skip')
+      expect(j).toMatchObject({ status: 'queued', memory: 'skip', result: null })
+      await until(() => pending.length === 2)
+      expect(pending[1].input.spec).toMatchObject({ memory: 'skip' })
+      expect(pending[1].input.artifacts).toEqual({ reestimate: true })
+      await expect(manager.setMemory('job-1', 'use')).rejects.toMatchObject({
+        code: 'JOB_INVALID_STATE'
+      })
+    })
+  })
+
   it('dismissConsistency grava a flag no resultado de um job terminal com relatório', async () => {
     const consistency = {
       analyzedCues: 1,

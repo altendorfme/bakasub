@@ -1,4 +1,4 @@
-import type { PromptSummary } from '../../../shared/ipc-contract'
+import type { JobMemoryMode, PromptSummary } from '../../../shared/ipc-contract'
 import { AppError } from '../../errors'
 import { buildMediaContext } from '../../media-context/media-block'
 import { mediaScope } from '../../memory/memory-key'
@@ -18,6 +18,8 @@ export interface TranslationInput {
   readonly mediaSources: PromptSummary['media']
   /** Obra (TMDB) congelada no job, para a chave do Job Memory; `''` sem obra. */
   readonly mediaScope: string
+  /** `skip`: ignorar as traduções salvas (tudo vai ao LLM; as novas sobrescrevem). */
+  readonly memory: JobMemoryMode
   readonly targetLang: string
   readonly sourceLang?: string
 }
@@ -58,6 +60,7 @@ export async function translationInput(ctx: StepContext): Promise<TranslationInp
       ...(spec.mediaUnavailable ? { unavailable: spec.mediaUnavailable } : {})
     },
     mediaScope: mediaScope(spec.media?.details),
+    memory: spec.memory === 'skip' ? 'skip' : 'use',
     targetLang: spec.targetLang,
     ...(sourceLang ? { sourceLang } : {})
   }

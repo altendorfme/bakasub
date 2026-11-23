@@ -1,4 +1,4 @@
-import type { JobCreateRequest, OutputMode } from '@shared/ipc-contract'
+import type { JobCreateRequest, JobMemoryMode, OutputMode } from '@shared/ipc-contract'
 import { noMedia, type MediaChoice } from '@renderer/components/media/media-choice'
 import { sourceKindOf, type SourceKind } from '@shared/file-types'
 
@@ -20,6 +20,8 @@ export interface WizardState {
   /** Replace a file that already has the output name instead of writing ` (2)`. */
   overwrite: boolean
   mux: { setDefault: boolean; keepOriginalSubtitles: boolean }
+  /** `skip` = "Ignore saved translations" (off by default). */
+  memory: JobMemoryMode
   media: MediaChoice
   /** Furthest step reached: completed steps can be revisited from the step bar. */
   furthest: number
@@ -39,6 +41,7 @@ export const initialWizard: WizardState = {
   outputMode: null,
   overwrite: false,
   mux: { setDefault: true, keepOriginalSubtitles: true },
+  memory: 'use',
   media: noMedia,
   furthest: 0,
   notice: null
@@ -58,7 +61,14 @@ export type WizardAction =
       patch: Partial<
         Pick<
           WizardState,
-          'presetId' | 'model' | 'targetLang' | 'notes' | 'outputDir' | 'outputMode' | 'overwrite'
+          | 'presetId'
+          | 'model'
+          | 'targetLang'
+          | 'notes'
+          | 'outputDir'
+          | 'outputMode'
+          | 'overwrite'
+          | 'memory'
         >
       >
     }
@@ -180,7 +190,8 @@ export function buildJobRequest(
     ...(s.notes.trim() ? { notes: s.notes.trim() } : {}),
     ...(s.outputDir ? { outputDir: s.outputDir } : {}),
     ...mediaRequest(s.media),
-    confirmBeforeTranslate: true
+    confirmBeforeTranslate: true,
+    ...(s.memory === 'skip' ? { memory: 'skip' as const } : {})
   }
   const write = s.overwrite ? { overwrite: true } : {}
   if (s.file.kind === 'subtitle')

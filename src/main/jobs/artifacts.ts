@@ -33,6 +33,11 @@ export interface Artifacts {
     /** System Prompt e blocos enviados (ausente em jobs anteriores a este campo). */
     prompt?: import('../../shared/ipc-contract').PromptSummary
   }
+  /**
+   * Preflight refeito a pedido da revisão (`jobs:set-memory`): a nova estimativa sempre para
+   * para confirmação, mesmo abaixo de `preflight.autoConfirmBelowUsd`. Consumido pelo preflight.
+   */
+  reestimate?: true
   validate?: { ok: true }
   write?: { outputs: string[] }
   mux?: { output: string; warnings: string[] }
