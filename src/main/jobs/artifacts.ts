@@ -38,6 +38,12 @@ export interface Artifacts {
    * para confirmação, mesmo abaixo de `preflight.autoConfirmBelowUsd`. Consumido pelo preflight.
    */
   reestimate?: true
+  /**
+   * Retry de um job cuja estimativa já tinha sido aceita: o preflight é refeito (a Job Memory
+   * mudou), mas a nova estimativa não para de novo para confirmação, salvo cota free insuficiente.
+   * Consumido pelo preflight.
+   */
+  preconfirmed?: true
   validate?: { ok: true }
   write?: { outputs: string[] }
   mux?: { output: string; warnings: string[] }

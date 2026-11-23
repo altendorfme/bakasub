@@ -10,12 +10,16 @@ import {
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { JobCreateRequest, JobProgressEvent } from '../../shared/ipc-contract'
+import type {
+  JobCreateRequest,
+  JobProgressEvent,
+  PreflightEstimate
+} from '../../shared/ipc-contract'
 import { testPresetSource } from '../presets/test-presets'
 import { JobRepository } from '../database/repositories/job.repository'
 import { openTestDatabase } from '../database/test-db'
 import { AppError } from '../errors'
-import type { Artifacts } from './artifacts'
+import { fileArtifact, type Artifacts } from './artifacts'
 import { currentJobId } from '../logging/job-context'
 import { JobManager } from './job-manager'
 import { StepFailure, type RunHooks, type RunOutcome } from './job-runner'
@@ -173,6 +177,49 @@ describe('JobManager', () => {
     await expect(manager.retry('job-1')).rejects.toMatchObject({ code: 'JOB_INVALID_STATE' })
   })
 
+  describe('retry refaz a estimativa quando a tradução não terminou', () => {
+    const estimate = (decision: 'confirmed' | 'needs-confirmation'): PreflightEstimate => ({
+      model: { id: 'a/b', pricing: null, catalogFetchedAt: null },
+      approximate: true,
+      lines: { total: 2, cached: 0, toTranslate: 2, copies: 0, chunks: 1 },
+      tokens: { input: { low: 1, high: 2 }, output: { low: 1, high: 2 } },
+      cost: { low: 0.01, high: 0.02 },
+      decision
+    })
+    const failAt = async (
+      artifacts: Record<string, unknown>,
+      step: 'translate' | 'preflight' = 'translate'
+    ): Promise<void> => {
+      await manager.create(req())
+      await tick()
+      await pending[0].hooks.onArtifacts(artifacts as never)
+      pending[0].reject(
+        new StepFailure(step, new AppError('LLM_UNAVAILABLE', 'x'), { outputs: [], warnings: [] })
+      )
+      await tick()
+    }
+
+    it('estimativa aceita: descarta o preflight e marca preconfirmed', async () => {
+      await failAt({
+        probe: { tracks: [] },
+        preflight: { estimate: estimate('confirmed'), coverage: { byReason: {} } }
+      })
+      await manager.retry('job-1')
+      await tick()
+      expect(pending[1].input.artifacts).toEqual({ probe: { tracks: [] }, preconfirmed: true })
+    })
+
+    it('cancelado na revisão: refaz e pede confirmação de novo', async () => {
+      await failAt({
+        probe: { tracks: [] },
+        preflight: { estimate: estimate('needs-confirmation'), coverage: { byReason: {} } }
+      })
+      await manager.retry('job-1')
+      await tick()
+      expect(pending[1].input.artifacts).toEqual({ probe: { tracks: [] } })
+    })
+  })
+
   it('erro inesperado (não AppError) vira INTERNAL', async () => {
     await manager.create(req())
     await tick()
@@ -324,8 +371,10 @@ describe('JobManager', () => {
     it('retry herda a escolha original; trocar descarta preflight e tradução', async () => {
       await manager.create({ ...req(), memory: 'skip' } as JobCreateRequest)
       await tick()
+      // Tradução concluída (arquivo confere): o retry mantém o preflight dela.
+      writeFileSync(join(root, 't.srt'), 'x')
       const translated = {
-        file: { path: '/w/t.srt', size: 1, sha256: 'x', format: 'srt' as const },
+        file: { ...(await fileArtifact(join(root, 't.srt'))), format: 'srt' as const },
         failedLines: [],
         usage: { requests: 1, promptTokens: 1, completionTokens: 1, cachedTokens: 0, cost: 0 },
         cache: { hits: 0, misses: 1, skipped: true }

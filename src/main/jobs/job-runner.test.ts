@@ -563,6 +563,32 @@ describe('JobRunner', () => {
     expect(h2.saved.at(-1)?.reestimate).toBeUndefined()
   })
 
+  it('retry de estimativa já aceita (preconfirmed): refaz o preflight sem parar de novo', async () => {
+    const spec = pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>)
+    const h = hooks()
+    const r = await runner().run({ spec, artifacts: { preconfirmed: true }, workDir }, h)
+    expect(preflightRuns).toBe(1)
+    expect(r.result.preflight?.decision).toBe('confirmed')
+    expect(translator.translate).toHaveBeenCalled()
+    expect(h.saved.at(-1)?.preconfirmed).toBeUndefined()
+  })
+
+  it('preconfirmed não dispensa o aviso de cota free insuficiente', async () => {
+    freeQuota = {
+      tier: 'under-10',
+      source: 'auto',
+      limit: 50,
+      used: 49,
+      remaining: 1,
+      requests: 2,
+      enough: false
+    }
+    const spec = pipeline({ confirmBeforeTranslate: true } as Partial<JobSpec>)
+    const r = await runner().run({ spec, artifacts: { preconfirmed: true }, workDir }, hooks())
+    expect(r.status).toBe('awaiting-confirmation')
+    expect(r.result.preflight?.decision).toBe('needs-confirmation')
+  })
+
   it('memory do spec chega ao preflight e à tradução', async () => {
     const calls: unknown[] = []
     const r = new JobRunner({

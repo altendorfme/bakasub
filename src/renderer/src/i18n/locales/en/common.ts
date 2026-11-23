@@ -533,6 +533,30 @@ export const common = {
     outputs: 'Saved to',
     finalCost: 'Cost: US$ {{value}}',
     costIncomplete: 'Cost of interrupted requests could not be fully determined.',
+    costCompare: {
+      heading: 'Estimated vs actual cost',
+      estimated: 'Estimated',
+      actual: 'Actual',
+      actualPartial: 'at least US$ {{value}}',
+      notEstimated: 'Not estimated',
+      nothingSent: 'nothing was sent to the AI',
+      within: 'Within the estimated range',
+      below: 'Below the estimate by {{pct}}%',
+      belowNoPct: 'Below the estimate',
+      above: 'Above the estimate by {{pct}}%',
+      aboveNoPct: 'Above the estimate',
+      free: 'Free model: nothing was billed.',
+      unavailable:
+        'This model has a variable price, so the preflight only estimated tokens: there is nothing to compare.',
+      unfinished:
+        'The job did not finish: the actual cost covers only what ran until it stopped, so there is no comparison.',
+      partial:
+        'Partial value: the cost of some interrupted requests was not reported, so there is no comparison.',
+      cached_one: 'The estimate already counted {{count}} line from saved translations.',
+      cached_other: 'The estimate already counted {{count}} lines from saved translations.',
+      cacheSkipped: 'The estimate ignored saved translations, as this job did.',
+      approximate: 'Approximate estimate: this model counts tokens differently from BakaSub.'
+    },
     untranslated_one: '{{count}} line stayed in the original language',
     untranslated_other: '{{count}} lines stayed in the original language',
     noExcerpt: 'Line #{{id}} (text not recorded for this job)',
