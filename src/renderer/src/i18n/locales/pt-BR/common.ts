@@ -540,6 +540,31 @@ export const common: LocaleShape<typeof en> = {
     outputs: 'Salvo em',
     finalCost: 'Custo: US$ {{value}}',
     costIncomplete: 'Não foi possível determinar todo o custo das requisições interrompidas.',
+    costCompare: {
+      heading: 'Custo estimado vs real',
+      estimated: 'Estimado',
+      actual: 'Real',
+      actualPartial: 'pelo menos US$ {{value}}',
+      notEstimated: 'Não estimado',
+      nothingSent: 'nada foi enviado à IA',
+      within: 'Dentro da faixa estimada',
+      below: '{{pct}}% abaixo da estimativa',
+      belowNoPct: 'Abaixo da estimativa',
+      above: '{{pct}}% acima da estimativa',
+      aboveNoPct: 'Acima da estimativa',
+      free: 'Modelo gratuito: nada foi cobrado.',
+      unavailable:
+        'Este modelo tem preço variável, então o preflight estimou só os tokens: não há com o que comparar.',
+      unfinished:
+        'O job não terminou: o custo real cobre só o que rodou até parar, então não há comparação.',
+      partial:
+        'Valor parcial: o custo de algumas requisições interrompidas não foi informado, então não há comparação.',
+      cached_one: 'A estimativa já contava {{count}} fala vinda das traduções salvas.',
+      cached_other: 'A estimativa já contava {{count}} falas vindas das traduções salvas.',
+      cacheSkipped: 'A estimativa ignorou as traduções salvas, como este job.',
+      approximate:
+        'Estimativa aproximada: este modelo conta tokens de um jeito diferente do BakaSub.'
+    },
     untranslated_one: '{{count}} fala ficou no idioma original',
     untranslated_other: '{{count}} falas ficaram no idioma original',
     noExcerpt: 'Fala nº {{id}} (texto não registrado neste job)',
@@ -552,6 +577,14 @@ export const common: LocaleShape<typeof en> = {
       pipeline: 'Tradução de vídeo'
     },
     batch: 'Lote',
+    setup: {
+      title: 'Configuração da tradução',
+      model: 'Modelo',
+      preset: 'Preset',
+      languages: 'Idiomas',
+      autoSource: 'Detectado automaticamente',
+      notRecorded: 'Não registrado'
+    },
     attempt: 'tentativa {{n}}',
     created: 'Adicionado {{when}}',
     finished: 'Concluído {{when}}',
@@ -1270,11 +1303,13 @@ export const common: LocaleShape<typeof en> = {
     scope: 'Área',
     allScopes: 'Todas as áreas',
     job: 'Job {{id}}',
+    filteredJob: 'Só o job: {{name}}',
     clearJob: 'Mostrar todos os jobs',
     openFolder: 'Abrir pasta de logs',
     export: 'Exportar logs',
     exported: 'Logs exportados.',
     empty: 'Nenhuma linha de log corresponde aos filtros.',
+    jobEmpty: 'Este job não tem mais linhas de log. Elas podem ter sido rotacionadas ou apagadas.',
     loading: 'Lendo o log…',
     loadFailed: 'Não foi possível ler o log.',
     details: 'Detalhes',

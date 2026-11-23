@@ -83,6 +83,18 @@ describe('readLogTail', () => {
     ).toEqual(['m2', 'm4'])
   })
 
+  it('a job older than the last 1000 lines is returned whole from the archives', async () => {
+    const old = Array.from({ length: 30 }, (_, i) => entry(i, { jobId: 'old', msg: `old${i}` }))
+    writeFileSync(join(dir, 'main.2.log'), lines(old))
+    writeFileSync(join(dir, 'main.1.log'), lines(Array.from({ length: 800 }, (_, i) => entry(i))))
+    writeFileSync(file, lines(Array.from({ length: 800 }, (_, i) => entry(i, { jobId: 'new' }))))
+    expect(await readLogTail(file, { limit: 1000, keep: 5 })).not.toContainEqual(
+      expect.objectContaining({ jobId: 'old' })
+    )
+    const out = await readLogTail(file, { limit: 2000, keep: 5, jobId: 'old' })
+    expect(out.map((e) => e.msg)).toEqual(old.map((e) => e.msg))
+  })
+
   it('no log file yet: empty', async () => {
     expect(await readLogTail(file, { limit: 10, keep: 5 })).toEqual([])
   })

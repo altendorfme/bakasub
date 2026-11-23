@@ -12,9 +12,10 @@ import type {
 } from '../../shared/ipc-contract'
 import type { JobRepository, JobRow } from '../database/repositories/job.repository'
 import { mediaSummary } from './media-summary'
+import { translationSummary } from './translation-summary'
 import { AppError } from '../errors'
 import { TranslationCancelled } from '../llm/translate-document'
-import type { Artifacts } from './artifacts'
+import { isStepComplete, type Artifacts } from './artifacts'
 import type { RunHooks, RunOutcome } from './job-runner'
 import { StepFailure } from './job-runner'
 import {
@@ -75,6 +76,7 @@ function toDto(r: JobRow): Job {
   const spec = r.spec as { source?: string }
   const media = mediaSummary(r.spec)
   const memory = jobMemoryMode(r.spec)
+  const translation = translationSummary(r.spec)
   return {
     id: r.id,
     kind: r.kind,
@@ -84,6 +86,7 @@ function toDto(r: JobRow): Job {
     source: spec.source ? basename(spec.source) : '',
     progress: r.progress,
     ...(media ? { media } : {}),
+    ...(translation ? { translation } : {}),
     ...(memory ? { memory } : {}),
     result: r.result ?? null,
     error: r.error ?? null,
@@ -100,6 +103,21 @@ function withoutSteps(raw: unknown, steps: readonly (keyof Artifacts)[]): Artifa
   const a = structuredClone((raw ?? {}) as Artifacts)
   for (const s of steps) delete a[s]
   return a
+}
+
+/**
+ * Retry sem trocar `memory`: se a tradução não terminou, o preflight é refeito. As falas traduzidas
+ * antes da falha já estão na Job Memory e o custo real conta só a nova tentativa, então a estimativa
+ * antiga (cheia) não seria comparável a ele. Uma estimativa já aceita (confirmada ou automática) não
+ * para de novo para confirmação (`preconfirmed`). `null` = artefatos ficam como estão.
+ */
+async function reestimateUnfinished(raw: unknown): Promise<Artifacts | null> {
+  const a = (raw ?? {}) as Artifacts
+  if (!a.preflight || (await isStepComplete('translate', a))) return null
+  const accepted = a.preflight.estimate.decision !== 'needs-confirmation'
+  const next = withoutSteps(a, ['preflight', 'translate'])
+  if (accepted) next.preconfirmed = true
+  return next
 }
 
 function isCancellation(err: unknown): boolean {
@@ -208,22 +226,19 @@ export class JobManager {
   /**
    * Volta à fila retomando da primeira etapa incompleta. `memory` ausente = a escolha original;
    * trocar descarta preflight e tradução (estimativa e cache mudam), mantendo probe/extração.
+   * Sem troca, uma tradução inacabada também refaz o preflight (`reestimateUnfinished`).
    */
   async retry(id: string, memory?: JobMemoryMode): Promise<Job> {
     const row = await this.row(id)
     if (!RETRYABLE.has(row.status) || this.running.has(id))
       throw new AppError('JOB_INVALID_STATE', `Job ${id} is ${row.status}`)
     const change = this.memoryChange(row, memory)
+    const artifacts = change
+      ? withoutSteps(row.artifacts, ['preflight', 'translate'])
+      : await reestimateUnfinished(row.artifacts)
     await this.deps.repo.update(id, {
-      ...(change
-        ? {
-            spec: change.spec,
-            artifacts: withoutSteps(row.artifacts, ['preflight', 'translate']) as Record<
-              string,
-              unknown
-            >
-          }
-        : {}),
+      ...(change ? { spec: change.spec } : {}),
+      ...(artifacts ? { artifacts: artifacts as Record<string, unknown> } : {}),
       status: 'queued',
       attempt: row.attempt + 1,
       error: null,

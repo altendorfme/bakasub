@@ -2,10 +2,14 @@ import { AlertTriangle, CheckCircle2, FileCheck2, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FailedLine, Job } from '@shared/ipc-contract'
 import { formatTimecode, formatUsd } from '@renderer/lib/format'
+import { CostComparison } from './cost-comparison'
 import { JobError } from './job-error'
 import { TermConsistency } from './term-consistency'
 
-/** Terminal state: outputs, cost, untranslated lines and warnings, or the error. */
+/**
+ * Terminal state: outputs, cost (against the preflight estimate when there was one), untranslated
+ * lines and warnings, or the error.
+ */
 export function JobResult({ job }: { job: Job }): React.JSX.Element {
   const { t } = useTranslation()
   const r = job.result
@@ -47,7 +51,9 @@ export function JobResult({ job }: { job: Job }): React.JSX.Element {
           ))}
         </div>
       ) : null}
-      {r?.usage ? (
+      {r?.preflight ? (
+        <CostComparison estimate={r.preflight} usage={r.usage} status={job.status} />
+      ) : r?.usage ? (
         <p className="text-xs text-muted-foreground">
           {t('jobs.finalCost', { value: formatUsd(r.usage.cost) })}
           {r.usage.costIncomplete ? ` · ${t('jobs.costIncomplete')}` : ''}

@@ -73,9 +73,17 @@ queued → running(step) → [awaiting-confirmation] → completed | completed-w
 - `cancelled` (user) deletes the work dir; `interrupted` (shutdown or crash) keeps it. On boot, `running` rows become `interrupted`.
 - `result.usage` keeps the LLM cost even for cancelled/failed jobs.
 
+## What the queue sees of a spec
+
+The renderer never gets the spec; `toDto` derives small summaries from it:
+
+- `Job.media` (`media-summary.ts`): title, artwork and episode of the frozen TMDB context.
+- `Job.translation` (`translation-summary.ts`, `translate`/`pipeline` only): `model` (OpenRouter id), `preset` (`{ id, name }` as named at creation), `targetLang`, `sourceLang`, read from the `PresetSnapshot` and languages the spec froze in `resolveJobSpec`. Every field is optional and type-checked: a spec persisted without one (or with a malformed one) just omits it and the UI says "not recorded". No migration is needed.
+- `Job.memory` (`jobMemoryMode`).
+
 ## Retry, cancel, remove
 
-- `jobs:retry` (failed / cancelled / interrupted): back to `queued`, `attempt + 1`. The runner resumes at the **first step whose artifact does not verify** (`artifacts.ts`: probe info, extracted and translated files with size + sha256); everything from there on is redone. Outputs (`write`, `mux`) are always redone. Translation is cheap anyway thanks to the Job Memory. The retry keeps the job's `memory` choice; `jobs:retry { id, memory }` can switch it, which also drops the `preflight` and `translate` artifacts (see [`job-memory.md`](./job-memory.md)).
+- `jobs:retry` (failed / cancelled / interrupted): back to `queued`, `attempt + 1`. The runner resumes at the **first step whose artifact does not verify** (`artifacts.ts`: probe info, extracted and translated files with size + sha256); everything from there on is redone. Outputs (`write`, `mux`) are always redone. Translation is cheap anyway thanks to the Job Memory. The retry keeps the job's `memory` choice; `jobs:retry { id, memory }` can switch it, which also drops the `preflight` and `translate` artifacts (see [`job-memory.md`](./job-memory.md)). Without a switch, an unfinished translation also re-runs the preflight, without asking again if the old estimate had been accepted, so the estimated vs actual comparison covers one attempt (see [`preflight.md`](./preflight.md#decision)).
 - `jobs:cancel`: queued → `cancelled` directly; running → abort (LLM request and backoff, child processes); a translation already paid for is still written to the cache.
 - `jobs:remove`: terminal jobs only; deletes the row and the work dir.
 - `jobs:clear-completed`: the queue's "Clear finished". Deletes every `completed`, `completed-with-warnings` and `cancelled` job in one `DELETE … WHERE id IN (…)`, then their work dirs (a dir that fails to go is collected later as an orphan). Failed and interrupted jobs stay, since they still need a decision.
