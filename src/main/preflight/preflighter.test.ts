@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { JobMemoryRepository } from '../database/repositories/job-memory.repository'
 import { openTestDatabase } from '../database/test-db'
 import type { ModelInfo } from '../llm/model-catalog'
+import type { ChatRequest } from '../llm/openrouter-client'
+import { translateDocument } from '../llm/translate-document'
 import { JobMemoryService } from '../memory/job-memory.service'
 import { srtFormat } from '../parsers/srt'
 import { Preflighter } from './preflighter'
@@ -106,5 +108,66 @@ describe('Preflighter', () => {
       targetLang: 'pt-BR'
     })
     expect(r.estimate.freeQuota).toBeUndefined()
+  })
+})
+
+describe('Preflighter e translateDocument: mesma chave do Job Memory', () => {
+  const preset = { model: 'a/b', glossary: [], temperature: 0.3, prompt: 'Anime' }
+  const calls: ChatRequest[] = []
+  const translate = (mediaScope?: string): ReturnType<typeof translateDocument> =>
+    translateDocument(
+      {
+        doc,
+        format: srtFormat,
+        preset,
+        targetLang: 'pt-BR',
+        ...(mediaScope ? { mediaScope } : {})
+      },
+      {
+        llm: {
+          chat: async (req) => {
+            calls.push(req)
+            const user = req.messages.find((m) => m.role === 'user')!.content
+            const ids = [...user.slice(user.indexOf('<target>')).matchAll(/<line id="(\d+)">/g)]
+            return {
+              content: JSON.stringify(
+                Object.fromEntries(ids.map((m) => [m[1], 'Olá, meu amigo.']))
+              ),
+              finishReason: 'stop',
+              generationId: 'g',
+              usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0, cost: 0 }
+            }
+          },
+          generationCost: async () => null
+        },
+        memory,
+        models: { find: async () => MODEL },
+        random: () => 1,
+        sleep: async () => undefined
+      }
+    )
+  const cached = async (mediaScope?: string): Promise<number> =>
+    (
+      await pf().run({
+        doc,
+        format: srtFormat,
+        preset,
+        targetLang: 'pt-BR',
+        ...(mediaScope ? { mediaScope } : {})
+      })
+    ).estimate.lines.cached
+
+  it('o preflight prevê o hit que o job dá; outra obra é miss e outra chamada ao LLM', async () => {
+    calls.length = 0
+    await translate('tmdb:series:1')
+    expect(await cached('tmdb:series:1')).toBe(1)
+    expect(await cached('tmdb:series:2')).toBe(0)
+    expect(await cached()).toBe(0)
+
+    expect((await translate('tmdb:series:1')).cache).toEqual({ hits: 1, misses: 0 })
+    expect(calls).toHaveLength(1)
+    expect((await translate('tmdb:series:2')).cache).toEqual({ hits: 0, misses: 1 })
+    expect(calls).toHaveLength(2)
+    expect((await memory.stats()).rows).toBe(2)
   })
 })

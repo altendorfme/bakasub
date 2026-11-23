@@ -14,6 +14,7 @@ export const preflightStep: Step = async (ctx) => {
       format: input.format,
       preset: input.preset,
       media: input.media,
+      mediaScope: input.mediaScope,
       targetLang: input.targetLang,
       sourceLang: input.sourceLang
     },

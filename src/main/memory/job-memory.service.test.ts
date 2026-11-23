@@ -52,7 +52,12 @@ const ctx = (over: Partial<Parameters<typeof JobMemoryService.context>[0]> = {})
 
 describe('JobMemoryService', () => {
   it('context canoniza idioma e glossário', () => {
-    expect(ctx().key).toEqual({ targetLang: 'pt-BR', model: 'm/a', promptHash: promptHash([]) })
+    expect(ctx().key).toEqual({
+      targetLang: 'pt-BR',
+      model: 'm/a',
+      promptHash: promptHash([]),
+      mediaScope: ''
+    })
   })
 
   it('entradas gravadas com regras de prompt antigas viram miss (sem migração)', async () => {
@@ -159,9 +164,22 @@ describe('JobMemoryService', () => {
     for (const other of [
       ctx({ model: 'm/b' }),
       ctx({ targetLang: 'pt-PT' }),
-      ctx({ glossary: [{ source: 'senpai', rule: 'manter' }] })
+      ctx({ glossary: [{ source: 'senpai', rule: 'manter' }] }),
+      ctx({ mediaScope: 'tmdb:series:1' })
     ])
       expect((await svc.lookupDocument(doc, other)).hits.size).toBe(0)
+  })
+
+  it('mesma obra compartilha cache; outra obra e o cache sem obra não', async () => {
+    const a = ctx({ mediaScope: 'tmdb:series:1' })
+    const first = await svc.lookupDocument(doc, a)
+    await svc.commitChunk(a, [
+      { hashed: first.misses[0], translated: 'Hello <g1>world</g1> beautiful today' },
+      { hashed: first.misses[1], translated: 'All good with you?' }
+    ])
+    expect((await svc.lookupDocument(doc, ctx({ mediaScope: 'tmdb:series:1' }))).hits.size).toBe(2)
+    expect((await svc.lookupDocument(doc, ctx({ mediaScope: 'tmdb:series:2' }))).hits.size).toBe(0)
+    expect((await svc.lookupDocument(doc, ctx())).hits.size).toBe(0)
   })
 
   it('signal abortado: nada é gravado', async () => {

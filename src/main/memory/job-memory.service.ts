@@ -88,6 +88,8 @@ export class JobMemoryService {
     glossary: readonly unknown[]
     /** Orientação de estilo do preset (entra na chave junto com o glossário). */
     stylePrompt?: string
+    /** Obra do job (`mediaScope(spec.media?.details)`); ausente = `''` (cache sem obra). */
+    mediaScope?: string
     lexInline: InlineLexer
     sourceLang?: string
   }): MemoryContext {
@@ -95,7 +97,8 @@ export class JobMemoryService {
       key: {
         targetLang: canonicalLang(input.targetLang),
         model: input.model,
-        promptHash: promptHash(input.glossary, input.stylePrompt)
+        promptHash: promptHash(input.glossary, input.stylePrompt),
+        mediaScope: input.mediaScope ?? ''
       },
       lexInline: input.lexInline,
       sourceLang: input.sourceLang

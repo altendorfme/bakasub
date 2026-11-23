@@ -15,6 +15,8 @@ export interface SubtitleTranslator {
       preset: PresetSnapshot
       /** Notas do usuário / contexto de mídia (`<media>`). */
       media?: string
+      /** Obra na chave do Job Memory (`mediaScope`). */
+      mediaScope?: string
       targetLang: string
       sourceLang?: string
     },

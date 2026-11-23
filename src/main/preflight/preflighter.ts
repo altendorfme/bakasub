@@ -24,6 +24,8 @@ export interface PreflightInput {
   readonly targetLang: string
   readonly sourceLang?: string
   readonly media?: string
+  /** Obra na chave do Job Memory (`mediaScope`); ausente = `''`. Igual no preflight e no job. */
+  readonly mediaScope?: string
 }
 
 /** Reparos e rodadas extras: requisições além de uma por chunk. */
@@ -65,6 +67,7 @@ export class Preflighter {
       model: model.id,
       glossary,
       stylePrompt: input.preset.prompt,
+      mediaScope: input.mediaScope,
       lexInline: input.format.lexInline,
       sourceLang: input.sourceLang
     })

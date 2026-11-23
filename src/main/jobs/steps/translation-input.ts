@@ -1,6 +1,7 @@
 import type { PromptSummary } from '../../../shared/ipc-contract'
 import { AppError } from '../../errors'
 import { buildMediaContext } from '../../media-context/media-block'
+import { mediaScope } from '../../memory/memory-key'
 import type { SubtitleDocument, SubtitleFormat } from '../../parsers'
 import type { PresetSnapshot } from '../job-spec'
 import type { StepContext } from '../step-context'
@@ -15,6 +16,8 @@ export interface TranslationInput {
   readonly media?: string
   /** De onde veio o `<media>` (e por que o TMDB pedido ficou de fora), para o resumo do prompt. */
   readonly mediaSources: PromptSummary['media']
+  /** Obra (TMDB) congelada no job, para a chave do Job Memory; `''` sem obra. */
+  readonly mediaScope: string
   readonly targetLang: string
   readonly sourceLang?: string
 }
@@ -54,6 +57,7 @@ export async function translationInput(ctx: StepContext): Promise<TranslationInp
       notes: !!spec.notes?.trim(),
       ...(spec.mediaUnavailable ? { unavailable: spec.mediaUnavailable } : {})
     },
+    mediaScope: mediaScope(spec.media?.details),
     targetLang: spec.targetLang,
     ...(sourceLang ? { sourceLang } : {})
   }

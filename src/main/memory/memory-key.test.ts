@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PROMPT_RULES_VERSION } from '../llm/prompt-builder'
-import { canonicalLang, promptHash } from './memory-key'
+import { canonicalLang, mediaScope, promptHash } from './memory-key'
 
 describe('canonicalLang', () => {
   it('canoniza BCP-47 e mantém a variante', () => {
@@ -42,5 +42,16 @@ describe('promptHash', () => {
     expect(promptHash([], 'Anime')).not.toBe(promptHash([], 'Documentary'))
     expect(promptHash([], ' Anime ')).toBe(promptHash([], 'Anime'))
     expect(promptHash([{ source: 'a' }])).toMatch(/^[0-9a-f]{64}$/)
+  })
+})
+
+describe('mediaScope', () => {
+  it('identidade da obra: provider + kind + id', () => {
+    expect(mediaScope({ provider: 'tmdb', kind: 'series', id: 209867 })).toBe('tmdb:series:209867')
+    expect(mediaScope({ provider: 'tmdb', kind: 'movie', id: 209867 })).toBe('tmdb:movie:209867')
+  })
+  it("sem obra (sem TMDB ou 'Include these details' desligado) => ''", () => {
+    expect(mediaScope(undefined)).toBe('')
+    expect(mediaScope(null)).toBe('')
   })
 })

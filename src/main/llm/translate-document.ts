@@ -63,6 +63,8 @@ export interface TranslateInput<F> {
   readonly sourceLang?: string
   /** Contexto de mídia (sinopse etc.), opcional. */
   readonly media?: string
+  /** Obra na chave do Job Memory (`mediaScope`); ausente = `''`. Igual no preflight e no job. */
+  readonly mediaScope?: string
   readonly limits?: Partial<ChunkLimits>
 }
 
@@ -154,6 +156,7 @@ export async function translateDocument<F>(
     model: model.id,
     glossary: glossary.entries,
     stylePrompt: input.preset.prompt,
+    mediaScope: input.mediaScope,
     lexInline: input.format.lexInline,
     sourceLang: input.sourceLang
   })
