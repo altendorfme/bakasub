@@ -603,6 +603,20 @@ export interface JobMediaSummary {
   episode?: { season: number; episode: number; title: string }
 }
 
+/**
+ * How a `translate`/`pipeline` job was set up, frozen in its spec at creation: editing or deleting
+ * the preset later does not change it. Fields missing = not recorded (spec persisted before them).
+ */
+export interface JobTranslationSummary {
+  /** OpenRouter model id actually used. */
+  model?: string
+  /** Preset as it was named when the job was created. */
+  preset?: { id: string; name: string }
+  targetLang?: string
+  /** Absent = detected from the file/track when the job ran (or left to the model). */
+  sourceLang?: string
+}
+
 export interface Job {
   id: string
   kind: JobKind
@@ -615,6 +629,8 @@ export interface Job {
   progress: JobProgress
   /** Só com contexto de mídia incluído. */
   media?: JobMediaSummary
+  /** Só `translate`/`pipeline`: modelo, preset e idiomas congelados no spec. */
+  translation?: JobTranslationSummary
   /** Só `translate`/`pipeline`: a escolha congelada no spec (jobs antigos = `use`). */
   memory?: JobMemoryMode
   result: JobResult | null

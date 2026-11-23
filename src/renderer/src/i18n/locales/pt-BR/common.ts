@@ -552,6 +552,14 @@ export const common: LocaleShape<typeof en> = {
       pipeline: 'Tradução de vídeo'
     },
     batch: 'Lote',
+    setup: {
+      title: 'Configuração da tradução',
+      model: 'Modelo',
+      preset: 'Preset',
+      languages: 'Idiomas',
+      autoSource: 'Detectado automaticamente',
+      notRecorded: 'Não registrado'
+    },
     attempt: 'tentativa {{n}}',
     created: 'Adicionado {{when}}',
     finished: 'Concluído {{when}}',

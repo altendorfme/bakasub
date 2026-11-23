@@ -12,6 +12,7 @@ import type {
 } from '../../shared/ipc-contract'
 import type { JobRepository, JobRow } from '../database/repositories/job.repository'
 import { mediaSummary } from './media-summary'
+import { translationSummary } from './translation-summary'
 import { AppError } from '../errors'
 import { TranslationCancelled } from '../llm/translate-document'
 import type { Artifacts } from './artifacts'
@@ -75,6 +76,7 @@ function toDto(r: JobRow): Job {
   const spec = r.spec as { source?: string }
   const media = mediaSummary(r.spec)
   const memory = jobMemoryMode(r.spec)
+  const translation = translationSummary(r.spec)
   return {
     id: r.id,
     kind: r.kind,
@@ -84,6 +86,7 @@ function toDto(r: JobRow): Job {
     source: spec.source ? basename(spec.source) : '',
     progress: r.progress,
     ...(media ? { media } : {}),
+    ...(translation ? { translation } : {}),
     ...(memory ? { memory } : {}),
     result: r.result ?? null,
     error: r.error ?? null,

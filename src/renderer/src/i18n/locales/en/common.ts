@@ -545,6 +545,14 @@ export const common = {
       pipeline: 'Video translation'
     },
     batch: 'Batch',
+    setup: {
+      title: 'Translation setup',
+      model: 'Model',
+      preset: 'Preset',
+      languages: 'Languages',
+      autoSource: 'Detected automatically',
+      notRecorded: 'Not recorded'
+    },
     attempt: 'attempt {{n}}',
     created: 'Added {{when}}',
     finished: 'Finished {{when}}',

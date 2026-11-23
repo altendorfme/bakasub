@@ -21,6 +21,7 @@ import { errorMessage } from '@renderer/i18n/error-message'
 import { episodeCode } from '@renderer/lib/episode'
 import { JobProgress } from './job-progress'
 import { JobResult } from './job-result'
+import { JobSetup } from './job-setup'
 import { MemoryOption } from './memory-option'
 import { PreflightReview } from './preflight-review'
 import { PromptSummary } from './prompt-summary'
@@ -129,6 +130,11 @@ export function JobDetail({
             <span>{t('jobs.finished', { when: when(job.finishedAt, i18n.language) })}</span>
           ) : null}
         </p>
+        {translates ? (
+          <div className="mt-2">
+            <JobSetup setup={job.translation ?? {}} />
+          </div>
+        ) : null}
       </header>
 
       {waiting ? (
