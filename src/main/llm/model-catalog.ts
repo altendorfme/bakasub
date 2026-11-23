@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import type { SettingsService } from '../settings/settings.service'
+import { isReasoningEffort, REASONING_EFFORTS, type ReasoningSupport } from './reasoning'
 
 export const MODELS_TTL_MS = 24 * 3_600_000
+/**
+ * Versão do formato do cache. Cache de outra versão (ex.: sem `reasoning`) conta como vencido:
+ * o próximo `get` busca de novo, mas ainda serve de fallback offline.
+ */
+export const MODELS_CACHE_VERSION = 2
 
 /** Visão normalizada de um item de `/api/v1/models` (só o que o pipeline/UI usam). */
 export interface ModelInfo {
@@ -19,6 +25,11 @@ export interface ModelInfo {
   readonly responseFormat: boolean
   /** `architecture.tokenizer` (GPT, Claude, Gemini…); define se a contagem local é exata. */
   readonly tokenizer?: string
+  /**
+   * Controle de raciocínio (objeto `reasoning` do catálogo), só quando `supported_parameters`
+   * traz `reasoning`. Ausente = não mandar nada (ver `reasoning.ts`).
+   */
+  readonly reasoning?: ReasoningSupport
 }
 
 const price = z.union([z.string(), z.number()]).transform(Number)
@@ -29,6 +40,15 @@ const RawModel = z.looseObject({
   pricing: z.looseObject({ prompt: price, completion: price }).optional(),
   supported_parameters: z.array(z.string()).optional(),
   architecture: z.looseObject({ tokenizer: z.string().nullish() }).optional(),
+  reasoning: z
+    .looseObject({
+      mandatory: z.boolean().optional(),
+      supported_efforts: z.array(z.string()).nullish(),
+      default_enabled: z.boolean().nullish(),
+      supports_max_tokens: z.boolean().nullish()
+    })
+    .nullish()
+    .catch(null),
   top_provider: z
     .looseObject({
       max_completion_tokens: z.number().nullish(),
@@ -54,7 +74,24 @@ export function parseModel(raw: unknown): ModelInfo | null {
     pricing: validPrice ? { prompt: p.prompt, completion: p.completion } : null,
     structuredOutputs: params.has('structured_outputs'),
     responseFormat: params.has('response_format'),
-    ...(m.architecture?.tokenizer ? { tokenizer: m.architecture.tokenizer } : {})
+    ...(m.architecture?.tokenizer ? { tokenizer: m.architecture.tokenizer } : {}),
+    ...(m.reasoning && params.has('reasoning') ? { reasoning: toReasoning(m.reasoning) } : {})
+  }
+}
+
+function toReasoning(r: {
+  mandatory?: boolean
+  supported_efforts?: string[] | null
+  default_enabled?: boolean | null
+  supports_max_tokens?: boolean | null
+}): ReasoningSupport {
+  // Esforço desconhecido (escala nova) é descartado: só mandamos valores que conhecemos.
+  const efforts = r.supported_efforts?.filter(isReasoningEffort)
+  return {
+    mandatory: r.mandatory ?? false,
+    ...(efforts && efforts.length ? { supportedEfforts: efforts } : {}),
+    ...(typeof r.default_enabled === 'boolean' ? { defaultEnabled: r.default_enabled } : {}),
+    supportsMaxTokens: r.supports_max_tokens ?? false
   }
 }
 
@@ -67,7 +104,15 @@ const CachedModel = z.object({
   pricing: z.object({ prompt: z.number(), completion: z.number() }).nullable(),
   structuredOutputs: z.boolean(),
   responseFormat: z.boolean(),
-  tokenizer: z.string().optional()
+  tokenizer: z.string().optional(),
+  reasoning: z
+    .object({
+      mandatory: z.boolean(),
+      supportedEfforts: z.array(z.enum(REASONING_EFFORTS)).optional(),
+      defaultEnabled: z.boolean().optional(),
+      supportsMaxTokens: z.boolean()
+    })
+    .optional()
 })
 
 export interface CatalogSnapshot {
@@ -97,16 +142,25 @@ export class ModelCatalog {
 
   async get(options: { force?: boolean; signal?: AbortSignal } = {}): Promise<CatalogSnapshot> {
     const cached = await this.cached()
-    if (!options.force && cached && this.now() - cached.fetchedAt < MODELS_TTL_MS)
-      return { ...cached, offline: false }
+    if (
+      !options.force &&
+      cached &&
+      cached.version === MODELS_CACHE_VERSION &&
+      this.now() - cached.fetchedAt < MODELS_TTL_MS
+    )
+      return { models: cached.models, fetchedAt: cached.fetchedAt, offline: false }
     try {
       const raw = await this.source.listModels(options.signal)
       const models = raw.map(parseModel).filter((m): m is ModelInfo => m !== null)
       const fetchedAt = this.now()
-      await this.settings.set('models.cache', { fetchedAt, models: [...models] })
+      await this.settings.set('models.cache', {
+        version: MODELS_CACHE_VERSION,
+        fetchedAt,
+        models: [...models]
+      })
       return { models, fetchedAt, offline: false }
     } catch (err) {
-      if (cached) return { ...cached, offline: true }
+      if (cached) return { models: cached.models, fetchedAt: cached.fetchedAt, offline: true }
       throw err
     }
   }
@@ -120,10 +174,16 @@ export class ModelCatalog {
     return fresh.models.find((m) => m.id === id) ?? null
   }
 
-  private async cached(): Promise<{ models: ModelInfo[]; fetchedAt: number } | null> {
+  private async cached(): Promise<{
+    models: ModelInfo[]
+    fetchedAt: number
+    version: number
+  } | null> {
     const v = await this.settings.get('models.cache')
     if (!v) return null
     const models = z.array(CachedModel).safeParse(v.models)
-    return models.success ? { models: models.data, fetchedAt: v.fetchedAt } : null
+    return models.success
+      ? { models: models.data, fetchedAt: v.fetchedAt, version: v.version ?? 1 }
+      : null
   }
 }

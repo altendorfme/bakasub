@@ -9,6 +9,8 @@ export const SETTINGS_SCHEMA = {
   'models.cache': {
     schema: z
       .object({
+        /** `MODELS_CACHE_VERSION`; ausente = cache anterior ao campo (versão 1). */
+        version: z.number().int().optional(),
         fetchedAt: z.number(),
         /** Itens já normalizados; o `ModelCatalog` revalida cada um ao ler. */
         models: z.array(z.unknown())
