@@ -62,6 +62,7 @@ A file is cut into **K contiguous lanes** that run at the same time. Each lane i
 - **`session_id`**: every request of one translation carries the same `session_id` (a UUID per `translateDocument` call). OpenRouter's sticky routing then keeps the model on the same provider endpoint, so the automatic prompt cache (OpenAI, DeepSeek, Gemini 2.5+, Grok, Moonshot…) keeps hitting across chunks and lanes. Fallback on provider errors still applies. `cachedTokens` comes back in `usage`.
 - **Repair**: same System; for each failing line, `<source>`, what was `<returned>` and the concrete `<problems>` (e.g. `<g1>…</g1> is missing`, `expected exactly 2 <br/>, got 1`).
 - Snapshots in `prompt-builder.test.ts` pin the exact text.
+- **`PROMPT_RULES_VERSION`** (`prompt-builder.ts`): version of the fixed System Prompt text (rules + `language-notes.ts`). It is part of the Job Memory `prompt_hash`, so lines cached with older rules are retranslated. **Bump it in every PR that changes the fixed text** and add the new fingerprint to `prompt-rules-version.test.ts` (the test fails otherwise; never edit an existing entry). See [`job-memory.md`](./job-memory.md#key).
 
 ## Output
 

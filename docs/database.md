@@ -66,17 +66,17 @@ Envelope encryption (`src/main/settings/secret-vault.ts`):
 
 ### `job_memory`
 
-| Column            | Type                                     | Notes                                                                  |
-| ----------------- | ---------------------------------------- | ---------------------------------------------------------------------- |
-| `id`              | integer PK autoincrement                 |                                                                        |
-| `context_hash`    | text, not null                           | sha256 of `v1\0prev\0payload` (see [`job-memory.md`](./job-memory.md)) |
-| `target_lang`     | text, not null                           | canonical BCP-47 (`pt-BR` ≠ `pt-PT`)                                   |
-| `model`           | text, not null                           | OpenRouter model id                                                    |
-| `prompt_hash`     | text, not null, default `''`             | sha256 of the canonical glossary JSON; `''` without glossary           |
-| `source_text`     | text, not null                           | source payload with markers (`<gN>`, `<xN/>`, `<br/>`)                 |
-| `translated_text` | text, not null                           | translated payload with markers                                        |
-| `updated_at`      | integer (ms), default `unixepoch()*1000` | last rewrite of the translation                                        |
-| `last_used_at`    | integer (ms), default `unixepoch()*1000` | last hit or write; the prune works on this column                      |
+| Column            | Type                                     | Notes                                                                                                    |
+| ----------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `id`              | integer PK autoincrement                 |                                                                                                          |
+| `context_hash`    | text, not null                           | sha256 of `v1\0prev\0payload` (see [`job-memory.md`](./job-memory.md))                                   |
+| `target_lang`     | text, not null                           | canonical BCP-47 (`pt-BR` ≠ `pt-PT`)                                                                     |
+| `model`           | text, not null                           | OpenRouter model id                                                                                      |
+| `prompt_hash`     | text, not null, default `''`             | sha256 of `{ glossary, rules, style }` (see `promptHash`); `''` only in rows predating the rules version |
+| `source_text`     | text, not null                           | source payload with markers (`<gN>`, `<xN/>`, `<br/>`)                                                   |
+| `translated_text` | text, not null                           | translated payload with markers                                                                          |
+| `updated_at`      | integer (ms), default `unixepoch()*1000` | last rewrite of the translation                                                                          |
+| `last_used_at`    | integer (ms), default `unixepoch()*1000` | last hit or write; the prune works on this column                                                        |
 
 Indexes: unique `(context_hash, target_lang, model, prompt_hash)`; `last_used_at`.
 

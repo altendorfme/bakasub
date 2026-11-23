@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { PROMPT_RULES_VERSION } from '../llm/prompt-builder'
 
 /** BCP-47 canônico (`pt-br` -> `pt-BR`). Variantes regionais são chaves distintas. Lança `RangeError`. */
 export function canonicalLang(tag: string): string {
@@ -20,12 +21,18 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
- * O que, no prompt, muda a tradução e entra na chave do cache: glossário + orientação de estilo
- * do preset. sha256 do JSON canônico, ou '' quando ambos são vazios. Presets com o mesmo
- * glossário e estilo compartilham cache; temperatura e contexto de mídia (por episódio) não entram.
+ * O que, no prompt, muda a tradução e entra na chave do cache: versão das regras fixas do
+ * System Prompt (`PROMPT_RULES_VERSION`) + glossário + orientação de estilo do preset. sha256 do
+ * JSON canônico; nunca vazio (a versão sempre entra). Presets com o mesmo glossário e estilo
+ * compartilham cache; temperatura e contexto de mídia (por episódio) não entram.
  */
-export function promptHash(glossary: readonly unknown[], stylePrompt = ''): string {
+export function promptHash(
+  glossary: readonly unknown[],
+  stylePrompt = '',
+  rulesVersion: number = PROMPT_RULES_VERSION
+): string {
   const style = stylePrompt.trim()
-  if (glossary.length === 0 && style === '') return ''
-  return createHash('sha256').update(canonicalJson({ glossary, style }), 'utf8').digest('hex')
+  return createHash('sha256')
+    .update(canonicalJson({ glossary, rules: rulesVersion, style }), 'utf8')
+    .digest('hex')
 }

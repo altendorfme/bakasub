@@ -8,7 +8,9 @@ import { JobMemoryRepository } from '../database/repositories/job-memory.reposit
 import { AppError } from '../errors'
 import { srtFormat } from '../parsers/srt'
 import { computeContextHashes } from './context-hash'
+import { PROMPT_RULES_VERSION } from '../llm/prompt-builder'
 import { JobMemoryService, type MemoryContext } from './job-memory.service'
+import { promptHash } from './memory-key'
 
 const DAY = 86_400_000
 let dir: string
@@ -50,7 +52,24 @@ const ctx = (over: Partial<Parameters<typeof JobMemoryService.context>[0]> = {})
 
 describe('JobMemoryService', () => {
   it('context canoniza idioma e glossário', () => {
-    expect(ctx().key).toEqual({ targetLang: 'pt-BR', model: 'm/a', promptHash: '' })
+    expect(ctx().key).toEqual({ targetLang: 'pt-BR', model: 'm/a', promptHash: promptHash([]) })
+  })
+
+  it('entradas gravadas com regras de prompt antigas viram miss (sem migração)', async () => {
+    const current = ctx()
+    const old: MemoryContext = {
+      ...current,
+      key: { ...current.key, promptHash: promptHash([], '', PROMPT_RULES_VERSION - 1) }
+    }
+    const first = await svc.lookupDocument(doc, old)
+    await svc.commitChunk(old, [
+      { hashed: first.misses[0], translated: 'Hello <g1>world</g1> beautiful today' },
+      { hashed: first.misses[1], translated: 'All good with you?' }
+    ])
+    expect((await svc.lookupDocument(doc, old, { peek: true })).hits.size).toBe(2)
+    const fresh = await svc.lookupDocument(doc, current, { peek: true })
+    expect(fresh.hits.size).toBe(0)
+    expect(fresh.misses.map((m) => m.cueId)).toEqual([1, 2])
   })
 
   it('miss total, commit e hit no reprocessamento', async () => {

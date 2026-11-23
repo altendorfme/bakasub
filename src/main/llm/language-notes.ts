@@ -35,3 +35,8 @@ export function languageNotes(tag: string): readonly string[] {
   const base = tag.split('-')[0]?.toLowerCase() ?? ''
   return NOTES[base] ?? []
 }
+
+/** Tags com notas próprias (para o teste de guarda de `PROMPT_RULES_VERSION`). */
+export function languageNoteTags(): readonly string[] {
+  return Object.keys(NOTES)
+}

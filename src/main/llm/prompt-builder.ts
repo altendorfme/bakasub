@@ -3,6 +3,14 @@ import type { Issue, TranslationUnit } from '../parsers'
 import type { ChunkContext } from './chunker'
 import { languageNotes } from './language-notes'
 
+/**
+ * Versão do texto fixo do System Prompt (`buildSystemPrompt` + `language-notes.ts`). Entra na
+ * chave da Job Memory (`promptHash`): traduções feitas com regras antigas deixam de ser hits.
+ * Incrementar em todo PR que mude esse texto; `prompt-rules-version.test.ts` quebra se o texto
+ * mudar sem a versão mudar.
+ */
+export const PROMPT_RULES_VERSION = 1
+
 export interface GlossaryEntry {
   readonly source: string
   readonly target?: string

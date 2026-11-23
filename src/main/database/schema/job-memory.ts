@@ -14,7 +14,7 @@ export const jobMemory = sqliteTable(
     /** BCP-47 canônico (`pt-BR` ≠ `pt-PT`). */
     targetLang: text('target_lang').notNull(),
     model: text('model').notNull(),
-    /** sha256 de glossário + estilo do preset (ver `promptHash`); '' sem nenhum dos dois. */
+    /** sha256 de versão das regras do prompt + glossário + estilo (ver `promptHash`); nunca '' em linhas novas. */
     promptHash: text('prompt_hash').notNull().default(''),
     sourceText: text('source_text').notNull(),
     translatedText: text('translated_text').notNull(),
