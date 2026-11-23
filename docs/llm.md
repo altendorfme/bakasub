@@ -30,7 +30,8 @@ translateDocument
 | `segmenter.ts`          | cuts the misses into lanes for parallel translation (`planLanes`, `countChunks`)                    |
 | `prompt-builder.ts`     | glossary parsing, System Prompt, translate/repair messages, strict JSON Schema                      |
 | `response-parser.ts`    | tolerant JSON extraction + Zod shape check                                                          |
-| `chunk-translator.ts`   | translate → validate → accept → repair loop, `length`/moderation splits                             |
+| `reasoning.ts`          | reasoning control per model (`planReasoning`) and "budget spent on reasoning" detection             |
+| `chunk-translator.ts`   | translate → validate → accept → repair loop, `length`/moderation splits, reasoning budget growth    |
 | `translate-document.ts` | orchestration of the lanes, failure threshold, drain/cancellation, progress timeline, final doc     |
 
 ## Chunks and context
@@ -38,7 +39,7 @@ translateDocument
 - Only Job Memory **misses** are sent, one per context hash (copies are filled from their representative and stay out of `<context>`, see [`job-memory.md`](./job-memory.md)), in timeline order (`HashedUnit.timeIndex`: `start.ms`, file order on ties). Inside a lane chunks run **sequentially**, so each chunk sees the previous translations; lanes run in parallel (next section).
 - A chunk holds up to **40 lines or ~2,000 estimated tokens** of `<target>` (`token-estimate.ts`: ~4 chars/token, ~1 per CJK character; for limits only, the preflight uses a real tokenizer, see [`preflight.md`](./preflight.md)). A line larger than the budget goes alone.
 - `<context>`: the 5 translatable cues before the chunk (source **and** translation when known, from the cache or an earlier chunk) and 2 after (source only), as plain text without markers.
-- `max_tokens` ≈ 2.5 × the target estimate + JSON overhead, at least 256, capped by `top_provider.max_completion_tokens`.
+- `max_tokens` ≈ 2.5 × the target estimate + JSON overhead, at least 256, plus a reasoning slack (1,024) when the model's reasoning cannot be turned off, times the lane's budget factor (see [Reasoning models](#reasoning-models)), capped by `top_provider.max_completion_tokens`.
 
 ## Lanes (parallel translation)
 
@@ -64,28 +65,57 @@ A file is cut into **K contiguous lanes** that run at the same time. Each lane i
 
 ## Output
 
-`{ "<cueId>": "<translated payload>" }`. Mode chosen per model from the catalog:
+`{ "<cueId>": "<translated payload>" }`. The output mode is a ladder (`output-mode.ts`), strictest first:
 
-1. `structured_outputs` → `response_format: { type: 'json_schema', json_schema: { name, strict: true, schema } }` with exactly the chunk ids as required properties and `additionalProperties: false`, plus `provider.require_parameters: true` (support is per endpoint, not per model).
-2. `response_format` → `{ type: 'json_object' }`.
-3. Neither → prompt only.
+1. `json_schema_strict`: `response_format: { type: 'json_schema', json_schema: { name, strict: true, schema } }` with exactly the chunk ids as required properties and `additionalProperties: false`, plus `provider.require_parameters: true` (support is per endpoint, not per model).
+2. `json_schema`: the same `response_format` **without** `provider` in the body. OpenRouter then treats `response_format` as a soft preference: an endpoint without support may ignore it, and Zod still validates.
+3. `json_object`: `response_format: { type: 'json_object' }`.
+4. `prompt`: no `response_format`, prompt instructions only.
+
+The job starts at the first step the catalog allows (`structured_outputs` → 1, `response_format` → 3, neither → 4). A `404 "No endpoints found…"` (`LlmErrorKind` `unsupported-params`) moves **one step down** right away: no backoff, no attempt spent, no extra round. The step lives in one `OutputModeState` per job, shared by every lane, so once a lane steps down no later chunk (of any lane) tries the stricter mode again; lanes that were already in flight with the old mode and also get the 404 just move to the current step without stepping down twice. Each downgrade is logged (`output mode downgraded model=… a -> b`) and returned in `TranslateResult.notices`, which the translate step turns into a job warning.
+
+A 404 on the last step fails the job with `LLM_NO_ENDPOINT`. The message says that, besides the model, the account's OpenRouter provider restrictions (Settings → Privacy: allowed/ignored providers, ZDR) may exclude every endpoint, and the job error offers a button to `https://openrouter.ai/settings/privacy`. That cause is the one no output mode can fix.
+
+Every request also carries the `reasoning` field chosen from the catalog (next section), or nothing for models without reasoning control.
 
 Always parsed with the same two layers: tolerant extraction (code fences, prose around, first balanced object) + Zod shape (extra ids ignored and logged; missing or non-string ids are failures), then `validateTranslation` per line.
 
+## Reasoning models
+
+Reasoning tokens are billed as output and count against `max_tokens` together with the visible text. A model that reasons by default (Nemotron 3 Super, MiMo v2.6, Claude Haiku 5.5: default effort `medium` or enabled) can spend the whole budget thinking and answer `finish_reason: "length"` with empty content. Subtitle translation does not need reasoning, so it is turned off whenever the model allows it.
+
+`parseModel` reads the catalog's `reasoning` object (`{ mandatory, supported_efforts?, default_enabled?, supports_max_tokens? }`) into `ModelInfo.reasoning`, only when `supported_parameters` lists `reasoning` (sending a parameter the endpoint does not list would narrow routing under `require_parameters`). Unknown effort names are dropped. The catalog cache carries a format `version` (`MODELS_CACHE_VERSION = 2`): an older cache, written without `reasoning`, counts as expired on the next `get` but is still served offline.
+
+`planReasoning(model)` (sent by `LlmSession` on every request of the job; never `exclude`, which still bills):
+
+| Catalog                                             | Request                                                                  | Examples                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| no `reasoning` object / parameter not supported     | nothing (body unchanged)                                                 | non-reasoning models                               |
+| `mandatory: true`                                   | lowest supported effort (or nothing) + 1,024-token slack on `max_tokens` | `["high","medium","low"]` → `low`                  |
+| `supported_efforts` contains `none`                 | `{ effort: "none" }`                                                     | Nemotron 3 Super, Haiku 5.5, Gemini 3.1 Flash Lite |
+| can be disabled, no `none` in the list (or no list) | `{ enabled: false }`                                                     | MiMo v2.6 Flash, Gemini 2.5 Flash Lite             |
+| `default_enabled: false`                            | nothing (already off)                                                    |                                                    |
+
+The client reads `usage.completion_tokens_details.reasoning_tokens` (`Usage.reasoningTokens`, absent when the provider does not report it) and the `chat ok` log line shows `max=` and `reasoning=` next to the token counts.
+
 ## Retries
 
-| Failure                                                   | Policy                                                                                                  |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| line fails validation / missing from the answer           | accept the valid lines (written to the cache), repair only the failing ones; ≤ 3 attempts per line      |
-| unparseable JSON                                          | counts as an attempt for every pending line; retried with the translate prompt                          |
-| `finish_reason: length`                                   | split the chunk in half (no content attempt spent)                                                      |
-| moderation (403 / `content_filter`)                       | split until isolated (≤ 3 levels); blocked lines → `UNTRANSLATED_CONTENT_FILTERED`                      |
-| 429                                                       | the whole lane cools down (`Retry-After`, else `X-RateLimit-Reset`, else backoff; ≤ 60 s); ≤ 5 attempts |
-| 429 free-model daily quota                                | fail the job: `LLM_DAILY_LIMIT` (reset time in the message)                                             |
-| 503                                                       | backoff 1 s…30 s with jitter, this request only; ≤ 5 attempts                                           |
-| 408 / 5xx / error inside the stream / 60 s idle / network | backoff; ≤ 3 attempts                                                                                   |
-| 401 / 402 (or 403 budget) / 400                           | fail the job: `LLM_AUTH` / `LLM_CREDITS` / `LLM_BAD_REQUEST`                                            |
-| transport attempts exhausted                              | extra chunk rounds after 60 s, 120 s (only the missing lines); then `LLM_UNAVAILABLE`                   |
+| Failure                                                   | Policy                                                                                                                      |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| line fails validation / missing from the answer           | accept the valid lines (written to the cache), repair only the failing ones; ≤ 3 attempts per line                          |
+| unparseable JSON                                          | counts as an attempt for every pending line; retried with the translate prompt                                              |
+| `finish_reason: length`, budget spent on reasoning        | same chunk again with `max_tokens` ×2, then ×4 (no split, no content attempt spent); still starved → `LLM_REASONING_BUDGET` |
+| `finish_reason: length`, long visible answer              | split the chunk in half (no content attempt spent)                                                                          |
+| moderation (403 / `content_filter`)                       | split until isolated (≤ 3 levels); blocked lines → `UNTRANSLATED_CONTENT_FILTERED`                                          |
+| 429                                                       | the whole lane cools down (`Retry-After`, else `X-RateLimit-Reset`, else backoff; ≤ 60 s); ≤ 5 attempts                     |
+| 429 free-model daily quota                                | fail the job: `LLM_DAILY_LIMIT` (reset time in the message)                                                                 |
+| 503                                                       | backoff 1 s…30 s with jitter, this request only; ≤ 5 attempts                                                               |
+| 408 / 5xx / error inside the stream / 60 s idle / network | backoff; ≤ 3 attempts                                                                                                       |
+| 401 / 402 (or 403 budget) / 400                           | fail the job: `LLM_AUTH` / `LLM_CREDITS` / `LLM_BAD_REQUEST`                                                                |
+| 404 "No endpoints found…"                                 | never repeated as is: one output-mode step down for the whole job (see Output); last step → `LLM_NO_ENDPOINT`               |
+| transport attempts exhausted                              | extra chunk rounds after 60 s, 120 s (only the missing lines); then `LLM_UNAVAILABLE`                                       |
+
+"Budget spent on reasoning" (`reasoningStarved`): `reasoning_tokens ≥ 50%` of `completion_tokens`; without the field, the visible content (estimated) is under 25% of `completion_tokens`; without `usage`, empty content. Splitting does not help there (every half reasons again and repeats the System Prompt and `<context>`). The budget factor belongs to the lane's `ChunkTranslator` and stays raised for its next chunks (the same model reasons alike; `max_tokens` is a cap, not a charge, though OpenRouter's in-flight budget weighs requests by it), so a job pays at most 2 extra requests per lane. The factor stops at 4× or at the model's `max_completion_tokens`; when it cannot grow any more the job fails with `LLM_REASONING_BUDGET` ("the model spent its output budget on reasoning"), not `LLM_UNAVAILABLE`, and gets no extra rounds.
 
 Every request first takes a slot from the shared `RateLimiter`; attempts, delays and rounds come from the `llm.retry.*` settings (read on every request). Details, defaults and the free-model quota: [`rate-limits.md`](./rate-limits.md).
 

@@ -19,6 +19,9 @@ export const APP_ERROR_CODES = [
   'LLM_DAILY_LIMIT',
   'LLM_UNKNOWN_MODEL',
   'LLM_TOO_MANY_FAILURES',
+  /** O raciocínio do modelo esgotou `max_tokens` mesmo com o orçamento ampliado. */
+  'LLM_REASONING_BUDGET',
+  'LLM_NO_ENDPOINT',
   'INVALID_PATH',
   'DISK_FULL',
   'PRESET_NOT_FOUND',

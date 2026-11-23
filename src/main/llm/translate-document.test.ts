@@ -219,6 +219,25 @@ describe('translateDocument', () => {
     expect(r.status).toBe('completed')
   })
 
+  it('length com resposta longa e válida até o corte continua dividindo (com reasoning_tokens)', async () => {
+    const long = (req: ChatRequest): ChatResult => ({
+      ...echo(req),
+      content: echo(req).content.slice(0, -10),
+      finishReason: 'length',
+      usage: {
+        promptTokens: 10,
+        completionTokens: 300,
+        cachedTokens: 0,
+        cost: 0,
+        reasoningTokens: 0
+      }
+    })
+    const d = deps((req, call) => (call === 1 ? long(req) : echo(req)))
+    const r = await translateDocument(input(longSrt(8)), d)
+    expect(d.calls.map((c) => targetLines(c).size)).toEqual([8, 4, 4])
+    expect(r.status).toBe('completed')
+  })
+
   it('moderação: divide até isolar; linha bloqueada vira CONTENT_FILTERED e não conta para o limite', async () => {
     const d = deps((req) => {
       if (targetLines(req).has(3)) throw new LlmError('moderation', 'blocked')
@@ -263,6 +282,98 @@ describe('translateDocument', () => {
     expect(d.calls).toHaveLength(9) // 3 tentativas × (1 + 2 rodadas)
     expect(d.sleep).toHaveBeenCalledWith(60_000, expect.any(AbortSignal))
     expect(d.sleep).toHaveBeenCalledWith(120_000, expect.any(AbortSignal))
+  })
+
+  describe('404 "No endpoints found": rebaixa o modo de saída', () => {
+    const noEndpoint = (): LlmError =>
+      new LlmError(
+        'unsupported-params',
+        'No endpoints found that can handle the requested parameters.',
+        { status: 404 }
+      )
+    /** Degrau de cada requisição, na ordem em que saíram. */
+    const modeOf = (c: ChatRequest): string =>
+      c.requireParameters ? 'json_schema_strict' : (c.responseFormat?.type ?? 'prompt')
+
+    it('404 no json_schema estrito: o chunk completa no degrau seguinte, sem backoff nem rodada extra', async () => {
+      const d = deps((req) => {
+        if (req.requireParameters) throw noEndpoint()
+        return echo(req)
+      })
+      const r = await translateDocument(input(srt('Hello there friend.')), d)
+      expect(r.status).toBe('completed')
+      expect(r.failed).toEqual([])
+      expect(d.calls.map(modeOf)).toEqual(['json_schema_strict', 'json_schema'])
+      // Degrau 2: mesmo schema, sem `require_parameters`.
+      expect(d.calls[1].responseFormat).toMatchObject({ type: 'json_schema' })
+      expect(d.calls[1].requireParameters).toBeUndefined()
+      expect(d.sleep).not.toHaveBeenCalled()
+      expect(r.notices).toEqual([expect.stringContaining('json_schema_strict -> json_schema')])
+    })
+
+    it('escada completa: estrito → json_schema → json_object → só prompt', async () => {
+      const d = deps((req) => {
+        if (req.responseFormat) throw noEndpoint()
+        return echo(req)
+      })
+      const r = await translateDocument(input(srt('Hello there friend.')), d)
+      expect(r.failed).toEqual([])
+      expect(d.calls.map(modeOf)).toEqual([
+        'json_schema_strict',
+        'json_schema',
+        'json_object',
+        'prompt'
+      ])
+      expect(d.calls[3].responseFormat).toBeUndefined()
+      expect(d.sleep).not.toHaveBeenCalled()
+      expect(r.notices).toHaveLength(3)
+    })
+
+    it('404 em todos os degraus: LLM_NO_ENDPOINT com as restrições da conta, sem retries', async () => {
+      const d = deps(() => {
+        throw noEndpoint()
+      })
+      const err = await translateDocument(input(srt('Hello there friend.')), d).catch((e) => e)
+      expect(err).toMatchObject({ code: 'LLM_NO_ENDPOINT' })
+      expect(err.message).toContain('provider restrictions')
+      expect(err.message).toContain('https://openrouter.ai/settings/privacy')
+      expect(d.calls).toHaveLength(4)
+      expect(d.sleep).not.toHaveBeenCalled()
+    })
+
+    it('modelo sem structured_outputs começa em json_object e desce para só prompt', async () => {
+      const d = deps(
+        (req) => {
+          if (req.responseFormat) throw noEndpoint()
+          return echo(req)
+        },
+        { models: { find: async () => ({ ...MODEL, structuredOutputs: false }) } }
+      )
+      await translateDocument(input(srt('Hello there friend.')), d)
+      expect(d.calls.map(modeOf)).toEqual(['json_object', 'prompt'])
+    })
+
+    it('o degrau vale para o job todo: chunks seguintes e outras lanes não voltam ao anterior', async () => {
+      const d = deps(
+        async (req) => {
+          await new Promise((r) => setTimeout(r, 1))
+          if (req.requireParameters) throw noEndpoint()
+          return echo(req)
+        },
+        { lanes: async () => 4 }
+      )
+      const r = await translateDocument(input(longSrt(400)), d)
+      expect(r.failed).toEqual([])
+      const modes = d.calls.map(modeOf)
+      const firstDowngraded = modes.indexOf('json_schema')
+      // Só as cabeças das lanes, já em voo, saem no modo estrito; depois, nunca mais.
+      expect(modes.slice(0, firstDowngraded).every((m) => m === 'json_schema_strict')).toBe(true)
+      expect(firstDowngraded).toBeLessThanOrEqual(4)
+      expect(modes.slice(firstDowngraded).every((m) => m === 'json_schema')).toBe(true)
+      expect(d.calls.length - firstDowngraded).toBeGreaterThan(4) // há chunks depois das cabeças
+      // Quatro lanes recebem 404, mas o job desce um degrau só.
+      expect(r.notices).toHaveLength(1)
+    })
   })
 
   it('rodada extra reenvia só as linhas que faltam', async () => {
@@ -513,6 +624,126 @@ function longSrt(
 }
 
 const firstId = (req: ChatRequest): number => [...targetLines(req).keys()][0]
+
+describe('translateDocument com modelos de raciocínio', () => {
+  const NEMOTRON: ModelInfo = {
+    ...MODEL,
+    id: 'nvidia/nemotron-3-super-120b-a12b',
+    maxCompletionTokens: 16384,
+    reasoning: {
+      mandatory: false,
+      supportedEfforts: ['medium', 'low', 'none'],
+      defaultEnabled: true,
+      supportsMaxTokens: true
+    }
+  }
+  const MANDATORY: ModelInfo = {
+    ...MODEL,
+    id: 'x/mandatory',
+    reasoning: {
+      mandatory: true,
+      supportedEfforts: ['high', 'medium', 'low'],
+      supportsMaxTokens: false
+    }
+  }
+  const withModel = (m: ModelInfo): Partial<TranslateDeps> => ({
+    models: { find: async (id: string) => (id === m.id ? m : null) }
+  })
+  const preset = (m: ModelInfo): Record<string, unknown> => ({
+    preset: { model: m.id, glossary: [], temperature: 0.3, prompt: '' }
+  })
+  /** Raciocínio comeu tudo: `length`, conteúdo vazio, saída = max_tokens em raciocínio. */
+  const starved = (req: ChatRequest, reasoning = true): ChatResult => ({
+    content: '',
+    finishReason: 'length',
+    generationId: 'gen-x',
+    usage: {
+      promptTokens: 10,
+      completionTokens: req.maxTokens,
+      cachedTokens: 0,
+      cost: 0,
+      ...(reasoning ? { reasoningTokens: req.maxTokens } : {})
+    }
+  })
+
+  it('corpo da requisição: Nemotron recebe effort none; modelo sem suporte não recebe nada novo', async () => {
+    const d = deps(echo, withModel(NEMOTRON))
+    await translateDocument(input(srt('Hello there.'), preset(NEMOTRON)), d)
+    expect(d.calls[0].reasoning).toEqual({ effort: 'none' })
+
+    const plain = deps(echo)
+    await translateDocument(input(srt('Hello there.')), plain)
+    expect(Object.keys(plain.calls[0]).sort()).toMatchInlineSnapshot(`
+      [
+        "maxTokens",
+        "messages",
+        "model",
+        "requireParameters",
+        "responseFormat",
+        "sessionId",
+        "temperature",
+      ]
+    `)
+  })
+
+  it('length + vazio: o chunk de 40 linhas repete inteiro com orçamento maior, sem dividir', async () => {
+    const d = deps((req, call) => (call === 1 ? starved(req) : echo(req)), withModel(NEMOTRON))
+    const r = await translateDocument(input(longSrt(40), preset(NEMOTRON)), d)
+    expect(d.calls.map((c) => targetLines(c).size)).toEqual([40, 40])
+    expect(d.calls[1].maxTokens).toBe(d.calls[0].maxTokens * 2)
+    expect(r.status).toBe('completed')
+    expect(r.failed).toHaveLength(0)
+  })
+
+  it('sem reasoning_tokens no usage: o critério de reserva (vazio) também amplia', async () => {
+    const d = deps(
+      (req, call) => (call <= 2 ? starved(req, false) : echo(req)),
+      withModel(NEMOTRON)
+    )
+    const r = await translateDocument(input(longSrt(40), preset(NEMOTRON)), d)
+    expect(d.calls.map((c) => targetLines(c).size)).toEqual([40, 40, 40])
+    expect(d.calls.map((c) => c.maxTokens / d.calls[0].maxTokens)).toEqual([1, 2, 4])
+    expect(r.status).toBe('completed')
+  })
+
+  it('o orçamento ampliado vale para os chunks seguintes da lane', async () => {
+    const base = deps(echo, withModel(NEMOTRON))
+    await translateDocument(input(longSrt(80), preset(NEMOTRON)), base)
+    await t.close()
+    t = await openTestDatabase()
+    memory = new JobMemoryService(new JobMemoryRepository(t.db))
+    const d = deps((req, call) => (call === 1 ? starved(req) : echo(req)), {
+      ...withModel(NEMOTRON),
+      memory
+    })
+    await translateDocument(input(longSrt(80), preset(NEMOTRON)), d)
+    expect(d.calls.map((c) => targetLines(c).size)).toEqual([40, 40, 40])
+    expect(d.calls[2].maxTokens).toBe(base.calls[1].maxTokens * 2)
+  })
+
+  it('ampliado até 4x e ainda sem saída: LLM_REASONING_BUDGET (no máximo 2 requisições extras)', async () => {
+    const d = deps((req) => starved(req), withModel(NEMOTRON))
+    await expect(translateDocument(input(longSrt(40), preset(NEMOTRON)), d)).rejects.toMatchObject({
+      code: 'LLM_REASONING_BUDGET'
+    })
+    expect(d.calls).toHaveLength(3)
+    expect(d.calls.every((c) => targetLines(c).size === 40)).toBe(true)
+  })
+
+  it('raciocínio obrigatório: menor esforço + folga no max_tokens, limitada pelo modelo', async () => {
+    const plain = deps(echo)
+    await translateDocument(input(srt('Hello there.')), plain)
+    const d = deps(echo, withModel(MANDATORY))
+    await translateDocument(input(srt('Hello there!'), preset(MANDATORY)), d)
+    expect(d.calls[0].reasoning).toEqual({ effort: 'low' })
+    expect(d.calls[0].maxTokens).toBe(plain.calls[0].maxTokens + 1024)
+
+    const capped = { ...MANDATORY, maxCompletionTokens: 600 }
+    const c = deps(echo, withModel(capped))
+    await translateDocument(input(srt('Hello again!'), preset(capped)), c)
+    expect(c.calls[0].maxTokens).toBe(600)
+  })
+})
 
 describe('translateDocument em lanes', () => {
   it('perJob 4 com 10 chunks: 4 requisições em voo ao mesmo tempo, mesmo session_id', async () => {

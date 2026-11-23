@@ -545,6 +545,7 @@ export const common = {
     hint: {
       dailyLimit: 'Free models reset at {{time}} (00:00 UTC). Retry then, or pick a paid model.',
       credits: 'Add credits on OpenRouter',
+      privacy: 'Open OpenRouter privacy settings',
       sidecar: 'Install tools',
       interrupted:
         'BakaSub closed while this job ran. Retrying continues from the step that stopped.'

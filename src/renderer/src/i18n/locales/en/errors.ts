@@ -22,6 +22,10 @@ const codes = {
     'Daily limit for free models reached. It resets at 00:00 UTC; what was already translated is kept, so retrying later continues from there.',
   LLM_UNKNOWN_MODEL: 'This model is no longer available on OpenRouter. Pick another one.',
   LLM_TOO_MANY_FAILURES: 'Too many lines failed to translate. Try another model or preset.',
+  LLM_NO_ENDPOINT:
+    'No OpenRouter provider accepted this model for your account. Check the provider restrictions in your OpenRouter privacy settings (allowed/ignored providers, ZDR) or pick another model.',
+  LLM_REASONING_BUDGET:
+    'The model spent its whole output budget on reasoning and returned no translation. Pick another model.',
   INVALID_PATH: 'This file or folder cannot be used. Choose it again.',
   DISK_FULL: 'Not enough free disk space for the output.',
   PRESET_NOT_FOUND: 'This preset no longer exists.',

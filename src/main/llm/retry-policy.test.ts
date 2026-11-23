@@ -13,7 +13,8 @@ describe('decide', () => {
     ['auth', 'LLM_AUTH'],
     ['credits', 'LLM_CREDITS'],
     ['bad-request', 'LLM_BAD_REQUEST'],
-    ['daily-limit', 'LLM_DAILY_LIMIT']
+    ['daily-limit', 'LLM_DAILY_LIMIT'],
+    ['unsupported-params', 'LLM_NO_ENDPOINT']
   ] as const)('%s é fatal (%s)', (kind, code) => {
     expect(decide(e(kind), 1)).toEqual({ action: 'fatal', code })
   })

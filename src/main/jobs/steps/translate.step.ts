@@ -51,6 +51,7 @@ export const translateStep: Step = async (ctx) => {
     throw err
   }
   ctx.recordUsage(result.usage)
+  for (const n of result.notices ?? []) ctx.warn(n)
 
   const out = join(ctx.workDir, `translated.${id}`)
   const fixes = await writeSubtitle(out, result.doc, format)

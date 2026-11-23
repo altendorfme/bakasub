@@ -23,6 +23,10 @@ export const errors: LocaleShape<typeof en> = {
     'Limite diário dos modelos gratuitos atingido. Ele zera às 00:00 UTC; o que já foi traduzido fica salvo, então tentar depois continua de onde parou.',
   LLM_UNKNOWN_MODEL: 'Este modelo não está mais disponível no OpenRouter. Escolha outro.',
   LLM_TOO_MANY_FAILURES: 'Muitas falas não puderam ser traduzidas. Tente outro modelo ou preset.',
+  LLM_NO_ENDPOINT:
+    'Nenhum provedor do OpenRouter aceitou este modelo para a sua conta. Confira as restrições de provedor nas configurações de privacidade do OpenRouter (provedores permitidos/ignorados, ZDR) ou escolha outro modelo.',
+  LLM_REASONING_BUDGET:
+    'O modelo gastou todo o orçamento de saída em raciocínio e não devolveu a tradução. Escolha outro modelo.',
   INVALID_PATH: 'Este arquivo ou pasta não pode ser usado. Escolha de novo.',
   DISK_FULL: 'Não há espaço livre em disco suficiente para a saída.',
   PRESET_NOT_FOUND: 'Este preset não existe mais.',

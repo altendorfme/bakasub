@@ -69,6 +69,10 @@ export function decide(
       return { action: 'fatal', code: 'LLM_BAD_REQUEST' }
     case 'daily-limit':
       return { action: 'fatal', code: 'LLM_DAILY_LIMIT' }
+    // Determinístico: repetir igual nunca resolve. `LlmSession` rebaixa o modo de saída antes de
+    // chegar aqui; este caso só vale quando não há degrau abaixo.
+    case 'unsupported-params':
+      return { action: 'fatal', code: 'LLM_NO_ENDPOINT' }
     case 'moderation':
       return { action: 'moderated' }
     case 'aborted':

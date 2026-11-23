@@ -553,6 +553,7 @@ export const common: LocaleShape<typeof en> = {
       dailyLimit:
         'Os modelos gratuitos zeram às {{time}} (00:00 UTC). Tente de novo nesse horário ou escolha um modelo pago.',
       credits: 'Adicionar créditos no OpenRouter',
+      privacy: 'Abrir as configurações de privacidade do OpenRouter',
       sidecar: 'Instalar ferramentas',
       interrupted:
         'O BakaSub fechou enquanto este job rodava. Tentar de novo continua da etapa em que parou.'

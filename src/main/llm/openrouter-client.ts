@@ -1,3 +1,4 @@
+import type { ReasoningRequest } from './reasoning'
 import { readSse } from './sse'
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
@@ -22,6 +23,12 @@ export type LlmErrorKind =
   | 'daily-limit'
   /** 502/503: modelo/provedor indisponível. Repete. */
   | 'unavailable'
+  /**
+   * 404 "No endpoints found…": nenhum endpoint do modelo aceita os parâmetros da requisição
+   * (ex.: `response_format` estrito com `require_parameters`) ou as restrições de provedor da
+   * conta excluem todos. Determinístico: nunca repete igual; `LlmSession` rebaixa o modo de saída.
+   */
+  | 'unsupported-params'
   /** Outros 5xx (e 404/413/422 inesperados). Repete. */
   | 'server'
   /** 408 ou inatividade do stream. Repete. */
@@ -95,6 +102,8 @@ export interface ChatRequest {
   readonly requireParameters?: boolean
   /** `session_id`: sticky routing para o mesmo provedor (preserva o cache do prefixo). */
   readonly sessionId?: string
+  /** `reasoning` unificado do OpenRouter (ver `planReasoning`). Ausente = não enviado. */
+  readonly reasoning?: ReasoningRequest
 }
 
 export interface Usage {
@@ -103,6 +112,11 @@ export interface Usage {
   readonly cachedTokens: number
   /** Créditos OpenRouter (1 crédito = 1 USD). */
   readonly cost: number
+  /**
+   * `completion_tokens_details.reasoning_tokens` (já incluídos em `completionTokens`). Ausente
+   * quando o provedor não informa.
+   */
+  readonly reasoningTokens?: number
 }
 
 export interface ChatResult {
@@ -198,6 +212,12 @@ function isInFlightBusy(body: ErrorBody | null): boolean {
   )
 }
 
+/** Texto do 404 de roteamento do OpenRouter ("No endpoints found that can handle…", "…matching your data policy"). */
+function isNoEndpoint(body: ErrorBody | null): boolean {
+  const m = body?.error?.message
+  return typeof m === 'string' && /no endpoints found/i.test(m)
+}
+
 const BUDGET_SOURCES =
   /^openrouter_(key_limit|guardrail_budget|workspace_budget|credits|in_flight_budget)$/
 
@@ -213,6 +233,7 @@ function kindForStatus(status: number, body: ErrorBody | null): LlmErrorKind {
   if (status === 408) return 'timeout'
   if (status === 429) return 'rate-limit'
   if (status === 502 || status === 503) return 'unavailable'
+  if (status === 404 && isNoEndpoint(body)) return 'unsupported-params'
   return 'server'
 }
 
@@ -224,10 +245,13 @@ interface StreamChunk {
     completion_tokens?: unknown
     cost?: unknown
     prompt_tokens_details?: { cached_tokens?: unknown }
+    completion_tokens_details?: { reasoning_tokens?: unknown } | null
   }
 }
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+const optNum = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null
 
 /**
  * Cliente mínimo de Chat Completions via SSE. Não decide retry nem valida conteúdo: só
@@ -271,7 +295,8 @@ export class OpenRouterClient {
           }
         : {}),
       ...(req.requireParameters ? { provider: { require_parameters: true } } : {}),
-      ...(req.sessionId ? { session_id: req.sessionId } : {})
+      ...(req.sessionId ? { session_id: req.sessionId } : {}),
+      ...(req.reasoning ? { reasoning: req.reasoning } : {})
     }
 
     const local = new AbortController()
@@ -346,11 +371,13 @@ export class OpenRouterClient {
         if (typeof choice?.delta?.content === 'string') content += choice.delta.content
         if (typeof choice?.finish_reason === 'string') finishReason = choice.finish_reason
         if (c.usage) {
+          const reasoningTokens = optNum(c.usage.completion_tokens_details?.reasoning_tokens)
           usage = {
             promptTokens: num(c.usage.prompt_tokens),
             completionTokens: num(c.usage.completion_tokens),
             cachedTokens: num(c.usage.prompt_tokens_details?.cached_tokens),
-            cost: num(c.usage.cost)
+            cost: num(c.usage.cost),
+            ...(reasoningTokens !== null ? { reasoningTokens } : {})
           }
         }
       }
