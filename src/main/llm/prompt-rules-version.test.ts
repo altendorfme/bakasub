@@ -28,7 +28,8 @@ function rulesFingerprint(): string {
  * Nunca edite uma linha existente: isso reaproveitaria no cache traduções feitas com outras regras.
  */
 const FINGERPRINTS: Readonly<Record<number, string>> = {
-  1: '1c690d5fd6fe6cc6ef57f770636ea74076754c46b9c68576d20786e66c53ea4a'
+  1: '1c690d5fd6fe6cc6ef57f770636ea74076754c46b9c68576d20786e66c53ea4a',
+  2: 'e5a6df741dce558e16c61b5e27ceb1ca1fe6a6bb835b07e83a49e84b09fa8062'
 }
 
 describe('PROMPT_RULES_VERSION', () => {

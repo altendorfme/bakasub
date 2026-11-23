@@ -28,6 +28,8 @@ Rules (they always apply, even if the style guidance above says otherwise):
    - Follow the 1990 Orthographic Agreement: "deem", "leem", "creem", "voo", "ideia", "heroico", "para" (verb), with no "trema" (ü).
    - Commands use the imperative ("Mire!"/"Mirem!", "Deem tudo de si!"), never a gerund ("Mirando…") or a description of the action.
    - Idioms become the Brazilian equivalent, not a literal calque (e.g. "sticks out like a sore thumb" → "chama atenção de longe" / "destoa de tudo").
+   - Gender: "I'm tired" from a woman → "Estou cansada"; speaker unknown → "Que cansaço!". "You're late" with an unknown listener → "Você se atrasou", not a guessed "atrasado"/"atrasada".
+7. Brazilian Portuguese marks gender where the source often does not (e.g. "I'm tired", "You're late"). Infer the gender of the speaker and of the listener from <context>, names, pronouns and the media background, and keep it consistent for the same character. If it cannot be inferred, use a natural gender-neutral phrasing instead of guessing; never write both forms with a slash.
 
 Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}"
 `;

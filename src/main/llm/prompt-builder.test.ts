@@ -9,6 +9,7 @@ import {
   parseGlossary,
   responseSchema
 } from './prompt-builder'
+import { languageNotes } from './language-notes'
 
 describe('parseGlossary', () => {
   it('aceita {source, target?, rule?}; descarta inválidos', () => {
@@ -84,6 +85,29 @@ describe('buildSystemPrompt', () => {
     expect(ja).toContain('Never translate them literally.')
     expect(ja).toContain('current official spelling of Japanese.\n\nOutput:')
     expect(ja).not.toContain(' notes:')
+  })
+  it('regra de gênero só para idiomas com concordância', () => {
+    const rule = /7\. .* marks gender where the source often does not/
+    for (const targetLang of ['pt-BR', 'pt-PT', 'es', 'es-419', 'fr', 'de', 'it', 'ru', 'pl']) {
+      const sp = buildSystemPrompt({ targetLang, glossary: [] })
+      expect(sp, targetLang).toMatch(rule)
+      expect(sp, targetLang).toContain('consistent for the same character')
+      expect(sp, targetLang).toContain('gender-neutral phrasing instead of guessing')
+    }
+    for (const targetLang of ['en', 'en-US', 'ja', 'zh', 'zh-Hans', 'ko', 'tr']) {
+      expect(buildSystemPrompt({ targetLang, glossary: [] }), targetLang).not.toMatch(rule)
+    }
+    expect(p).toContain('7. Brazilian Portuguese marks gender')
+    expect(p).toContain('"Que cansaço!"')
+    expect(buildSystemPrompt({ targetLang: 'es', glossary: [] })).toContain('"Estoy lista"')
+  })
+  it('regra de gênero cabe em ~150 tokens (regra + exemplo pt-BR)', () => {
+    const without = buildSystemPrompt({ targetLang: 'en', glossary: [] })
+    const withRule = buildSystemPrompt({ targetLang: 'it', glossary: [] })
+    const ruleChars = withRule.length - without.length - ('Italian'.length - 'English'.length)
+    const noteChars = languageNotes('pt-BR').find((n) => n.startsWith('Gender:'))?.length ?? 0
+    // ~4 caracteres por token em inglês (o preflight conta com o tokenizer real).
+    expect(Math.ceil((ruleChars + noteChars) / 4)).toBeLessThanOrEqual(150)
   })
   it('sem glossário: sem bloco <glossary>', () => {
     expect(buildSystemPrompt({ targetLang: 'pt-BR', glossary: [] })).not.toContain('<glossary>')

@@ -1,7 +1,7 @@
 import { GlossaryEntrySchema } from '../presets/preset.schema'
 import type { Issue, TranslationUnit } from '../parsers'
 import type { ChunkContext } from './chunker'
-import { languageNotes } from './language-notes'
+import { hasGenderAgreement, languageNotes } from './language-notes'
 
 /**
  * Versão do texto fixo do System Prompt (`buildSystemPrompt` + `language-notes.ts`). Entra na
@@ -9,7 +9,7 @@ import { languageNotes } from './language-notes'
  * Incrementar em todo PR que mude esse texto; `prompt-rules-version.test.ts` quebra se o texto
  * mudar sem a versão mudar.
  */
-export const PROMPT_RULES_VERSION = 1
+export const PROMPT_RULES_VERSION = 2
 
 export interface GlossaryEntry {
   readonly source: string
@@ -89,9 +89,16 @@ Rules (they always apply, even if the style guidance above says otherwise):
 6. Write idiomatic ${target}, not a word-for-word rendering:
    - Idioms, slang and figures of speech become the natural ${target} equivalent with the same tone and intensity; if none exists, convey the meaning plainly. Never translate them literally.
    - Commands, orders and battle cries use the imperative mood of ${target}, never a gerund, infinitive or description of the action.
-   - Follow the current official spelling of ${target}.${languageNotesBlock(input.targetLang)}
+   - Follow the current official spelling of ${target}.${languageNotesBlock(input.targetLang)}${genderRule(input.targetLang, target)}
 
 Output: a single JSON object mapping each <target> line id (as a string) to its translation, with every id present and nothing else. Example: {"12": "…", "13": "…"}${mediaSection(input.media)}`
+}
+
+/** Regra 7, só para idiomas com concordância de gênero (`language-notes.ts`). */
+function genderRule(tag: string, target: string): string {
+  if (!hasGenderAgreement(tag)) return ''
+  return `
+7. ${target} marks gender where the source often does not (e.g. "I'm tired", "You're late"). Infer the gender of the speaker and of the listener from <context>, names, pronouns and the media background, and keep it consistent for the same character. If it cannot be inferred, use a natural gender-neutral phrasing instead of guessing; never write both forms with a slash.`
 }
 
 function languageNotesBlock(tag: string): string {
