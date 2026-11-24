@@ -1,18 +1,19 @@
-import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BatchSource } from '@shared/ipc-contract'
 import { useOutputPrefs } from '@renderer/data/output-prefs'
-import { cn } from '@renderer/lib/utils'
+import { SummaryList } from '../summary-list'
+import type { SummaryRow } from '../summary-rows'
 import type { BatchCtx } from './batch-ctx'
 import type { BatchStep } from './batch-state'
 import { useSettingsLabels } from './use-settings-labels'
 import { rowsOf, workPreset } from './works'
 
-/** Same look as the single-file summary: one row per choice, linking to its step. */
+/** Same rules as the single-file summary: a row per choice of a reached step, linking to it. */
 export function BatchSummary({
   source,
   ctx,
   steps,
+  furthest,
   current,
   canGo,
   onGo
@@ -20,6 +21,8 @@ export function BatchSummary({
   source: BatchSource | null
   ctx: BatchCtx | null
   steps: readonly BatchStep[]
+  /** Index of the furthest step reached. */
+  furthest: number
   current: BatchStep
   canGo: (s: BatchStep) => boolean
   onGo: (s: BatchStep) => void
@@ -40,11 +43,15 @@ export function BatchSummary({
           ctx.grouping.works
             .filter((w) => rowsOf(ctx.grouping, ctx.rows, w.id).some((i) => ctx.rows[i].include))
             .map((w) => label.preset(workPreset(w, ctx.suggestions)))
+            .filter((p) => p !== none)
         )
       ].join(', ')
     : ''
+  // The labels fall back to `none` when even Settings has no value: such a row is left out.
+  const known = (v: string): string | null => (v === none ? null : v)
+  const model = known(label.model(o?.model ?? null))
 
-  const rows: { step: BatchStep; label: string; value: string; warn?: string }[] = [
+  const rows: SummaryRow<BatchStep>[] = [
     {
       step: 'files',
       label: t('batch.summary.source'),
@@ -53,7 +60,7 @@ export function BatchSummary({
           ? source.path
           : source
             ? t('batch.files.fromFiles', { count: source.paths.length })
-            : none
+            : null
     },
     {
       step: 'files',
@@ -62,38 +69,36 @@ export function BatchSummary({
         ? out
           ? t('batch.summary.includedOut', { count: included, out })
           : t('batch.summary.included', { count: included })
-        : none,
+        : null,
       ...(attention ? { warn: t('batch.status.attention', { count: attention }) } : {})
     },
     {
       step: 'tracks',
       label: t('batch.summary.tracks'),
-      value: ctx ? t('batch.summary.tracksValue') : none
+      value: ctx ? t('batch.summary.tracksValue') : null
     },
     {
       step: 'works',
       label: t('batch.summary.works'),
-      value: ctx?.grouping.works.map((w) => w.name).join(', ') || none
+      value: ctx?.grouping.works.map((w) => w.name).join(', ') || null
     },
     {
       step: 'preset',
       label: t('batch.summary.preset'),
-      value: presets || none
+      value: presets || null
     },
     {
       step: 'preset',
       label: t('batch.summary.model'),
-      value: customized
-        ? t('batch.summary.customized', {
-            preset: label.model(o?.model ?? null),
-            count: customized
-          })
-        : label.model(o?.model ?? null)
+      value:
+        model && customized
+          ? t('batch.summary.customized', { preset: model, count: customized })
+          : model
     },
     {
       step: 'preset',
       label: t('batch.summary.language'),
-      value: label.lang(o?.targetLang ?? null)
+      value: known(label.lang(o?.targetLang ?? null))
     },
     ...(ctx?.flavor === 'pipeline'
       ? [
@@ -112,49 +117,17 @@ export function BatchSummary({
   ]
 
   return (
-    <aside
-      aria-labelledby="batch-summary"
-      className="grid grid-cols-[minmax(0,1fr)] content-start gap-3 rounded-xl border bg-card/92 p-4 lg:sticky lg:top-6"
-    >
-      <h2 id="batch-summary" className="text-sm font-semibold">
-        {t('batch.summary.title')}
-      </h2>
-      <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
-        {rows
-          .filter((r) => steps.includes(r.step))
-          .map((r) => {
-            const go = canGo(r.step)
-            return (
-              <li key={r.label}>
-                <button
-                  type="button"
-                  disabled={!go}
-                  onClick={() => onGo(r.step)}
-                  aria-label={`${r.label}: ${r.value}. ${t('translate.summary.edit', { step: t(`batch.steps.${r.step}`) })}`}
-                  className={cn(
-                    'grid w-full gap-0.5 rounded-md px-2 py-1.5 text-left disabled:cursor-default',
-                    go && 'hover:bg-accent',
-                    current === r.step && 'bg-accent/60'
-                  )}
-                >
-                  <span className="text-[11px] text-muted-foreground">{r.label}</span>
-                  <span
-                    className={cn('truncate text-sm', r.value === none && 'text-muted-foreground')}
-                    title={r.value}
-                  >
-                    {r.value}
-                  </span>
-                  {r.warn ? (
-                    <span className="flex items-center gap-1 text-xs text-warning">
-                      <AlertTriangle className="size-3.5 shrink-0" />
-                      {r.warn}
-                    </span>
-                  ) : null}
-                </button>
-              </li>
-            )
-          })}
-      </ul>
-    </aside>
+    <SummaryList
+      id="batch-summary"
+      title={t('batch.summary.title')}
+      empty={t('batch.summary.empty')}
+      rows={rows}
+      steps={steps}
+      furthest={furthest}
+      current={current}
+      stepLabel={(s) => t(`batch.steps.${s}`)}
+      canGo={canGo}
+      onGo={onGo}
+    />
   )
 }

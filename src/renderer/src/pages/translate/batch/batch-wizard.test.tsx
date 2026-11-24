@@ -239,6 +239,12 @@ function setup(): {
 
 afterEach(cleanup)
 
+/** The summary's row labels, in order. */
+const summaryRows = (): string[] =>
+  within(screen.getByRole('complementary', { name: 'Summary' }))
+    .queryAllByRole('button')
+    .map((b) => b.firstElementChild?.textContent ?? '')
+
 const next = async (): Promise<void> =>
   userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
 
@@ -247,6 +253,8 @@ describe('Translate several files', () => {
     const { create, confirm, planCall } = setup()
     await userEvent.click(await screen.findByRole('button', { name: 'Select several files' }))
     expect(screen.getByRole('heading', { name: 'Choose the files' })).toBeTruthy()
+    expect(screen.getByText('Choose a folder or files to get started.')).toBeTruthy()
+    expect(summaryRows()).toEqual([])
     await userEvent.click(screen.getByRole('button', { name: 'Choose a folder' }))
 
     // Both kinds are planned (the folder has only videos, so no choice is offered).
@@ -255,9 +263,12 @@ describe('Translate several files', () => {
     expect(screen.getByText('1 left out')).toBeTruthy()
     expect(screen.getByText('2 works recognized')).toBeTruthy()
     expect(screen.queryByText(/This folder has videos and subtitle files/)).toBeNull()
+    // Only the first step's rows: no tracks, works or defaults not seen yet.
+    expect(summaryRows()).toEqual(['Source', 'Files'])
     await next()
 
     expect(await screen.findByRole('heading', { name: 'Check the subtitle tracks' })).toBeTruthy()
+    expect(summaryRows()).toEqual(['Source', 'Files', 'Tracks'])
     expect(screen.getByText('1 left out')).toBeTruthy()
     await next()
 
@@ -290,6 +301,17 @@ describe('Translate several files', () => {
     await next()
 
     expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
+    expect(summaryRows()).toEqual([
+      'Source',
+      'Files',
+      'Tracks',
+      'Works',
+      'Preset',
+      'Model',
+      'Into',
+      'Write',
+      'Output'
+    ])
     await userEvent.click(screen.getByRole('button', { name: 'Translate 3 files' }))
     expect(create).toHaveBeenCalledWith({
       kind: 'pipeline',

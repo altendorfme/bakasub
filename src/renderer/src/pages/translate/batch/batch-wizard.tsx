@@ -235,6 +235,7 @@ export function BatchWizard({ onSwitchMode }: { onSwitchMode: () => void }): Rea
                 source={state.source}
                 ctx={ctx}
                 steps={steps}
+                furthest={state.furthest}
                 current={step}
                 canGo={reachable}
                 onGo={go}

@@ -204,7 +204,7 @@ export const common = {
       media: 'Media',
       mediaOff: 'Not included',
       output: 'Output',
-      none: '—',
+      empty: 'Choose a file to get started.',
       edit: 'Edit {{step}}'
     },
     existing: {
@@ -449,7 +449,8 @@ export const common = {
       nextToEach: 'Next to each file',
       included: '{{count}} included',
       includedOut: '{{count}} included · {{out}} out',
-      none: '—'
+      none: '—',
+      empty: 'Choose a folder or files to get started.'
     },
     start_one: 'Translate {{count}} file',
     start_other: 'Translate {{count}} files',
