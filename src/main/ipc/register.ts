@@ -1,5 +1,5 @@
 import type { AppInfoService } from '../services/app-info.service'
-import type { AppUpdater } from '../services/app-updater'
+import type { AppUpdater, AutoCheckHandle } from '../services/app-updater'
 import type { BatchService } from '../batch/batch-service'
 import type { JobManager } from '../jobs/job-manager'
 import type { FreeQuota } from '../llm/free-quota'
@@ -27,6 +27,7 @@ import { registerSidecarHandlers } from './handlers/sidecar.handler'
 export interface IpcDependencies {
   appInfo: AppInfoService
   appUpdate: AppUpdater
+  autoCheck: Pick<AutoCheckHandle, 'onboardingFinished'>
   sidecars: SidecarManager
   memory: JobMemoryService
   vault: SecretVault

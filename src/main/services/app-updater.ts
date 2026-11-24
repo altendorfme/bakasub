@@ -301,20 +301,84 @@ function isNetworkFailure(err: unknown): boolean {
  */
 export const AUTO_CHECK_DELAY_MS = 3_000
 
+export interface AutoCheckHandle {
+  /**
+   * O wizard de boas-vindas terminou: arma a checagem se ela ainda não ocorreu nesta sessão.
+   * Reavalia `onboarded` antes de armar, então um sinal espúrio não fura o gate.
+   */
+  onboardingFinished(): void
+  /** Descarta o timer pendente; nada mais é checado automaticamente nesta sessão. */
+  cancel(): void
+}
+
 /**
- * Checagem silenciosa única após o boot, desligável por `updates.autoCheck`. Só consulta:
- * baixar e instalar dependem de ação do usuário. Devolve o cancelador do timer.
+ * Checagem silenciosa única por sessão, desligável por `updates.autoCheck`. Só consulta: baixar e
+ * instalar dependem de ação do usuário.
+ *
+ * Gate de onboarding: `onboarded` é avaliado no boot. Se já estiver satisfeito, a checagem roda
+ * após `delayMs` (comportamento de sempre). Senão o wizard está (ou vai estar) aberto e nada é
+ * consultado até `onboardingFinished()`; a regra derivada sozinha não basta durante a sessão,
+ * porque ela fica verdadeira no meio do wizard (passos opcionais vêm depois dos obrigatórios).
  */
 export function scheduleAutoCheck(
   updater: Pick<AppUpdater, 'check'>,
-  opts: { enabled: () => Promise<boolean>; delayMs?: number; log: { warn(...a: unknown[]): void } }
-): () => void {
-  const timer = setTimeout(() => {
+  opts: {
+    enabled: () => Promise<boolean>
+    onboarded: () => Promise<boolean>
+    delayMs?: number
+    log: { warn(...a: unknown[]): void }
+  }
+): AutoCheckHandle {
+  // idle: aguardando o wizard. evaluating: lendo `onboarded`. scheduled: timer armado.
+  // done: já checou (ou foi cancelado); terminal.
+  let phase: 'idle' | 'evaluating' | 'scheduled' | 'done' = 'idle'
+  let timer: ReturnType<typeof setTimeout> | null = null
+  // `onboardingFinished` chegou durante uma avaliação que pode ter lido o estado antigo.
+  let rearm = false
+
+  const run = (): void => {
+    phase = 'done'
+    timer = null
     void opts
       .enabled()
       .then((on) => (on ? updater.check() : undefined))
       .catch((err) => opts.log.warn('auto update check failed', err))
-  }, opts.delayMs ?? AUTO_CHECK_DELAY_MS)
-  timer.unref()
-  return () => clearTimeout(timer)
+  }
+
+  const arm = (): void => {
+    if (phase === 'evaluating') {
+      rearm = true
+      return
+    }
+    if (phase !== 'idle') return
+    phase = 'evaluating'
+    rearm = false
+    opts
+      .onboarded()
+      .catch((err) => {
+        opts.log.warn('onboarding state unavailable; auto update check deferred', err)
+        return false
+      })
+      .then((ok) => {
+        if (phase !== 'evaluating') return // cancelado durante a leitura
+        if (!ok) {
+          phase = 'idle'
+          if (rearm) arm()
+          return
+        }
+        phase = 'scheduled'
+        timer = setTimeout(run, opts.delayMs ?? AUTO_CHECK_DELAY_MS)
+        timer.unref()
+      })
+  }
+
+  arm()
+  return {
+    onboardingFinished: arm,
+    cancel: () => {
+      if (timer) clearTimeout(timer)
+      timer = null
+      phase = 'done'
+    }
+  }
 }

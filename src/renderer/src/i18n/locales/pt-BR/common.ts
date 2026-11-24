@@ -977,6 +977,8 @@ export const common: LocaleShape<typeof en> = {
       failed: 'A atualização falhou. Nada foi alterado.',
       unsupported:
         'Esta versão não se atualiza sozinha (build de desenvolvimento ou fora de um AppImage/instalador). Baixe a nova versão na página da release.',
+      devBuild:
+        'Build de desenvolvimento: a atualização pelo app fica desligada e nunca mexe no BakaSub instalado.',
       openRelease: 'Abrir a página da release',
       showNotes: 'Ver notas da versão',
       hideNotes: 'Ocultar notas da versão',

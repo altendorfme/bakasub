@@ -69,6 +69,7 @@ function setup(jobs: Job[] = []): {
           platform: 'linux' as const,
           arch: 'x64',
           electron: '44',
+          isDev: false,
           userDataPath: '/u'
         }),
       getUpdateState: () => ok({ state: 'not-available' as const, current: '0.1.0' }),

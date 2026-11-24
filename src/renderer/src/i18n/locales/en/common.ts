@@ -963,6 +963,8 @@ export const common = {
       failed: 'The update failed. Nothing was changed.',
       unsupported:
         'This build cannot update itself (development build or not an AppImage/installer). Download the new version from the release page.',
+      devBuild:
+        'Development build: in-app updates are off, so it never touches the installed BakaSub.',
       openRelease: 'Open the release page',
       showNotes: 'Show release notes',
       hideNotes: 'Hide release notes',

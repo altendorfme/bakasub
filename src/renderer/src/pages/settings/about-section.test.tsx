@@ -37,6 +37,7 @@ function setup(
         platform: 'linux' as const,
         arch: 'x64',
         electron: '44',
+        isDev: false,
         userDataPath: '/u'
       }),
     getUpdateState: () => ok(status),
@@ -190,6 +191,33 @@ describe('About → updates', () => {
     expect(screen.queryByRole('button', { name: 'Restart and update' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Open the release page' }))
     expect(app.openExternal).toHaveBeenCalledWith('https://github.com/x/y/releases')
+  })
+
+  it('dev build: name and version say dev, updates are explained as off', async () => {
+    setup(
+      { ...base, state: 'unsupported' },
+      {
+        getInfo: () =>
+          ok({
+            name: 'BakaSub',
+            version: '0.1.0',
+            isDev: true,
+            platform: 'linux' as const,
+            arch: 'x64',
+            electron: '44',
+            userDataPath: '/u'
+          })
+      }
+    )
+    expect(await screen.findByText(/BakaSub \(dev\) · Version 0\.1\.0-dev/)).toBeTruthy()
+    expect(screen.getByText(/Development build: in-app updates are off/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Check for updates' })).toBeNull()
+  })
+
+  it('installed build: no dev marker', async () => {
+    setup(base)
+    expect(await screen.findByText('BakaSub · Version 0.1.0')).toBeTruthy()
+    expect(screen.queryByText(/\(dev\)|-dev/)).toBeNull()
   })
 
   it('error offline: non-blocking message and retry', async () => {

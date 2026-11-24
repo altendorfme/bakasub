@@ -9,6 +9,8 @@ import { Switch } from '@renderer/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter } from '@renderer/components/ui/dialog'
 import { Progress } from '@renderer/components/ui/progress'
 import {
+  appDisplayName,
+  appDisplayVersion,
   useAppInfo,
   useAppUpdateStatus,
   useCancelUpdateDownload,
@@ -38,7 +40,8 @@ export function AboutSection(): React.JSX.Element {
       {info ? (
         <div className="grid gap-0.5">
           <p className="text-base font-semibold">
-            {info.name} · {t('settings.about.version', { version: info.version })}
+            {appDisplayName(info)} ·{' '}
+            {t('settings.about.version', { version: appDisplayVersion(info) })}
           </p>
           <p className="text-xs text-muted-foreground">
             {t('settings.about.platform', {
@@ -53,7 +56,7 @@ export function AboutSection(): React.JSX.Element {
         </div>
       ) : null}
 
-      <UpdatePanel open={open} />
+      <UpdatePanel open={open} isDev={info?.isDev ?? false} />
       <AutoCheck />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -99,7 +102,13 @@ function AutoCheck(): React.JSX.Element {
 }
 
 /** Check → Download (size) → Restart and update, each step an explicit click. */
-function UpdatePanel({ open }: { open: (url: string) => void }): React.JSX.Element {
+function UpdatePanel({
+  open,
+  isDev
+}: {
+  open: (url: string) => void
+  isDev: boolean
+}): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const status = useAppUpdateStatus().data
   const check = useCheckUpdate()
@@ -139,7 +148,9 @@ function UpdatePanel({ open }: { open: (url: string) => void }): React.JSX.Eleme
     >
       {state === 'unsupported' ? (
         <>
-          <p className="text-muted-foreground">{t('settings.about.unsupported')}</p>
+          <p className="text-muted-foreground">
+            {t(isDev ? 'settings.about.devBuild' : 'settings.about.unsupported')}
+          </p>
           {status?.fallbackUrl ? (
             <div>
               <Button onClick={() => open(status.fallbackUrl!)}>
