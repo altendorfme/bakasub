@@ -251,6 +251,14 @@ const openSingle = async (): Promise<void> => {
 const next = async (): Promise<void> =>
   userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
 
+const summary = (): HTMLElement => screen.getByRole('complementary', { name: 'Summary' })
+
+/** The summary's row labels, in order. */
+const summaryRows = (): string[] =>
+  within(summary())
+    .queryAllByRole('button')
+    .map((b) => b.firstElementChild?.textContent ?? '')
+
 describe('Translate a file', () => {
   it('subtitle: no track step, defaults prefilled, preflight review, confirm, live progress', async () => {
     const { fake, create, confirm } = setup('/subs/ep01.en.srt')
@@ -425,6 +433,60 @@ describe('Translate a file', () => {
     expect(create).not.toHaveBeenCalled()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Translate anyway' }))
     expect(create).toHaveBeenCalled()
+  })
+
+  it('subtitle: the summary grows with the reached steps and never shows a placeholder', async () => {
+    setup('/subs/ep01.en.srt')
+    await openSingle()
+    expect(within(summary()).getByText('Choose a file to get started.')).toBeTruthy()
+    expect(summaryRows()).toEqual([])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await screen.findAllByText('ep01.en.srt')
+    expect(summaryRows()).toEqual(['File'])
+    await next()
+
+    await screen.findByRole('heading', { name: 'How to translate' })
+    // No TMDB work: no "Media" row.
+    expect(summaryRows()).toEqual(['File', 'Preset', 'Model', 'Into'])
+    await next()
+
+    await screen.findByRole('heading', { name: 'Where to save' })
+    expect(summaryRows()).toEqual(['File', 'Preset', 'Model', 'Into', 'Output'])
+    expect(within(summary()).getByText('ep01.pt-BR.srt')).toBeTruthy()
+
+    // Back to the first step: the reached rows stay, and still link to their step.
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await screen.findByRole('heading', { name: 'Choose what to translate' })
+    expect(summaryRows()).toEqual(['File', 'Preset', 'Model', 'Into', 'Output'])
+    expect(within(summary()).queryByText('—')).toBeNull()
+    for (const b of within(summary()).getAllByRole('button'))
+      expect(b.getAttribute('aria-label')).not.toContain('—')
+    await userEvent.click(within(summary()).getByRole('button', { name: /^Output:/ }))
+    expect(await screen.findByRole('heading', { name: 'Where to save' })).toBeTruthy()
+  })
+
+  it('video: the track row comes with the track step, the media row with a TMDB work', async () => {
+    setup('/v/Show - 01.mkv', undefined, animeMedia)
+    await openSingle()
+    expect(summaryRows()).toEqual([])
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse files' }))
+    await screen.findAllByText('Show - 01.mkv')
+    expect(summaryRows()).toEqual(['File'])
+    await next()
+
+    await screen.findByRole('radiogroup')
+    expect(await within(summary()).findByText('English · ASS')).toBeTruthy()
+    expect(summaryRows()).toEqual(['File', 'Track'])
+    await next()
+
+    expect(await within(summary()).findByText('The Show')).toBeTruthy()
+    expect(summaryRows()).toEqual(['File', 'Track', 'Preset', 'Model', 'Into', 'Media'])
+    await next()
+
+    await screen.findByRole('heading', { name: 'Where to save' })
+    expect(summaryRows()).toEqual(['File', 'Track', 'Preset', 'Model', 'Into', 'Media', 'Output'])
   })
 
   it('reached steps can be revisited from the step bar without Continue', async () => {

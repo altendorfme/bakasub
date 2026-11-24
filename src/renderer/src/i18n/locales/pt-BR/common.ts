@@ -208,7 +208,7 @@ export const common: LocaleShape<typeof en> = {
       media: 'Mídia',
       mediaOff: 'Não incluída',
       output: 'Saída',
-      none: '—',
+      empty: 'Escolha um arquivo para começar.',
       edit: 'Editar {{step}}'
     },
     existing: {
@@ -456,7 +456,8 @@ export const common: LocaleShape<typeof en> = {
       nextToEach: 'Ao lado de cada arquivo',
       included: '{{count}} incluídos',
       includedOut: '{{count}} incluídos · {{out}} de fora',
-      none: '—'
+      none: '—',
+      empty: 'Escolha uma pasta ou arquivos para começar.'
     },
     start_one: 'Traduzir {{count}} arquivo',
     start_other: 'Traduzir {{count}} arquivos',
