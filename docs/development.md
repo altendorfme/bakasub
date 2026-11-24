@@ -10,6 +10,14 @@ npm run dev        # electron-vite with HMR
 
 Supported platforms: Linux x64 and Windows x64. mkvtoolnix is not required on your machine: install the sidecars from the app (onboarding or Settings → Video tools).
 
+## Dev data folder
+
+Unpackaged runs use their own permanent userData, **separate from the installed app**: `~/.config/bakasub-dev` on Linux, `%APPDATA%\bakasub-dev` on Windows (installed: `bakasub`). Database, logs, sidecars, cache and the single-instance lock are all separate, so dev and the installed app run side by side and dev migrations never reach the installed database. Full table in [`architecture.md`](./architecture.md#user-data).
+
+- Dev starts from an **empty database** and installs its own sidecars. Nothing is copied from the installed app.
+- Optional, manual: to start dev from your real data, close both apps and copy the database (`cp ~/.config/bakasub/bakasub.db* ~/.config/bakasub-dev/`). Secrets are encrypted with the OS keychain (`safeStorage`); if the copied vault cannot be decrypted, the app resets it (logged as `secret vault master key was unrecoverable`) and you re-enter the keys.
+- `BAKASUB_USER_DATA=/some/dir npm run dev` points any run (dev or packaged) at another folder: throwaway profiles, tests, scripts, a second dev instance.
+
 ## Scripts
 
 | Script                            | Purpose                                                      |

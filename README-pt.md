@@ -48,7 +48,15 @@ Progresso, custo e resultados ficam na **Fila**. O passo a passo completo está 
 ## Bom saber
 
 - **Custo e privacidade.** Você paga o OpenRouter diretamente pelo que traduz. O texto das legendas, suas notas e o glossário são enviados ao OpenRouter; o nome do arquivo vai ao TMDB se você adicionar uma chave. Nada é enviado sem você iniciar um job, e nada vai para o autor. Detalhes no [guia do usuário](./docs/user-guide.md#privacy-what-leaves-your-computer).
-- **Seus dados** ficam em `~/.config/bakasub` (Linux) ou `%APPDATA%\bakasub` (Windows). Atualizar ou desinstalar o app não os apaga.
+- **Seus dados** ficam na pasta de dados do usuário. Atualizar ou desinstalar o app não os apaga. Builds de desenvolvimento (`npm run dev`) usam uma pasta separada e nunca tocam nos dados do app instalado:
+
+  |         | Instalado           | Desenvolvimento         |
+  | ------- | ------------------- | ----------------------- |
+  | Linux   | `~/.config/bakasub` | `~/.config/bakasub-dev` |
+  | Windows | `%APPDATA%\bakasub` | `%APPDATA%\bakasub-dev` |
+
+  Banco, logs, ferramentas baixadas e cache ficam todos dentro dela. `BAKASUB_USER_DATA=<dir>` sobrescreve a pasta (testes, scripts). Detalhes em [Development](./docs/development.md#dev-data-folder) (em inglês).
+
 - **Não suportado**: legendas em imagem (PGS, VobSub, DVB) e macOS.
 - **Limitações conhecidas**: não há tela geral do lote depois de sair da página que o criou (os jobs aparecem um a um na Fila); não há override manual de encoding, então um arquivo mal detectado deve ser salvo de novo como UTF-8.
 

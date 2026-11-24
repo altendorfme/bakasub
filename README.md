@@ -48,7 +48,15 @@ Progress, cost and results are in the **Queue**. A full walkthrough is in the [u
 ## Good to know
 
 - **Cost and privacy.** You pay OpenRouter directly for what you translate. The subtitle text, your notes and the glossary are sent to OpenRouter; the file name is sent to TMDB if you add a key. Nothing is sent without you starting a job, and nothing goes to the author. Details in the [user guide](./docs/user-guide.md#privacy-what-leaves-your-computer).
-- **Your data** stays in `~/.config/bakasub` (Linux) or `%APPDATA%\bakasub` (Windows). Updating or uninstalling the app does not delete it.
+- **Your data** stays in your user data folder. Updating or uninstalling the app does not delete it. Development builds (`npm run dev`) use a separate folder, so they never touch the installed app's data:
+
+  |         | Installed           | Development             |
+  | ------- | ------------------- | ----------------------- |
+  | Linux   | `~/.config/bakasub` | `~/.config/bakasub-dev` |
+  | Windows | `%APPDATA%\bakasub` | `%APPDATA%\bakasub-dev` |
+
+  Database, logs, downloaded tools and cache are all inside it. `BAKASUB_USER_DATA=<dir>` overrides the folder (tests, scripts). Details in [Development](./docs/development.md#dev-data-folder).
+
 - **Not supported**: image-based subtitles (PGS, VobSub, DVB) and macOS.
 - **Known limitations**: no overview screen for a batch after you leave its page (its jobs show one by one in the Queue); no manual encoding override, so a badly detected file should be re-saved as UTF-8.
 

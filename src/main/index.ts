@@ -1,3 +1,5 @@
+// Must stay first: points userData at the right folder before anything reads it.
+import './bootstrap/user-data'
 import { app, BrowserWindow, dialog, protocol, safeStorage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { initLogger, logFile, logger, redactor, setLogLevel } from './logging/logger'
