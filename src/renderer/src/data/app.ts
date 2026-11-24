@@ -14,6 +14,14 @@ import { qk } from './query-keys'
 export const useAppInfo = (): UseQueryResult<AppInfo> =>
   useQuery({ queryKey: qk.app.info(), queryFn: () => unwrap(window.api.app.getInfo()) })
 
+/** `BakaSub (dev)` for an unpackaged build, so it never passes for the installed app. */
+export const appDisplayName = (info: Pick<AppInfo, 'name' | 'isDev'>): string =>
+  info.isDev ? `${info.name} (dev)` : info.name
+
+/** `0.4.0-dev` for an unpackaged build; the installed version is shown as is. */
+export const appDisplayVersion = (info: Pick<AppInfo, 'version' | 'isDev'>): string =>
+  info.isDev ? `${info.version}-dev` : info.version
+
 /**
  * Snapshot of the updater (no network). It is read once on mount; every later change arrives as
  * the `app:update-state` event, which patches this cache (see `useAppUpdateEvents`): no polling.

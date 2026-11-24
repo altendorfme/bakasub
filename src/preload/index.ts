@@ -33,7 +33,8 @@ const api: BakaSubApi = {
     downloadUpdate: () => invoke('app:download-update'),
     cancelUpdateDownload: () => invoke('app:cancel-update-download'),
     installUpdate: (opts) => invoke('app:install-update', opts ?? {}),
-    openExternal: (url) => invoke('app:open-external', { url })
+    openExternal: (url) => invoke('app:open-external', { url }),
+    onboardingFinished: () => invoke('app:onboarding-finished')
   },
   sidecars: {
     check: () => invoke('sidecars:check'),

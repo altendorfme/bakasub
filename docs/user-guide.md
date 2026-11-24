@@ -102,7 +102,7 @@ Translated lines are saved locally, so reprocessing a file (or another file with
 
 ## Where files are stored
 
-Settings, cache, logs and downloaded tools live in your user data folder (Linux: `~/.config/bakasub`, Windows: `%APPDATA%\bakasub`). Uninstalling or updating the app does not delete it. Output files go where you chose in the Output step.
+Settings, cache, logs and downloaded tools live in your user data folder (Linux: `~/.config/bakasub`, Windows: `%APPDATA%\bakasub`). Uninstalling or updating the app does not delete it. Settings → About shows the exact path. Development builds use a separate `bakasub-dev` folder (see [`development.md`](./development.md#dev-data-folder)). Output files go where you chose in the Output step.
 
 ## Troubleshooting
 

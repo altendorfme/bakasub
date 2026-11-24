@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AppUpdater,
   scheduleAutoCheck,
@@ -282,17 +282,99 @@ describe('AppUpdater', () => {
 })
 
 describe('scheduleAutoCheck', () => {
-  it('checks once after the delay when enabled', async () => {
+  const log = (): { warn: ReturnType<typeof vi.fn<(...a: unknown[]) => void>> } => ({
+    warn: vi.fn<(...a: unknown[]) => void>()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('already onboarded: checks once after the boot delay', async () => {
     vi.useFakeTimers()
     const check = vi.fn().mockResolvedValue({})
+    const h = scheduleAutoCheck(
+      { check },
+      { enabled: async () => true, onboarded: async () => true, delayMs: 100, log: log() }
+    )
+    await vi.advanceTimersByTimeAsync(99)
+    expect(check).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(check).toHaveBeenCalledTimes(1)
+    // A late wizard signal never adds a second check.
+    h.onboardingFinished()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(check).toHaveBeenCalledTimes(1)
+  })
+
+  it('not onboarded: never checks while the wizard is open', async () => {
+    vi.useFakeTimers()
+    const check = vi.fn()
+    let onboarded = false
     scheduleAutoCheck(
       { check },
-      { enabled: async () => true, delayMs: 100, log: { warn: vi.fn() } }
+      { enabled: async () => true, onboarded: async () => onboarded, delayMs: 100, log: log() }
     )
+    await vi.advanceTimersByTimeAsync(1_000)
+    // The required steps become true mid-wizard: still nothing until the wizard finishes.
+    onboarded = true
+    await vi.advanceTimersByTimeAsync(1_000)
     expect(check).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(100)
+  })
+
+  it('onboarded later in the session: checks once after the wizard finishes', async () => {
+    vi.useFakeTimers()
+    const check = vi.fn().mockResolvedValue({})
+    let onboarded = false
+    const h = scheduleAutoCheck(
+      { check },
+      { enabled: async () => true, onboarded: async () => onboarded, delayMs: 100, log: log() }
+    )
+    await vi.advanceTimersByTimeAsync(1_000)
+    onboarded = true
+    h.onboardingFinished()
+    h.onboardingFinished()
+    await vi.advanceTimersByTimeAsync(99)
+    expect(check).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
     expect(check).toHaveBeenCalledTimes(1)
-    vi.useRealTimers()
+    h.onboardingFinished()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(check).toHaveBeenCalledTimes(1)
+  })
+
+  it('a finish signal is ignored while the shared rule still fails', async () => {
+    vi.useFakeTimers()
+    const check = vi.fn()
+    const h = scheduleAutoCheck(
+      { check },
+      { enabled: async () => true, onboarded: async () => false, delayMs: 100, log: log() }
+    )
+    h.onboardingFinished()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('a finish signal during the boot evaluation is not lost', async () => {
+    vi.useFakeTimers()
+    const check = vi.fn().mockResolvedValue({})
+    // Boot reads the old state (false); the wizard finishes before that read resolves.
+    const reads = [false, true]
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const onboarded = vi.fn(async () => {
+      const v = reads.shift() ?? true
+      if (!v) await gate
+      return v
+    })
+    const h = scheduleAutoCheck(
+      { check },
+      { enabled: async () => true, onboarded, delayMs: 100, log: log() }
+    )
+    h.onboardingFinished()
+    release()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(onboarded).toHaveBeenCalledTimes(2)
+    expect(check).toHaveBeenCalledTimes(1)
   })
 
   it('does nothing when the setting is off', async () => {
@@ -300,23 +382,41 @@ describe('scheduleAutoCheck', () => {
     const check = vi.fn()
     scheduleAutoCheck(
       { check },
-      { enabled: async () => false, delayMs: 100, log: { warn: vi.fn() } }
+      { enabled: async () => false, onboarded: async () => true, delayMs: 100, log: log() }
     )
     await vi.advanceTimersByTimeAsync(100)
     expect(check).not.toHaveBeenCalled()
-    vi.useRealTimers()
+  })
+
+  it('an onboarding read failure defers instead of checking', async () => {
+    vi.useFakeTimers()
+    const check = vi.fn()
+    const l = log()
+    scheduleAutoCheck(
+      { check },
+      {
+        enabled: async () => true,
+        onboarded: () => Promise.reject(new Error('db')),
+        delayMs: 100,
+        log: l
+      }
+    )
+    await vi.advanceTimersByTimeAsync(500)
+    expect(check).not.toHaveBeenCalled()
+    expect(l.warn).toHaveBeenCalled()
   })
 
   it('can be cancelled', async () => {
     vi.useFakeTimers()
     const check = vi.fn()
-    const cancel = scheduleAutoCheck(
+    const h = scheduleAutoCheck(
       { check },
-      { enabled: async () => true, delayMs: 100, log: { warn: vi.fn() } }
+      { enabled: async () => true, onboarded: async () => true, delayMs: 100, log: log() }
     )
-    cancel()
+    await vi.advanceTimersByTimeAsync(0)
+    h.cancel()
+    h.onboardingFinished()
     await vi.advanceTimersByTimeAsync(200)
     expect(check).not.toHaveBeenCalled()
-    vi.useRealTimers()
   })
 })

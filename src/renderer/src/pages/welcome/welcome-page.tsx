@@ -78,8 +78,11 @@ export function WelcomePage(): React.JSX.Element {
   const allRequired = STEPS.every((st) => !st.required || isDone(st.id, key, settings, toolsReady))
 
   const next = (): void => {
-    if (last) void navigate({ to: '/translate' })
-    else setIndex(index + 1)
+    if (last) {
+      // Releases the session's auto update check, held while the wizard is open. Best effort.
+      void window.api.app.onboardingFinished().catch(() => undefined)
+      void navigate({ to: '/translate' })
+    } else setIndex(index + 1)
   }
 
   return (

@@ -6,6 +6,7 @@ export class AppInfoService {
     return {
       name: app.getName(),
       version: app.getVersion(),
+      isDev: !app.isPackaged,
       platform: process.platform,
       arch: process.arch,
       electron: process.versions.electron,

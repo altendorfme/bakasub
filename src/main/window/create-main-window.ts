@@ -1,6 +1,7 @@
-import { BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
+import { windowTitle } from '../config/app-identity'
 // PNG: Electron's nativeImage does not read SVG. Source: resources/icon.svg (npm run icons).
 import icon from '../../../resources/icon.png?asset'
 
@@ -8,6 +9,7 @@ export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1100,
     height: 720,
+    title: windowTitle(app.getName(), app.isPackaged),
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -22,6 +24,11 @@ export function createMainWindow(): BrowserWindow {
   })
 
   win.on('ready-to-show', () => win.show())
+  // The renderer's <title> would overwrite the BrowserWindow title: keep the dev suffix on it.
+  win.on('page-title-updated', (event, title) => {
+    event.preventDefault()
+    win.setTitle(windowTitle(title, app.isPackaged))
+  })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)

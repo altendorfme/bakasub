@@ -4,11 +4,12 @@ import { AppError } from '../../errors'
 import { isAllowedExternalUrl } from '../../services/external-links'
 import { createHandler } from '../create-handler'
 import type { AppInfoService } from '../../services/app-info.service'
-import type { AppUpdater } from '../../services/app-updater'
+import type { AppUpdater, AutoCheckHandle } from '../../services/app-updater'
 
 export function registerAppHandlers(deps: {
   appInfo: AppInfoService
   appUpdate: AppUpdater
+  autoCheck: Pick<AutoCheckHandle, 'onboardingFinished'>
 }): void {
   createHandler('app:get-info', { handle: () => deps.appInfo.get() })
   createHandler('app:check-update', { handle: () => deps.appUpdate.check() })
@@ -18,6 +19,12 @@ export function registerAppHandlers(deps: {
   createHandler('app:install-update', {
     input: z.object({ confirmJobs: z.boolean().optional() }).strict(),
     handle: (opts) => deps.appUpdate.install(opts)
+  })
+  createHandler('app:onboarding-finished', {
+    handle: () => {
+      deps.autoCheck.onboardingFinished()
+      return { acknowledged: true as const }
+    }
   })
   createHandler('app:open-external', {
     input: z.object({ url: z.string().max(2048) }),

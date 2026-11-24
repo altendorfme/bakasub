@@ -66,14 +66,34 @@ docs/              detailed system flows
 
 ## User data
 
-Everything lives in `app.getPath('userData')` (Linux: `~/.config/bakasub`, Windows: `%APPDATA%\bakasub`), never in the install directory:
+Everything lives in `app.getPath('userData')`, never in the install directory:
 
 ```
 bakasub.db            SQLite (WAL)
 logs/main.log         JSON lines, rotates at 5 MB (5 files kept)
 cache/manifests/      last valid remote manifest (offline fallback)
-bin/                  sidecars
+cache/artwork/        TMDB artwork (LRU, 200 MB)
+cache/jobs/<id>/      per-job work directory
+bin/                  sidecars (+ installed.json)
 ```
+
+The folder depends on how the app runs. `src/main/bootstrap/user-data.ts` is the **first import** of `src/main/index.ts` and calls `app.setPath('userData', …)` before the logger, the single-instance lock, the database or any `app.getPath('userData')`; the rule itself is the pure `resolveUserDataDir` (`src/main/config/user-data-dir.ts`, unit-tested):
+
+1. `BAKASUB_USER_DATA` set (non-empty): that directory, packaged or not (relative paths resolve from the working directory).
+2. Unpackaged (`!app.isPackaged`, i.e. `electron-vite dev` or `electron .`): `<appData>/bakasub-dev`.
+3. Installed: Electron's default, `<appData>/bakasub`.
+
+|                      | Installed app                                  | Development (`npm run dev`) |
+| -------------------- | ---------------------------------------------- | --------------------------- |
+| userData (Linux)     | `~/.config/bakasub`                            | `~/.config/bakasub-dev`     |
+| userData (Windows)   | `%APPDATA%\bakasub`                            | `%APPDATA%\bakasub-dev`     |
+| Database             | `<userData>/bakasub.db` (+ `-wal`, `-shm`)     | same, in the dev folder     |
+| Logs                 | `<userData>/logs/main.log`                     | same, in the dev folder     |
+| Sidecars             | `<userData>/bin/` (`installed.json`)           | same, in the dev folder     |
+| Cache                | `<userData>/cache/` (manifests, artwork, jobs) | same, in the dev folder     |
+| Single-instance lock | keyed on `bakasub`                             | keyed on `bakasub-dev`      |
+
+So a dev build and the installed app can run at the same time without sharing the lock, the WAL database, logs, sidecars or cache, and a new migration applied in dev never touches the installed database. Settings → About shows the real `userDataPath`.
 
 ## Sidecars in short
 

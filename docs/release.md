@@ -39,7 +39,7 @@ Artifacts: `bakasub-<v>.AppImage`, `bakasub-<v>-linux-x64-unpacked.tar.gz`, `bak
 
 `electron-builder.yml` has a `publish` block (GitHub, `lsilvatti/bakasub`), which makes electron-builder embed `app-update.yml` in the build and generate `latest.yml`/`latest-linux.yml` (sha512 of the installer + blockmap for differential downloads). CI keeps `--publish never` and attaches those files to the release itself.
 
-Flow: tag `vX.Y.Z` → CI creates a **draft** → review → **publish the draft by hand**. Publishing is the "go" of the update: the updater only sees published, non-pre-release releases (`allowPrerelease = false`), so a draft never reaches users. The Main only checks (silently once, `AUTO_CHECK_DELAY_MS` = 3 s after the window is created, unless `updates.autoCheck` is off, or on demand; a new version opens the renderer's update dialog); it downloads on `app:download-update` and restarts on `app:install-update`. See the contract in [`ipc.md`](./ipc.md).
+Flow: tag `vX.Y.Z` → CI creates a **draft** → review → **publish the draft by hand**. Publishing is the "go" of the update: the updater only sees published, non-pre-release releases (`allowPrerelease = false`), so a draft never reaches users. The Main only checks (silently once, `AUTO_CHECK_DELAY_MS` = 3 s after boot, or after the welcome wizard finishes on a first run, unless `updates.autoCheck` is off, or on demand; a new version opens the renderer's update dialog); it downloads on `app:download-update` and restarts on `app:install-update`. See the contract in [`ipc.md`](./ipc.md).
 
 Limitations:
 

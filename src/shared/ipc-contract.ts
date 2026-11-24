@@ -5,7 +5,10 @@
 
 export interface AppInfo {
   name: string
+  /** Raw `app.getVersion()` (semver); format it for display with `isDev`. */
   version: string
+  /** Unpackaged build (`electron-vite dev`): own userData, AppUserModelId and no auto-update. */
+  isDev: boolean
   platform: NodeJS.Platform
   arch: string
   electron: string
@@ -1021,6 +1024,11 @@ export interface IpcInvokeContract {
   'app:install-update': { req: { confirmJobs?: boolean }; res: { installing: true } }
   /** Só HTTPS para hosts da allowlist do Main (TMDB, OpenRouter, GitHub, Buy Me a Coffee); senão `URL_NOT_ALLOWED`. */
   'app:open-external': { req: { url: string }; res: { opened: true } }
+  /**
+   * O wizard de boas-vindas terminou ("Concluir"): libera a checagem automática de update da
+   * sessão (se `updates.autoCheck` e a regra de onboarding valerem). Idempotente.
+   */
+  'app:onboarding-finished': { req: void; res: { acknowledged: true } }
   'sidecars:check': { req: void; res: SidecarReport }
   /** O Main exibe diálogo nativo de consentimento; sem aceite, nada é baixado. */
   'sidecars:install': { req: { tools: string[] }; res: SidecarInstallResult }
@@ -1161,6 +1169,7 @@ export const INVOKE_CHANNELS = [
   'app:cancel-update-download',
   'app:install-update',
   'app:open-external',
+  'app:onboarding-finished',
   'sidecars:check',
   'sidecars:install',
   'sidecars:cancel',
@@ -1235,6 +1244,7 @@ export interface BakaSubApi {
     cancelUpdateDownload(): Promise<IpcResult<{ cancelled: boolean }>>
     installUpdate(opts?: { confirmJobs?: boolean }): Promise<IpcResult<{ installing: true }>>
     openExternal(url: string): Promise<IpcResult<{ opened: true }>>
+    onboardingFinished(): Promise<IpcResult<{ acknowledged: true }>>
   }
   sidecars: {
     check(): Promise<IpcResult<SidecarReport>>

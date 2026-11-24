@@ -2,7 +2,12 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { Job } from '@shared/ipc-contract'
 import { jobCounts, useJobs } from '@renderer/data/jobs'
-import { updatePending, useAppInfo, useAppUpdateStatus } from '@renderer/data/app'
+import {
+  appDisplayVersion,
+  updatePending,
+  useAppInfo,
+  useAppUpdateStatus
+} from '@renderer/data/app'
 import { useApiKeyStatus, useTmdbKeyStatus } from '@renderer/data/settings'
 import { useSidecarReport } from '@renderer/data/sidecars'
 import { cooldownUntil, sessionCost } from '@renderer/data/jobs'
@@ -120,7 +125,7 @@ export function StatusBar(): React.JSX.Element {
       </Link>
       {info.data ? (
         <Link to="/settings" search={{ tab: 'about' }} className="hover:text-foreground">
-          {t('status.version', { version: info.data.version })}
+          {t('status.version', { version: appDisplayVersion(info.data) })}
           {updatePending(update.data) ? (
             <span className="ml-1 text-primary">{t('status.update')}</span>
           ) : null}

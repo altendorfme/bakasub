@@ -6,6 +6,7 @@ import {
   type UseQueryResult
 } from '@tanstack/react-query'
 import type { ApiKeyStatus, PublicSettings, TmdbKeyStatus } from '@shared/ipc-contract'
+import { isOnboarded as onboardingRule } from '@shared/onboarding'
 import { unwrap } from '@renderer/lib/ipc'
 import { qk } from './query-keys'
 
@@ -21,12 +22,16 @@ export const apiKeyStatusQuery = {
 
 export const useSettings = (): UseQueryResult<PublicSettings> => useQuery(settingsQuery)
 
-/** What the app needs before translating: a key, a default model and a default language. */
+/** What the app needs before translating (rule shared with the Main's auto update gate). */
 export const isOnboarded = (
   key: ApiKeyStatus | undefined,
   s: PublicSettings | undefined
 ): boolean =>
-  !!key?.present && !!s?.['translation.defaultModel'] && !!s['translation.defaultTargetLang']
+  onboardingRule({
+    apiKeyPresent: !!key?.present,
+    defaultModel: s?.['translation.defaultModel'],
+    defaultTargetLang: s?.['translation.defaultTargetLang']
+  })
 
 /** The Main answers with the full snapshot (rules applied): it replaces the cache as is. */
 export function useUpdateSettings(): UseMutationResult<

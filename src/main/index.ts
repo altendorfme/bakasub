@@ -1,3 +1,5 @@
+// Must stay first: points userData at the right folder before anything reads it.
+import './bootstrap/user-data'
 import { app, BrowserWindow, dialog, protocol, safeStorage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { initLogger, logFile, logger, redactor, setLogLevel } from './logging/logger'
@@ -13,8 +15,10 @@ import { join } from 'node:path'
 import { emitToRenderers } from './ipc/events'
 import { registerIpc } from './ipc/register'
 import { paths } from './config/paths'
+import { appUserModelId } from './config/app-identity'
 import { createSidecarModule } from './sidecars/create-sidecar-manager'
 import { scheduleAutoCheck } from './services/app-updater'
+import { isOnboarded } from '../shared/onboarding'
 import { createAppUpdater } from './services/create-app-updater'
 import { NativeConsentGate } from './services/sidecar-consent'
 import { consentLanguage } from './services/sidecar-consent-text'
@@ -40,7 +44,7 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(async () => {
-      electronApp.setAppUserModelId('com.bakasub.app')
+      electronApp.setAppUserModelId(appUserModelId(app.isPackaged))
       app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
       let mainWindow: BrowserWindow | null = null
       const openMainWindow = (): BrowserWindow => (mainWindow = createMainWindow())
@@ -132,9 +136,21 @@ if (!app.requestSingleInstanceLock()) {
         hasActiveJobs: () => jobModule.jobs.isBusy(),
         onStatus: (status) => notifier.onUpdateStatus(status)
       })
+      // Avaliado já no boot: no primeiro uso o wizard abre e nada é consultado até ele terminar.
+      const autoCheck = scheduleAutoCheck(appUpdate, {
+        enabled: () => jobModule.settings.get('updates.autoCheck'),
+        onboarded: async () =>
+          isOnboarded({
+            apiKeyPresent: await vault.has('openrouter.apiKey'),
+            defaultModel: await jobModule.settings.get('translation.defaultModel'),
+            defaultTargetLang: await jobModule.settings.get('translation.defaultTargetLang')
+          }),
+        log: logger.app
+      })
       registerIpc({
         appInfo: new AppInfoService(),
         appUpdate,
+        autoCheck,
         sidecars: sidecarModule.manager,
         memory,
         vault,
@@ -150,10 +166,6 @@ if (!app.requestSingleInstanceLock()) {
         mediaContext: mediaContext.service
       })
       openMainWindow()
-      scheduleAutoCheck(appUpdate, {
-        enabled: () => jobModule.settings.get('updates.autoCheck'),
-        log: logger.app
-      })
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) openMainWindow()
