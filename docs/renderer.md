@@ -44,7 +44,7 @@ i18next with **English as the default and source language**. Namespaces: `common
 
 ## Onboarding
 
-Route `/welcome`, outside the shell (no sidebar). The shell layout route (`id: 'shell'`) has a `beforeLoad` guard: while the API key, the default model or the default target language is missing (`isOnboarded`), every page redirects there. The guard uses `ensureQueryData` with the same query options as the hooks (`settingsQuery`, `apiKeyStatusQuery`); an IPC failure lets the user in rather than locking the app.
+Route `/welcome`, outside the shell (no sidebar). The shell layout route (`id: 'shell'`) has a `beforeLoad` guard: while the API key, the default model or the default target language is missing (`isOnboarded`), every page redirects there. The rule lives in `src/shared/onboarding.ts` (shared with the Main's auto update gate); "Finish" calls `app.onboardingFinished()` so the Main may run the session's automatic update check, held while the wizard is open. The guard uses `ensureQueryData` with the same query options as the hooks (`settingsQuery`, `apiKeyStatusQuery`); an IPC failure lets the user in rather than locking the app.
 
 Steps, saved as they go (no "submit at the end"): OpenRouter key (`KeyForm`, checked by the Main in `GET /key` before saving: `LLM_AUTH` / `NETWORK`), models (`ModelPicker`), languages (`LanguagePicker`), video tools (sidecar install, optional), TMDB key (optional). The page opens at the first required step that is not done; later required steps unlock in order. "Start translating" goes to `/translate`.
 

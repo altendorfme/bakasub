@@ -49,6 +49,7 @@ const catalog: ModelList = {
 function setup(initial: { key: boolean; settings: PublicSettings }): {
   setApiKey: ReturnType<typeof vi.fn>
   update: ReturnType<typeof vi.fn>
+  onboardingFinished: ReturnType<typeof vi.fn>
   router: ReturnType<typeof createAppRouter>
 } {
   let key: ApiKeyStatus = { present: initial.key, protection: 'os' }
@@ -62,7 +63,9 @@ function setup(initial: { key: boolean; settings: PublicSettings }): {
     settings = { ...settings, ...patch }
     return { ok: true as const, data: settings }
   })
+  const onboardingFinished = vi.fn(() => ok({ acknowledged: true as const }))
   installFakeApi({
+    app: { onboardingFinished },
     jobs: { list: () => ok([]) },
     sidecars: {
       check: () =>
@@ -90,7 +93,7 @@ function setup(initial: { key: boolean; settings: PublicSettings }): {
     history: createMemoryHistory({ initialEntries: ['/translate'] })
   })
   render(<App queryClient={queryClient} router={router} />)
-  return { setApiKey, update, router }
+  return { setApiKey, update, onboardingFinished, router }
 }
 
 afterEach(async () => {
@@ -140,7 +143,7 @@ describe('Onboarding', () => {
   })
 
   it('finishing goes to Translate once the required steps are done', async () => {
-    const { router } = setup({
+    const { router, onboardingFinished } = setup({
       key: true,
       settings: {
         ...fresh,
@@ -156,7 +159,10 @@ describe('Onboarding', () => {
     await userEvent.click(within(list).getByText('Brazilian Portuguese'))
     await userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
+    // Required steps done, optional ones still open: the update check stays held.
+    expect(onboardingFinished).not.toHaveBeenCalled()
     await userEvent.click(await screen.findByRole('button', { name: 'Start translating' }))
+    expect(onboardingFinished).toHaveBeenCalledOnce()
     expect(await screen.findByRole('button', { name: 'Select several files' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/translate')
   })
